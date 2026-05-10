@@ -665,22 +665,20 @@ async function writeToExcel(child, date, att) {
     const fileName = encodeURIComponent(`${child.name} - Invoice - 2026-2027.xlsx`);
     const folderPath = '2026-2027 INVOICES';
     const tab = MONTH_TABS[date.getMonth()+1];
-    const dayRow = date.getDate() + 4; // Row offset — date 1 = row 5 in template
+    const dayRow = date.getDate() + 8; // Row offset — date 1 = row 9
 
-    // Find attendance column (col H = index 7 in template = early/late)
-    // Col E = attendance Y/N, Col J = early drop off/late collection
     const earlyBlocks = att.earlyMins > 0 ? blk(att.earlyMins) : 0;
     const lateBlocks  = att.lateMins  > 0 ? blk(att.lateMins)  : 0;
     const totalBlocks = earlyBlocks + lateBlocks;
 
     const updates = [];
-    // Mark attendance Y
+    // Col D = Attendance Y/N
     if (att.signInTime) {
-      updates.push({ address: `${tab}!E${dayRow}`, values: [['Y']] });
+      updates.push({ address: `${tab}!D${dayRow}`, values: [['Y']] });
     }
-    // Write early/late blocks
+    // Col M = Early drop off / late collection blocks
     if (totalBlocks > 0) {
-      updates.push({ address: `${tab}!J${dayRow}`, values: [[totalBlocks]] });
+      updates.push({ address: `${tab}!M${dayRow}`, values: [[totalBlocks]] });
     }
 
     for (const upd of updates) {
