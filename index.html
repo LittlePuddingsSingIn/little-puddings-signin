@@ -662,7 +662,13 @@ function updateODBadge() {
 async function writeToExcel(child, date, att) {
   if (!odConnected || !odAccessToken) return;
   try {
-    const fileName = encodeURIComponent(`${child.name} - Invoice - 2026-2027.xlsx`);
+    const fullName = child.surname ? `${child.name} ${child.surname}` : child.name;
+    // Handle special filename formats from the actual workbooks
+    let fileNameStr = `${fullName} - Invoice - 2026-2027.xlsx`;
+    if (child.id === 'theat') fileNameStr = 'Thea Topliss Invoice - 2026-2027.xlsx';
+    if (child.id === 'oliver') fileNameStr = 'Oliver Booker- Invoice - 2026-2027.xlsx';
+    if (child.id === 'rory') fileNameStr = 'Rory Dickins- Invoice - 2026-2027.xlsx';
+    const fileName = encodeURIComponent(fileNameStr);
     const folderPath = '2026-2027 INVOICES';
     const tab = MONTH_TABS[date.getMonth()+1];
     const dayRow = date.getDate() + 8; // Row offset — date 1 = row 9
@@ -682,12 +688,21 @@ async function writeToExcel(child, date, att) {
     }
 
     for (const upd of updates) {
-      const url = `https://graph.microsoft.com/v1.0/me/drive/root:/${folderPath}/${fileName}:/workbook/worksheets('${tab}')/range(address='${upd.address}')`;
-      await fetch(url, {
+      const parts = upd.address.split('!');
+      const sheetName = parts[0];
+      const cellRef = parts[1];
+      const url = `https://graph.microsoft.com/v1.0/me/drive/root:/${folderPath}/${fileName}:/workbook/worksheets('${sheetName}')/range(address='${cellRef}')`;
+      const response = await fetch(url, {
         method: 'PATCH',
         headers: { 'Authorization': `Bearer ${odAccessToken}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ values: upd.values })
       });
+      if (!response.ok) {
+        const err = await response.text();
+        console.error('Graph write error:', response.status, err);
+      } else {
+        console.log('✓ Written to Excel:', upd.address);
+      }
     }
 
     // Save full register entry to master log
@@ -746,36 +761,37 @@ const EMOJIS = ['🌱','🌿','🌸','🌺','🌻','🌼','🍃','🍂','🌊','
 // DATA — children stored as mutable array so admin can add/edit
 // ════════════════════════════════════════════════
 let CHILDREN = [
-  {id:'mia',      name:'Mia',         emoji:'🌸',type:'ey',  ao:1,  color:AC[0], pin:'1001',days:[1,3],      cs:'07:30',ce:'17:30',billing:'funded',    ay:false,hb:null,      notes:'9mth funding',                              startDate:'2025-09-01',endDate:null,archived:false},
-  {id:'luke',     name:'Luke',        emoji:'🌊',type:'ey',  ao:2,  color:AC[1], pin:'1002',days:[1,2,3,4],  cs:'07:30',ce:'17:30',billing:'wraparound',ay:false,hb:null,      notes:'9mth funding 7.5hrs/day',                   startDate:'2025-09-01',endDate:null,archived:false},
-  {id:'oliver',   name:'Oliver',      emoji:'🦔',type:'ey',  ao:3,  color:AC[2], pin:'1003',days:[2,3],      cs:'08:00',ce:'17:30',billing:'fullday',   ay:true, hb:'fullday', notes:'Under 2, full day, 9mth funding from Sep 26',startDate:'2026-05-18',endDate:null,archived:false},
-  {id:'sama',     name:'Sama',        emoji:'🌺',type:'ey',  ao:4,  color:AC[3], pin:'1004',days:[1,2,3,4],  cs:'08:00',ce:'16:00',billing:'wraparound',ay:false,hb:null,      notes:'9mth funding',                              startDate:'2025-09-01',endDate:null,archived:false},
-  {id:'holly',    name:'Holly',       emoji:'🍃',type:'ey',  ao:5,  color:AC[4], pin:'1005',days:[1,2,3,4,5],cs:'08:30',ce:'17:30',billing:'wraparound',ay:true, hb:'fullday', notes:'2yr funding + wrap',                        startDate:'2025-09-01',endDate:null,archived:false},
-  {id:'arlo',     name:'Arlo',        emoji:'🌱',type:'ey',  ao:6,  color:AC[5], pin:'1006',days:[1,2,4],    cs:'08:00',ce:'16:30',billing:'funded',    ay:false,hb:null,      notes:'2yr funding only',                          startDate:'2025-09-01',endDate:null,archived:false},
-  {id:'aureliusz',name:'Aureliusz',   emoji:'🌻',type:'ey',  ao:7,  color:AC[6], pin:'1007',days:[4,5],      cs:'08:30',ce:'16:00',billing:'funded',    ay:false,hb:null,      notes:'2yr funding only',                          startDate:'2025-09-01',endDate:null,archived:false},
-  {id:'james',    name:'James',       emoji:'🐸',type:'ey',  ao:8,  color:AC[7], pin:'1008',days:[1,3],      cs:'07:30',ce:'17:30',billing:'funded',    ay:false,hb:null,      notes:'2yr funding only',                          startDate:'2025-09-01',endDate:null,archived:false},
-  {id:'frankie',  name:'Frankie',     emoji:'🚂',type:'ey',  ao:9,  color:AC[8], pin:'1009',days:[1,2,3,4,5],cs:'08:00',ce:'17:00',billing:'wraparound',ay:true, hb:'fullday', notes:'Wrap around now, funded only from June term',startDate:'2025-09-01',endDate:null,archived:false},
-  {id:'frederick',name:'Frederick',   emoji:'🐛',type:'ey',  ao:10, color:AC[9], pin:'1010',days:[3,4],      cs:'08:00',ce:'17:00',billing:'wraparound',ay:true, hb:'fullday', notes:'2yr funding + wrap',                        startDate:'2025-09-01',endDate:null,archived:false},
-  {id:'jean',     name:'Jean',        emoji:'🌿',type:'ey',  ao:11, color:AC[10],pin:'1011',days:[1,2,3,4,5],cs:'08:30',ce:'16:30',billing:'wraparound',ay:true, hb:'fullday', notes:'3yr 15hrs funding',                          startDate:'2025-09-01',endDate:null,archived:false},
-  {id:'joshua',   name:'Joshua',      emoji:'🐝',type:'ey',  ao:12, color:AC[0], pin:'1012',days:[4,5],      cs:'08:30',ce:'17:30',billing:'wraparound',ay:false,hb:null,      notes:'3yr funding 3.15hrs',                        startDate:'2025-09-01',endDate:null,archived:false},
-  {id:'margaret', name:'Margaret',    emoji:'🌼',type:'ey',  ao:13, color:AC[1], pin:'1013',days:[1,2,3,4,5],cs:'08:10',ce:'14:20',billing:'wraparound',ay:true, hb:'halfday', notes:'3yr funding',                               startDate:'2025-09-01',endDate:null,archived:false},
-  {id:'ashraf',   name:'Ashraf',      emoji:'🌍',type:'ey',  ao:14, color:AC[2], pin:'1014',days:[1,2],      cs:'08:30',ce:'14:30',billing:'halfday',   ay:true, hb:'halfday', notes:'Half day fee',                               startDate:'2025-09-01',endDate:null,archived:false},
-  {id:'diora',    name:'Diora',       emoji:'🦚',type:'ey',  ao:15, color:AC[3], pin:'1015',days:[1,2,3,4],  cs:'07:30',ce:'17:00',billing:'fullday',   ay:true, hb:'fullday', notes:'4yr funding, all year round',               startDate:'2025-09-01',endDate:null,archived:false},
-  {id:'rory',     name:'Rory',        emoji:'🦊',type:'ey',  ao:16, color:AC[4], pin:'1016',days:[2,3,4,5],  cs:'07:45',ce:'17:15',billing:'wraparound',ay:false,hb:null,      notes:'4yr funding 7.5hrs/day',                    startDate:'2025-09-01',endDate:null,archived:false},
-  // School run children — schoolRun:true means auto sign-out at 08:55
-  // afterSchoolDays: days they return for afternoon (auto sign-in at 15:25)
-  {id:'alara',    name:'Alara',       emoji:'⭐',type:'school',ao:1, color:AC[5], pin:'2001',days:[1,2,3,4,5],cs:'07:30',ce:'16:30',billing:'wraparound',ay:false,hb:null,      notes:'Before school daily, after school Mon only', startDate:'2025-09-01',endDate:null,archived:false, schoolRun:true, afterSchoolDays:[1]},
-  {id:'bernard',  name:'Bernard',     emoji:'🚀',type:'school',ao:2, color:AC[6], pin:'2002',days:[1,2,3,4,5],cs:'07:30',ce:'17:30',billing:'wraparound',ay:false,hb:null,      notes:'Before school daily, after school Wed & Thurs',startDate:'2025-09-01',endDate:null,archived:false, schoolRun:true, afterSchoolDays:[3,4]},
-  {id:'bonnie',   name:'Bonnie',      emoji:'🌈',type:'school',ao:3, color:AC[7], pin:'2003',days:[2,3,4,5], cs:'07:30',ce:'08:55',billing:'wraparound',ay:false,hb:null,       notes:'Before school Tue-Fri only',                startDate:'2025-09-01',endDate:null,archived:false, schoolRun:true, afterSchoolDays:[]},
-  {id:'douglas',  name:'Douglas',     emoji:'⚡',type:'school',ao:4, color:AC[8], pin:'2004',days:[1,2,3,4,5],cs:'07:30',ce:'17:30',billing:'wraparound',ay:false,hb:null,      notes:'Before school daily, after school Wed & Thurs',startDate:'2025-09-01',endDate:null,archived:false, schoolRun:true, afterSchoolDays:[3,4]},
-  {id:'ellia',    name:'Ellia',       emoji:'🌙',type:'school',ao:5, color:AC[9], pin:'2005',days:[1,2,3,4,5],cs:'08:00',ce:'17:00',billing:'fullday',   ay:false,hb:'fullday', notes:'Holidays only',                             startDate:'2025-09-01',endDate:null,archived:false, schoolRun:false,afterSchoolDays:[]},
-  {id:'evelyndad',name:'Evelyn (Dad)',emoji:'🌟',type:'school',ao:6, color:AC[10],pin:'2006',days:[3],        cs:'15:25',ce:'17:00',billing:'wraparound',ay:false,hb:null,       notes:'After school Wed, billed to Dad',           startDate:'2025-09-01',endDate:null,archived:false, schoolRun:false,afterSchoolDays:[]},
-  {id:'evelynmum',name:'Evelyn (Mum)',emoji:'🌟',type:'school',ao:7, color:AC[10],pin:'2007',days:[1,2,3,4,5],cs:'08:00',ce:'17:30',billing:'varies',    ay:false,hb:null,       notes:'Min 4hrs/week, billed to Mum',              startDate:'2025-09-01',endDate:null,archived:false, schoolRun:false,afterSchoolDays:[]},
-  {id:'harry',    name:'Harry',       emoji:'🦎',type:'school',ao:8, color:AC[6], pin:'2012',days:[2,3,5],    cs:'07:30',ce:'08:55',billing:'wraparound',ay:false,hb:'fullday',  notes:'Before school Tue/Wed/Fri, hol full days',  startDate:'2025-09-01',endDate:null,archived:false, schoolRun:true, afterSchoolDays:[]},
-  {id:'hope',     name:'Hope',        emoji:'🕊️',type:'school',ao:9, color:AC[0], pin:'2008',days:[1,2,3,4,5],cs:'07:30',ce:'17:00',billing:'wraparound',ay:false,hb:null,      notes:'Before school daily, after school Tue & Thurs',startDate:'2025-09-01',endDate:null,archived:false, schoolRun:true, afterSchoolDays:[2,4]},
-  {id:'norman',   name:'Norman',      emoji:'🦁',type:'school',ao:10,color:AC[1], pin:'2009',days:[1,2,3,4],  cs:'07:30',ce:'17:00',billing:'wraparound',ay:false,hb:null,       notes:'Before school Mon-Thurs, after school Mon-Wed',startDate:'2025-09-01',endDate:null,archived:false, schoolRun:true, afterSchoolDays:[1,2,3]},
-  {id:'thear',    name:'Thea R',      emoji:'🌷',type:'school',ao:11,color:AC[2], pin:'2010',days:[1,2,3,4,5],cs:'08:00',ce:'17:00',billing:'fullday',   ay:false,hb:'fullday', notes:'Holidays only',                             startDate:'2025-09-01',endDate:null,archived:false, schoolRun:false,afterSchoolDays:[]},
-  {id:'theat',    name:'Thea T',      emoji:'🌹',type:'school',ao:12,color:AC[3], pin:'2011',days:[1,2,3,4,5],cs:'08:00',ce:'17:00',billing:'fullday',   ay:false,hb:'fullday', notes:'Holidays only',                             startDate:'2025-09-01',endDate:null,archived:false, schoolRun:false,afterSchoolDays:[]},
+  // EY
+  {id:'mia',      name:'Mia',         surname:'Leeder',      emoji:'🌸',type:'ey',  ao:1,  color:AC[0], pin:'1001',days:[1,3],      cs:'07:30',ce:'17:30',billing:'funded',    ay:false,hb:null,      notes:'9mth funding',                               startDate:'2025-09-01',endDate:null,archived:false},
+  {id:'luke',     name:'Luke',        surname:'Greensit',    emoji:'🌊',type:'ey',  ao:2,  color:AC[1], pin:'1002',days:[1,2,3,4],  cs:'07:30',ce:'17:30',billing:'wraparound',ay:false,hb:null,      notes:'9mth funding 7.5hrs/day',                    startDate:'2025-09-01',endDate:null,archived:false},
+  {id:'oliver',   name:'Oliver',      surname:'Booker',      emoji:'🦔',type:'ey',  ao:3,  color:AC[2], pin:'1003',days:[2,3],      cs:'08:00',ce:'17:30',billing:'fullday',   ay:true, hb:'fullday', notes:'Under 2, full day, 9mth funding from Sep 26', startDate:'2026-05-18',endDate:null,archived:false},
+  {id:'sama',     name:'Sama',        surname:'Al-Derzi',    emoji:'🌺',type:'ey',  ao:4,  color:AC[3], pin:'1004',days:[1,2,3,4],  cs:'08:00',ce:'16:00',billing:'wraparound',ay:false,hb:null,      notes:'9mth funding',                               startDate:'2025-09-01',endDate:null,archived:false},
+  {id:'holly',    name:'Holly',       surname:'Hingley',     emoji:'🍃',type:'ey',  ao:5,  color:AC[4], pin:'1005',days:[1,2,3,4,5],cs:'08:30',ce:'17:30',billing:'wraparound',ay:true, hb:'fullday', notes:'2yr funding + wrap',                         startDate:'2025-09-01',endDate:null,archived:false},
+  {id:'arlo',     name:'Arlo',        surname:'Turner',      emoji:'🌱',type:'ey',  ao:6,  color:AC[5], pin:'1006',days:[1,2,4],    cs:'08:00',ce:'16:30',billing:'funded',    ay:false,hb:null,      notes:'2yr funding only',                           startDate:'2025-09-01',endDate:null,archived:false},
+  {id:'aureliusz',name:'Aureliusz',   surname:'Bingham',     emoji:'🌻',type:'ey',  ao:7,  color:AC[6], pin:'1007',days:[4,5],      cs:'08:30',ce:'16:00',billing:'funded',    ay:false,hb:null,      notes:'2yr funding only',                           startDate:'2025-09-01',endDate:null,archived:false},
+  {id:'james',    name:'James',       surname:'Leeder',      emoji:'🐸',type:'ey',  ao:8,  color:AC[7], pin:'1008',days:[1,3],      cs:'07:30',ce:'17:30',billing:'funded',    ay:false,hb:null,      notes:'2yr funding only',                           startDate:'2025-09-01',endDate:null,archived:false},
+  {id:'frankie',  name:'Frankie',     surname:'King',        emoji:'🚂',type:'ey',  ao:9,  color:AC[8], pin:'1009',days:[1,2,3,4,5],cs:'08:00',ce:'17:00',billing:'wraparound',ay:true, hb:'fullday', notes:'Wrap around now, funded only from June term', startDate:'2025-09-01',endDate:null,archived:false},
+  {id:'frederick',name:'Frederick',   surname:'Atkins',      emoji:'🐛',type:'ey',  ao:10, color:AC[9], pin:'1010',days:[3,4],      cs:'08:00',ce:'17:00',billing:'wraparound',ay:true, hb:'fullday', notes:'2yr funding + wrap',                         startDate:'2025-09-01',endDate:null,archived:false},
+  {id:'jean',     name:'Jean',        surname:'Haymans',     emoji:'🌿',type:'ey',  ao:11, color:AC[10],pin:'1011',days:[1,2,3,4,5],cs:'08:30',ce:'16:30',billing:'wraparound',ay:true, hb:'fullday', notes:'3yr 15hrs funding',                          startDate:'2025-09-01',endDate:null,archived:false},
+  {id:'joshua',   name:'Joshua',      surname:'Dixon',       emoji:'🐝',type:'ey',  ao:12, color:AC[0], pin:'1012',days:[4,5],      cs:'08:30',ce:'17:30',billing:'wraparound',ay:false,hb:null,      notes:'3yr funding 3.15hrs',                        startDate:'2025-09-01',endDate:null,archived:false},
+  {id:'margaret', name:'Margaret',    surname:'Jasaitis',    emoji:'🌼',type:'ey',  ao:13, color:AC[1], pin:'1013',days:[1,2,3,4,5],cs:'08:10',ce:'14:20',billing:'wraparound',ay:true, hb:'halfday', notes:'3yr funding',                                startDate:'2025-09-01',endDate:null,archived:false},
+  {id:'ashraf',   name:'Ashraf',      surname:'Adeniji',     emoji:'🌍',type:'ey',  ao:14, color:AC[2], pin:'1014',days:[1,2],      cs:'08:30',ce:'14:30',billing:'halfday',   ay:true, hb:'halfday', notes:'Half day fee',                               startDate:'2025-09-01',endDate:null,archived:false},
+  {id:'diora',    name:'Diora',       surname:'Maslovskaja', emoji:'🦚',type:'ey',  ao:15, color:AC[3], pin:'1015',days:[1,2,3,4],  cs:'07:30',ce:'17:00',billing:'fullday',   ay:true, hb:'fullday', notes:'4yr funding, all year round',                startDate:'2025-09-01',endDate:null,archived:false},
+  {id:'rory',     name:'Rory',        surname:'Dickins',     emoji:'🦊',type:'ey',  ao:16, color:AC[4], pin:'1016',days:[2,3,4,5],  cs:'07:45',ce:'17:15',billing:'wraparound',ay:false,hb:null,      notes:'4yr funding 7.5hrs/day',                     startDate:'2025-09-01',endDate:null,archived:false},
+  // School
+  {id:'alara',    name:'Alara',       surname:'Claypole-Demir',emoji:'⭐',type:'school',ao:1, color:AC[5], pin:'2001',days:[1,2,3,4,5],cs:'07:30',ce:'16:30',billing:'wraparound',ay:false,hb:null,      notes:'Before school daily, after school Mon only',   startDate:'2025-09-01',endDate:null,archived:false,schoolRun:true, afterSchoolDays:[1]},
+  {id:'bernard',  name:'Bernard',     surname:'Burr',          emoji:'🚀',type:'school',ao:2, color:AC[6], pin:'2002',days:[1,2,3,4,5],cs:'07:30',ce:'17:30',billing:'wraparound',ay:false,hb:null,      notes:'Before school daily, after school Wed & Thurs',startDate:'2025-09-01',endDate:null,archived:false,schoolRun:true, afterSchoolDays:[3,4]},
+  {id:'bonnie',   name:'Bonnie',      surname:'Stukins',       emoji:'🌈',type:'school',ao:3, color:AC[7], pin:'2003',days:[2,3,4,5], cs:'07:30',ce:'08:55',billing:'wraparound',ay:false,hb:null,       notes:'Before school Tue-Fri only',                   startDate:'2025-09-01',endDate:null,archived:false,schoolRun:true, afterSchoolDays:[]},
+  {id:'douglas',  name:'Douglas',     surname:'Burr',          emoji:'⚡',type:'school',ao:4, color:AC[8], pin:'2004',days:[1,2,3,4,5],cs:'07:30',ce:'17:30',billing:'wraparound',ay:false,hb:null,      notes:'Before school daily, after school Wed & Thurs',startDate:'2025-09-01',endDate:null,archived:false,schoolRun:true, afterSchoolDays:[3,4]},
+  {id:'ellia',    name:'Ellia',       surname:'Grigaliunas',   emoji:'🌙',type:'school',ao:5, color:AC[9], pin:'2005',days:[1,2,3,4,5],cs:'08:00',ce:'17:00',billing:'fullday',   ay:false,hb:'fullday', notes:'Holidays only',                                startDate:'2025-09-01',endDate:null,archived:false,schoolRun:false,afterSchoolDays:[]},
+  {id:'evelyndad',name:'Evelyn',      surname:'Betts -DAD',    emoji:'🌟',type:'school',ao:6, color:AC[10],pin:'2006',days:[3],        cs:'15:25',ce:'17:00',billing:'wraparound',ay:false,hb:null,       notes:'After school Wed, billed to Dad',              startDate:'2025-09-01',endDate:null,archived:false,schoolRun:false,afterSchoolDays:[]},
+  {id:'evelynmum',name:'Evelyn',      surname:'Betts -MUM',    emoji:'🌟',type:'school',ao:7, color:AC[10],pin:'2007',days:[1,2,3,4,5],cs:'08:00',ce:'17:30',billing:'varies',    ay:false,hb:null,       notes:'Min 4hrs/week, billed to Mum',                 startDate:'2025-09-01',endDate:null,archived:false,schoolRun:false,afterSchoolDays:[]},
+  {id:'harry',    name:'Harry',       surname:'Worsely',       emoji:'🦎',type:'school',ao:8, color:AC[6], pin:'2012',days:[2,3,5],    cs:'07:30',ce:'08:55',billing:'wraparound',ay:false,hb:'fullday',  notes:'Before school Tue/Wed/Fri, hol full days',     startDate:'2025-09-01',endDate:null,archived:false,schoolRun:true, afterSchoolDays:[]},
+  {id:'henry',    name:'Henry',       surname:'Chatterton',    emoji:'🌟',type:'ey', ao:17,color:AC[3], pin:'2013',days:[],        cs:'08:00',ce:'17:00',billing:'fullday',   ay:true, hb:'fullday', notes:'Ad hoc only, under 5, full day fee',          startDate:'2025-09-01',endDate:null,archived:false},
+  {id:'hope',     name:'Hope',        surname:'Elsom',         emoji:'🕊️',type:'school',ao:10,color:AC[0], pin:'2008',days:[1,2,3,4,5],cs:'07:30',ce:'17:00',billing:'wraparound',ay:false,hb:null,      notes:'Before school daily, after school Tue & Thurs',startDate:'2025-09-01',endDate:null,archived:false,schoolRun:true, afterSchoolDays:[2,4]},
+  {id:'norman',   name:'Norman',      surname:'Sadler',        emoji:'🦁',type:'school',ao:11,color:AC[1], pin:'2009',days:[1,2,3,4],  cs:'07:30',ce:'17:00',billing:'wraparound',ay:false,hb:null,       notes:'Before school Mon-Thurs, after school Mon-Wed',startDate:'2025-09-01',endDate:null,archived:false,schoolRun:true, afterSchoolDays:[1,2,3]},
+  {id:'thear',    name:'Thea R',      surname:'Rose',          emoji:'🌷',type:'school',ao:12,color:AC[2], pin:'2010',days:[1,2,3,4,5],cs:'08:00',ce:'17:00',billing:'fullday',   ay:false,hb:'fullday', notes:'Holidays only',                                startDate:'2025-09-01',endDate:null,archived:false,schoolRun:false,afterSchoolDays:[]},
+  {id:'theat',    name:'Thea T',      surname:'Topliss',       emoji:'🌹',type:'school',ao:13,color:AC[3], pin:'2011',days:[1,2,3,4,5],cs:'08:00',ce:'17:00',billing:'fullday',   ay:false,hb:'fullday', notes:'Holidays only',                                startDate:'2025-09-01',endDate:null,archived:false,schoolRun:false,afterSchoolDays:[]},
 ];
 
 let STAFF = [
