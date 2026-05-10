@@ -396,6 +396,8 @@
         </div>
       </div>
     </div>
+    <div class="set-section" id="clearSignInSection"></div>
+    <div class="set-section" id="collectedFromSchoolSection"></div>
     <div class="set-section">
       <div class="set-title">🔑 Reset PIN to 0000</div>
       <div class="sec-sub" style="margin-bottom:8px">Tap a name to reset — they'll be prompted to set a new PIN on next sign in</div>
@@ -762,17 +764,20 @@ let CHILDREN = [
   {id:'ashraf',   name:'Ashraf',      emoji:'🌍',type:'ey',  ao:14, color:AC[2], pin:'1014',days:[1,2],      cs:'08:30',ce:'14:30',billing:'halfday',   ay:true, hb:'halfday', notes:'Half day fee',                               startDate:'2025-09-01',endDate:null,archived:false},
   {id:'diora',    name:'Diora',       emoji:'🦚',type:'ey',  ao:15, color:AC[3], pin:'1015',days:[1,2,3,4],  cs:'07:30',ce:'17:00',billing:'fullday',   ay:true, hb:'fullday', notes:'4yr funding, all year round',               startDate:'2025-09-01',endDate:null,archived:false},
   {id:'rory',     name:'Rory',        emoji:'🦊',type:'ey',  ao:16, color:AC[4], pin:'1016',days:[2,3,4,5],  cs:'07:45',ce:'17:15',billing:'wraparound',ay:false,hb:null,      notes:'4yr funding 7.5hrs/day',                    startDate:'2025-09-01',endDate:null,archived:false},
-  {id:'alara',    name:'Alara',       emoji:'⭐',type:'school',ao:1, color:AC[5], pin:'2001',days:[1,2,3,4,5],cs:'07:30',ce:'16:30',billing:'wraparound',ay:false,hb:null,      notes:'Before school daily, after school Mon only', startDate:'2025-09-01',endDate:null,archived:false},
-  {id:'bernard',  name:'Bernard',     emoji:'🚀',type:'school',ao:2, color:AC[6], pin:'2002',days:[1,2,3,4,5],cs:'07:30',ce:'17:30',billing:'wraparound',ay:false,hb:null,      notes:'Before and after school',                   startDate:'2025-09-01',endDate:null,archived:false},
-  {id:'bonnie',   name:'Bonnie',      emoji:'🌈',type:'school',ao:3, color:AC[7], pin:'2003',days:[2,3,4,5], cs:'07:30',ce:'08:55',billing:'wraparound',ay:false,hb:null,       notes:'Before school Tue-Fri',                     startDate:'2025-09-01',endDate:null,archived:false},
-  {id:'douglas',  name:'Douglas',     emoji:'⚡',type:'school',ao:4, color:AC[8], pin:'2004',days:[1,2,3,4,5],cs:'07:30',ce:'17:30',billing:'wraparound',ay:false,hb:null,      notes:'Before and after school, same as Bernard',  startDate:'2025-09-01',endDate:null,archived:false},
-  {id:'ellia',    name:'Ellia',       emoji:'🌙',type:'school',ao:5, color:AC[9], pin:'2005',days:[1,2,3,4,5],cs:'08:00',ce:'17:00',billing:'fullday',   ay:false,hb:'fullday', notes:'Holidays only',                             startDate:'2025-09-01',endDate:null,archived:false},
-  {id:'evelyndad',name:'Evelyn (Dad)',emoji:'🌟',type:'school',ao:6, color:AC[10],pin:'2006',days:[3],        cs:'15:25',ce:'17:00',billing:'wraparound',ay:false,hb:null,       notes:'After school Wed, billed to Dad',           startDate:'2025-09-01',endDate:null,archived:false},
-  {id:'evelynmum',name:'Evelyn (Mum)',emoji:'🌟',type:'school',ao:7, color:AC[10],pin:'2007',days:[1,2,3,4,5],cs:'08:00',ce:'17:30',billing:'varies',    ay:false,hb:null,       notes:'Min 4hrs/week, billed to Mum',              startDate:'2025-09-01',endDate:null,archived:false},
-  {id:'hope',     name:'Hope',        emoji:'🕊️',type:'school',ao:8, color:AC[0], pin:'2008',days:[1,2,3,4,5],cs:'07:30',ce:'17:00',billing:'wraparound',ay:false,hb:null,      notes:'Before and after school',                   startDate:'2025-09-01',endDate:null,archived:false},
-  {id:'norman',   name:'Norman',      emoji:'🦁',type:'school',ao:9, color:AC[1], pin:'2009',days:[1,2,3,4,5],cs:'07:30',ce:'17:00',billing:'wraparound',ay:false,hb:null,      notes:'Before and after school',                   startDate:'2025-09-01',endDate:null,archived:false},
-  {id:'thear',    name:'Thea R',      emoji:'🌷',type:'school',ao:10,color:AC[2], pin:'2010',days:[1,2,3,4,5],cs:'08:00',ce:'17:00',billing:'fullday',   ay:false,hb:'fullday', notes:'Holidays only',                             startDate:'2025-09-01',endDate:null,archived:false},
-  {id:'theat',    name:'Thea T',      emoji:'🌹',type:'school',ao:11,color:AC[3], pin:'2011',days:[1,2,3,4,5],cs:'08:00',ce:'17:00',billing:'fullday',   ay:false,hb:'fullday', notes:'Holidays only',                             startDate:'2025-09-01',endDate:null,archived:false},
+  // School run children — schoolRun:true means auto sign-out at 08:55
+  // afterSchoolDays: days they return for afternoon (auto sign-in at 15:25)
+  {id:'alara',    name:'Alara',       emoji:'⭐',type:'school',ao:1, color:AC[5], pin:'2001',days:[1,2,3,4,5],cs:'07:30',ce:'16:30',billing:'wraparound',ay:false,hb:null,      notes:'Before school daily, after school Mon only', startDate:'2025-09-01',endDate:null,archived:false, schoolRun:true, afterSchoolDays:[1]},
+  {id:'bernard',  name:'Bernard',     emoji:'🚀',type:'school',ao:2, color:AC[6], pin:'2002',days:[1,2,3,4,5],cs:'07:30',ce:'17:30',billing:'wraparound',ay:false,hb:null,      notes:'Before school daily, after school Wed & Thurs',startDate:'2025-09-01',endDate:null,archived:false, schoolRun:true, afterSchoolDays:[3,4]},
+  {id:'bonnie',   name:'Bonnie',      emoji:'🌈',type:'school',ao:3, color:AC[7], pin:'2003',days:[2,3,4,5], cs:'07:30',ce:'08:55',billing:'wraparound',ay:false,hb:null,       notes:'Before school Tue-Fri only',                startDate:'2025-09-01',endDate:null,archived:false, schoolRun:true, afterSchoolDays:[]},
+  {id:'douglas',  name:'Douglas',     emoji:'⚡',type:'school',ao:4, color:AC[8], pin:'2004',days:[1,2,3,4,5],cs:'07:30',ce:'17:30',billing:'wraparound',ay:false,hb:null,      notes:'Before school daily, after school Wed & Thurs',startDate:'2025-09-01',endDate:null,archived:false, schoolRun:true, afterSchoolDays:[3,4]},
+  {id:'ellia',    name:'Ellia',       emoji:'🌙',type:'school',ao:5, color:AC[9], pin:'2005',days:[1,2,3,4,5],cs:'08:00',ce:'17:00',billing:'fullday',   ay:false,hb:'fullday', notes:'Holidays only',                             startDate:'2025-09-01',endDate:null,archived:false, schoolRun:false,afterSchoolDays:[]},
+  {id:'evelyndad',name:'Evelyn (Dad)',emoji:'🌟',type:'school',ao:6, color:AC[10],pin:'2006',days:[3],        cs:'15:25',ce:'17:00',billing:'wraparound',ay:false,hb:null,       notes:'After school Wed, billed to Dad',           startDate:'2025-09-01',endDate:null,archived:false, schoolRun:false,afterSchoolDays:[]},
+  {id:'evelynmum',name:'Evelyn (Mum)',emoji:'🌟',type:'school',ao:7, color:AC[10],pin:'2007',days:[1,2,3,4,5],cs:'08:00',ce:'17:30',billing:'varies',    ay:false,hb:null,       notes:'Min 4hrs/week, billed to Mum',              startDate:'2025-09-01',endDate:null,archived:false, schoolRun:false,afterSchoolDays:[]},
+  {id:'harry',    name:'Harry',       emoji:'🦎',type:'school',ao:8, color:AC[6], pin:'2012',days:[2,3,5],    cs:'07:30',ce:'08:55',billing:'wraparound',ay:false,hb:'fullday',  notes:'Before school Tue/Wed/Fri, hol full days',  startDate:'2025-09-01',endDate:null,archived:false, schoolRun:true, afterSchoolDays:[]},
+  {id:'hope',     name:'Hope',        emoji:'🕊️',type:'school',ao:9, color:AC[0], pin:'2008',days:[1,2,3,4,5],cs:'07:30',ce:'17:00',billing:'wraparound',ay:false,hb:null,      notes:'Before school daily, after school Tue & Thurs',startDate:'2025-09-01',endDate:null,archived:false, schoolRun:true, afterSchoolDays:[2,4]},
+  {id:'norman',   name:'Norman',      emoji:'🦁',type:'school',ao:10,color:AC[1], pin:'2009',days:[1,2,3,4],  cs:'07:30',ce:'17:00',billing:'wraparound',ay:false,hb:null,       notes:'Before school Mon-Thurs, after school Mon-Wed',startDate:'2025-09-01',endDate:null,archived:false, schoolRun:true, afterSchoolDays:[1,2,3]},
+  {id:'thear',    name:'Thea R',      emoji:'🌷',type:'school',ao:11,color:AC[2], pin:'2010',days:[1,2,3,4,5],cs:'08:00',ce:'17:00',billing:'fullday',   ay:false,hb:'fullday', notes:'Holidays only',                             startDate:'2025-09-01',endDate:null,archived:false, schoolRun:false,afterSchoolDays:[]},
+  {id:'theat',    name:'Thea T',      emoji:'🌹',type:'school',ao:12,color:AC[3], pin:'2011',days:[1,2,3,4,5],cs:'08:00',ce:'17:00',billing:'fullday',   ay:false,hb:'fullday', notes:'Holidays only',                             startDate:'2025-09-01',endDate:null,archived:false, schoolRun:false,afterSchoolDays:[]},
 ];
 
 let STAFF = [
@@ -794,6 +799,7 @@ let attendance = {};
 let staffLog = {};
 let eventLog = {};
 let overrides = {};
+let collectedFromSchool = {}; // [dateKey][childId] = true — skip afternoon auto sign-in
 let pinTarget = null, pinEntry = '', pinShaking = false;
 let mgrPinEntry = '', mgrPinShaking = false;
 let actionTarget = null;
@@ -1210,6 +1216,9 @@ function archiveEntity(){
 // ════════════════════════════════════════════════
 function renderSettings(){
   const scheduled=CHILDREN.filter(c=>childScheduledToday(c,viewDate));
+  const collected=getCollected(viewDate);
+
+  // Override sign in/out grid
   document.getElementById('overrideChildGrid').innerHTML=scheduled.length?scheduled.map(c=>{
     const att=getAtt(c.id,viewDate),sel=overrideSelectedChild===c.id;
     return`<div class="mgr-ov-card ${sel?'selected':''}" onclick="selectOverrideChild('${c.id}')">
@@ -1230,6 +1239,39 @@ function renderSettings(){
     document.getElementById('overrideTimeRow').style.display='none';
   }
 
+  // Clear sign-in section
+  const signedInToday=CHILDREN.filter(c=>getAtt(c.id,viewDate).signInTime);
+  const clearSection=document.getElementById('clearSignInSection');
+  if(clearSection){
+    clearSection.innerHTML=`<div class="set-title">🗑 Clear a Sign-In</div>
+      <div class="sec-sub" style="margin-bottom:8px">Tap a child to completely remove their sign-in record for today</div>
+      ${signedInToday.length?`<div class="mgr-ov-grid">${signedInToday.map(c=>`
+        <div class="mgr-ov-card" onclick="clearSignIn('${c.id}')">
+          <div class="mgr-ov-av" style="background:${c.color}">${c.emoji}</div>
+          <div class="mgr-ov-name">${c.name}</div>
+          <div class="mgr-ov-status" style="color:var(--error)">Tap to clear</div>
+        </div>`).join('')}</div>`
+      :'<div style="color:rgba(255,255,255,0.3);font-size:12px;padding:8px">No children signed in today</div>'}`;
+  }
+
+  // Collected from school section
+  const schoolRunToday=CHILDREN.filter(c=>c.schoolRun&&c.afterSchoolDays&&c.afterSchoolDays.includes(viewDate.getDay())&&childScheduledToday(c,viewDate));
+  const collectedSection=document.getElementById('collectedFromSchoolSection');
+  if(collectedSection){
+    collectedSection.innerHTML=`<div class="set-title">🏫 Collected from School</div>
+      <div class="sec-sub" style="margin-bottom:8px">Tap to mark a child as collected from school — they won't be auto-signed in at 15:25</div>
+      ${schoolRunToday.length?`<div class="mgr-ov-grid">${schoolRunToday.map(c=>`
+        <div class="mgr-ov-card ${collected[c.id]?'selected':''}" onclick="toggleCollectedFromSchool('${c.id}')">
+          <div class="mgr-ov-av" style="background:${c.color}">${c.emoji}</div>
+          <div class="mgr-ov-name">${c.name}</div>
+          <div class="mgr-ov-status" style="color:${collected[c.id]?'var(--error)':'var(--ok)'}">
+            ${collected[c.id]?'✗ Collected from school':'✓ Returning at 15:25'}
+          </div>
+        </div>`).join('')}</div>`
+      :'<div style="color:rgba(255,255,255,0.3);font-size:12px;padding:8px">No afternoon school run children today</div>'}`;
+  }
+
+  // PIN reset grid
   const everyone=[
     ...CHILDREN.filter(c=>!c.archived).map(c=>({type:'child',id:c.id,name:c.name,role:c.notes,color:c.color,emoji:c.emoji})),
     ...STAFF.filter(s=>!s.archived).map(s=>({type:'staff',id:s.id,name:s.name,role:s.role,color:s.color,emoji:null}))
@@ -1459,6 +1501,74 @@ function closeOD(){ document.getElementById('odOv').classList.remove('vis'); }
 // FLASH
 // ════════════════════════════════════════════════
 function showFlash(msg){ const f=document.getElementById('flash');f.textContent=msg;f.classList.add('show');setTimeout(()=>f.classList.remove('show'),3000); }
+
+// ════════════════════════════════════════════════
+// SCHOOL RUN AUTOMATION
+// ════════════════════════════════════════════════
+function getCollected(d){ const k=dk(d);if(!collectedFromSchool[k])collectedFromSchool[k]={};return collectedFromSchool[k]; }
+
+function schoolRunTick() {
+  const now = new Date();
+  const todayKey = dk(now);
+  // Only fire on weekdays during term time
+  if(now.getDay()===0||now.getDay()===6) return;
+  if(!isTerm(now)) return;
+
+  const h=now.getHours(), m=now.getMinutes();
+  const t=ts(now);
+
+  // 08:55 — auto sign-out all school run children who were signed in this morning
+  if(h===8 && m===55) {
+    CHILDREN.filter(c=>c.schoolRun && childScheduledToday(c,now)).forEach(c=>{
+      const att=getAtt(c.id,now);
+      if(att.signedIn && att.signInTime) {
+        att.signedIn=false; att.signOutTime='08:55';
+        getLog(now).unshift({name:c.name,type:'child',action:'out',time:'08:55',extra:0,verified:true,note:'Auto — school drop off'});
+        if(odConnected) writeToExcel(c,now,att);
+      }
+    });
+    renderAll();
+    showFlash('🚌 School run — children signed out at 08:55');
+  }
+
+  // 15:25 — auto sign-in school children scheduled for afternoon (unless collected from school)
+  if(h===15 && m===25) {
+    const collected=getCollected(now);
+    CHILDREN.filter(c=>c.schoolRun && c.afterSchoolDays && c.afterSchoolDays.includes(now.getDay()) && childScheduledToday(c,now)).forEach(c=>{
+      if(collected[c.id]) return; // parent collected from school — skip
+      const att=getAtt(c.id,now);
+      if(!att.signedIn) {
+        att.signedIn=true; att.signInTime='15:25';
+        getLog(now).unshift({name:c.name,type:'child',action:'in',time:'15:25',extra:0,verified:true,note:'Auto — afternoon collection'});
+        if(odConnected) writeToExcel(c,now,att);
+      }
+    });
+    renderAll();
+    showFlash('🏫 Afternoon — children signed in at 15:25');
+  }
+}
+
+// Run every 30 seconds to catch exact times
+setInterval(schoolRunTick, 30000);
+
+function toggleCollectedFromSchool(cid) {
+  const collected=getCollected(viewDate);
+  collected[cid]=!collected[cid];
+  const c=CHILDREN.find(x=>x.id===cid);
+  showFlash(collected[cid]?`${c.emoji} ${c.name} — collected from school today`:`${c.emoji} ${c.name} — will return at 15:25`);
+  renderSettings();
+}
+
+function clearSignIn(cid) {
+  const att=getAtt(cid,viewDate);
+  const c=CHILDREN.find(x=>x.id===cid);
+  att.signedIn=false; att.signInTime=null; att.signOutTime=null; att.earlyMins=0; att.lateMins=0;
+  // Remove from log
+  const k=dk(viewDate);
+  if(eventLog[k]) eventLog[k]=eventLog[k].filter(e=>e.name!==c.name);
+  showFlash(`${c.emoji} ${c.name} — sign-in cleared`);
+  renderSettings(); renderChildren(); updateStatusBar();
+}
 
 // ════════════════════════════════════════════════
 // RENDER ALL
