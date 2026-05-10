@@ -1,0 +1,1486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Little Puddings — Sign In & Out</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Lato:wght@300;400;700;900&display=swap" rel="stylesheet">
+<!-- Microsoft Authentication Library -->
+<script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
+<style>
+  :root {
+    --forest:#2C4A3E; --forest-dark:#1e3329; --moss:#4A7C6A;
+    --sage:#7FA99A; --cream:#F7F3EC; --parchment:#EDE8DC;
+    --gold:#C9A84C; --gold-light:#E5C97E; --bark:#6B4F3A;
+    --error:#c0392b; --warn:#e67e22; --ok:#5fcf80;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{font-family:'Lato',sans-serif;background:var(--forest-dark);min-height:100vh;display:flex;flex-direction:column;background-image:radial-gradient(ellipse at top left,#3a6354 0%,transparent 55%),radial-gradient(ellipse at bottom right,#1a2e24 0%,transparent 55%)}
+
+  /* HEADER */
+  .header{background:var(--cream);padding:12px 20px;display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid var(--gold);box-shadow:0 2px 16px rgba(0,0,0,0.2);flex-shrink:0;position:sticky;top:0;z-index:50}
+  .logo-area{display:flex;align-items:center;gap:10px}
+  .logo-leaf{width:36px;height:36px;background:var(--forest);border-radius:50% 50% 50% 0;transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0}
+  .logo-text h1{font-family:'Playfair Display',serif;font-size:17px;color:var(--forest);line-height:1.1}
+  .logo-text p{font-size:9px;color:var(--moss);letter-spacing:1.5px;text-transform:uppercase;font-weight:700}
+  .header-right{display:flex;align-items:center;gap:10px}
+  .htime .time{font-family:'Playfair Display',serif;font-size:22px;color:var(--forest);font-weight:700;line-height:1;text-align:right}
+  .htime .date{font-size:9px;color:var(--moss);letter-spacing:1px;text-transform:uppercase;text-align:right}
+  .mgr-btn{background:var(--forest);color:var(--gold-light);border:none;border-radius:10px;padding:8px 12px;font-size:11px;font-weight:700;cursor:pointer;letter-spacing:0.5px;text-transform:uppercase;transition:all 0.2s}
+  .mgr-btn:hover{background:var(--moss)}
+  .mgr-btn.active{background:var(--gold);color:var(--forest)}
+
+  /* MAIN */
+  .main{flex:1;padding:14px;display:flex;flex-direction:column;gap:12px}
+
+  /* STATUS */
+  .status-bar{background:rgba(255,255,255,0.06);border:1px solid rgba(201,168,76,0.25);border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .sdot{width:9px;height:9px;border-radius:50%;background:var(--ok);box-shadow:0 0 8px var(--ok);flex-shrink:0;animation:pulse 2s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+  .stext{color:rgba(255,255,255,0.8);font-size:12px;flex:1}
+  .stext strong{color:var(--gold-light)}
+  .od-badge{font-size:10px;padding:3px 8px;border-radius:20px;font-weight:700;letter-spacing:0.5px;cursor:pointer}
+  .od-off{background:rgba(230,126,34,0.15);color:var(--warn);border:1px solid rgba(230,126,34,0.3)}
+  .od-on{background:rgba(95,207,128,0.15);color:var(--ok);border:1px solid rgba(95,207,128,0.3)}
+
+  /* MANAGER BANNER */
+  .mgr-banner{background:rgba(201,168,76,0.12);border:1px solid rgba(201,168,76,0.3);border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .mgr-banner-text{color:var(--gold-light);font-size:12px;font-weight:700;flex:1}
+  .mgr-small-btn{background:var(--forest);color:var(--gold-light);border:none;border-radius:8px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer}
+  .mgr-exit-btn{background:var(--gold);color:var(--forest);border:none;border-radius:8px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer}
+
+  /* DATE NAV */
+  .date-nav{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,0.05);border-radius:10px;padding:8px 12px}
+  .dnav-btn{background:rgba(255,255,255,0.1);border:none;color:rgba(255,255,255,0.7);border-radius:7px;padding:5px 10px;cursor:pointer;font-size:14px}
+  .dnav-label{flex:1;text-align:center;color:var(--gold-light);font-size:13px;font-weight:700;font-family:'Playfair Display',serif}
+  .today-btn{background:var(--forest);color:var(--gold-light);border:none;border-radius:7px;padding:5px 10px;cursor:pointer;font-size:10px;font-weight:700;text-transform:uppercase}
+
+  /* TABS */
+  .tabs{display:flex;background:rgba(255,255,255,0.07);border-radius:11px;padding:3px;gap:3px}
+  .tab{flex:1;padding:10px 4px;border:none;border-radius:8px;font-family:'Lato',sans-serif;font-size:11px;font-weight:700;letter-spacing:0.5px;cursor:pointer;transition:all 0.2s;text-transform:uppercase;color:rgba(255,255,255,0.45);background:transparent}
+  .tab.active{background:var(--gold);color:var(--forest);box-shadow:0 2px 10px rgba(201,168,76,0.35)}
+
+  /* SECTION */
+  .sec-head{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+  .sec-label{font-family:'Playfair Display',serif;color:var(--gold-light);font-size:14px}
+  .sec-line{flex:1;height:1px;background:rgba(201,168,76,0.2)}
+  .sec-count{font-size:10px;font-weight:700;color:var(--moss);background:rgba(74,124,106,0.15);padding:2px 7px;border-radius:20px}
+  .sec-sub{color:rgba(255,255,255,0.35);font-size:10px;letter-spacing:0.5px;margin-bottom:10px;text-transform:uppercase}
+
+  /* CHILDREN GRID */
+  .children-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:4px}
+  @media(max-width:600px){.children-grid{grid-template-columns:repeat(3,1fr)}}
+  .child-card{background:var(--cream);border-radius:12px;padding:11px 8px;text-align:center;cursor:pointer;transition:all 0.18s;border:2.5px solid transparent;position:relative;overflow:hidden}
+  .child-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--moss)}
+  .child-card.in{background:#eaf4f0;border-color:var(--moss)}
+  .child-card.in::before{height:5px}
+  .child-card.override{border-style:dashed;border-color:var(--gold)}
+  .child-card:active{transform:scale(0.95)}
+  .child-avatar{width:42px;height:42px;border-radius:50%;margin:3px auto 7px;display:flex;align-items:center;justify-content:center;font-size:20px}
+  .child-name{font-family:'Playfair Display',serif;font-size:12px;color:var(--forest);font-weight:700;margin-bottom:3px;line-height:1.2}
+  .child-badge{font-size:9px;font-weight:700;letter-spacing:0.8px;text-transform:uppercase;padding:2px 6px;border-radius:20px;display:inline-block;margin-bottom:3px}
+  .badge-out{background:rgba(107,79,58,0.1);color:var(--bark)}
+  .badge-in{background:rgba(74,124,106,0.15);color:var(--moss)}
+  .child-time{font-size:9px;color:var(--moss);margin-top:2px}
+  .early-flag{position:absolute;top:4px;right:4px;width:8px;height:8px;border-radius:50%;background:var(--error);box-shadow:0 0 5px var(--error)}
+
+  /* STAFF */
+  .staff-list{display:flex;flex-direction:column;gap:8px}
+  .staff-card{background:var(--parchment);border-radius:11px;padding:12px 14px;display:flex;align-items:center;gap:12px;cursor:pointer;transition:all 0.18s;border:2px solid transparent}
+  .staff-card.in{border-color:var(--gold);background:#f6f0e0}
+  .staff-card.late{border-color:var(--error);background:#fdf0ee}
+  .staff-card:active{transform:scale(0.98)}
+  .staff-avatar{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Playfair Display',serif;font-size:16px;font-weight:700;color:white;flex-shrink:0}
+  .staff-info{flex:1}
+  .staff-name{font-family:'Playfair Display',serif;font-size:14px;color:var(--forest);font-weight:700}
+  .staff-role{font-size:9px;color:var(--moss);letter-spacing:0.5px;text-transform:uppercase}
+  .staff-clock{font-size:10px;color:var(--gold);font-weight:700;margin-top:2px}
+  .staff-late-note{font-size:10px;color:var(--error);font-weight:700;margin-top:1px}
+  .staff-sbadge{font-size:10px;font-weight:700;padding:4px 10px;border-radius:20px;letter-spacing:0.5px;text-transform:uppercase;flex-shrink:0}
+  .sb-in{background:rgba(74,124,106,0.15);color:var(--moss)}
+  .sb-out{background:rgba(107,79,58,0.1);color:var(--bark)}
+  .sb-late{background:rgba(192,57,43,0.12);color:var(--error)}
+
+  /* LOG */
+  .log-wrap{background:rgba(255,255,255,0.04);border-radius:12px;padding:14px;border:1px solid rgba(201,168,76,0.12)}
+  .log-entry{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.05);font-size:12px}
+  .log-entry:last-child{border-bottom:none}
+  .log-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+  .ld-in{background:var(--ok)} .ld-out{background:var(--gold)} .ld-ov{background:var(--warn)}
+  .log-name{color:rgba(255,255,255,0.9);font-weight:700;flex:1}
+  .log-detail{color:rgba(255,255,255,0.45);font-size:11px}
+  .log-extra{font-size:10px;color:var(--error);font-weight:700;margin-left:4px}
+  .log-time{color:var(--gold-light);font-weight:700;font-size:11px;white-space:nowrap}
+
+  /* INVOICE */
+  .inv-card{background:var(--cream);border-radius:13px;padding:16px;border-left:5px solid var(--gold);margin-bottom:10px}
+  .inv-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+  .inv-name{font-family:'Playfair Display',serif;font-size:14px;color:var(--forest)}
+  .inv-badge{background:var(--forest);color:var(--gold-light);font-size:9px;font-weight:700;letter-spacing:1px;padding:3px 9px;border-radius:20px}
+  .inv-row{display:flex;justify-content:space-between;padding:4px 0;font-size:12px;color:var(--bark);border-bottom:1px solid var(--parchment)}
+  .inv-row:last-child{border-bottom:none}
+  .inv-row.total{font-weight:700;color:var(--forest);font-size:13px;padding-top:8px}
+  .inv-row.hl{color:var(--error);font-weight:700}
+
+  /* OVERRIDE PANEL */
+  .ov-section{background:rgba(255,255,255,0.05);border-radius:12px;padding:14px;border:1px solid rgba(201,168,76,0.15);margin-bottom:10px}
+  .ov-title{color:var(--gold-light);font-family:'Playfair Display',serif;font-size:13px;margin-bottom:10px}
+  .ov-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+  @media(max-width:600px){.ov-grid{grid-template-columns:repeat(3,1fr)}}
+  .ov-card{background:var(--cream);border-radius:10px;padding:10px 6px;text-align:center;cursor:pointer;border:2px solid transparent;transition:all 0.18s}
+  .ov-card:active{transform:scale(0.95)}
+  .ov-card.added{border-color:var(--ok);background:#eaf4f0}
+  .ov-card.removed{border-color:var(--error);background:#fdf0ee;opacity:0.7}
+  .ov-av{font-size:18px;margin-bottom:4px}
+  .ov-name{font-family:'Playfair Display',serif;font-size:11px;color:var(--forest);font-weight:700;line-height:1.2}
+  .ov-action{font-size:9px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;margin-top:3px}
+  .ov-add-c{color:var(--ok)} .ov-rem-c{color:var(--error)} .ov-norm{color:var(--moss)}
+
+  /* SETTINGS */
+  .set-section{background:rgba(255,255,255,0.05);border-radius:12px;padding:14px;border:1px solid rgba(201,168,76,0.15);margin-bottom:10px}
+  .set-title{color:var(--gold-light);font-family:'Playfair Display',serif;font-size:13px;margin-bottom:10px}
+  .mgr-ov-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+  @media(max-width:600px){.mgr-ov-grid{grid-template-columns:repeat(3,1fr)}}
+  .mgr-ov-card{background:var(--cream);border-radius:10px;padding:10px 6px;text-align:center;cursor:pointer;border:2px solid transparent;transition:all 0.18s}
+  .mgr-ov-card.selected{border-color:var(--gold);background:#f6f0e0}
+  .mgr-ov-card:active{transform:scale(0.95)}
+  .mgr-ov-av{width:36px;height:36px;border-radius:50%;margin:0 auto 4px;display:flex;align-items:center;justify-content:center;font-size:18px}
+  .mgr-ov-name{font-family:'Playfair Display',serif;font-size:11px;color:var(--forest);font-weight:700;line-height:1.2}
+  .mgr-ov-status{font-size:9px;margin-top:3px}
+  .time-row{display:flex;gap:8px;margin-top:10px;align-items:center}
+  .time-inp{flex:1;padding:10px 12px;border:2px solid var(--sage);border-radius:9px;font-family:'Lato',sans-serif;font-size:14px;background:var(--parchment);outline:none;text-align:center}
+  .time-inp:focus{border-color:var(--forest)}
+  .apply-btn{background:var(--forest);color:var(--gold-light);border:none;border-radius:9px;padding:10px 16px;font-size:13px;font-weight:700;cursor:pointer}
+  .pin-reset-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .pr-card{background:var(--parchment);border-radius:10px;padding:10px 8px;text-align:center;cursor:pointer;transition:all 0.18s;border:2px solid transparent}
+  .pr-card:hover{border-color:var(--gold)}
+  .pr-card:active{transform:scale(0.96)}
+  .pr-name{font-family:'Playfair Display',serif;font-size:12px;color:var(--forest);font-weight:700}
+  .pr-role{font-size:9px;color:var(--moss);text-transform:uppercase;letter-spacing:0.5px;margin-top:2px}
+  .pr-status{font-size:9px;font-weight:700;margin-top:3px}
+  .prs-def{color:var(--warn)} .prs-set{color:var(--ok)}
+
+  /* ADMIN PANEL */
+  .admin-section{background:rgba(255,255,255,0.05);border-radius:12px;padding:14px;border:1px solid rgba(201,168,76,0.15);margin-bottom:10px}
+  .admin-title{color:var(--gold-light);font-family:'Playfair Display',serif;font-size:13px;margin-bottom:10px}
+  .admin-list{display:flex;flex-direction:column;gap:6px;max-height:280px;overflow-y:auto}
+  .admin-row{background:var(--cream);border-radius:9px;padding:10px 12px;display:flex;align-items:center;gap:10px;cursor:pointer;border:2px solid transparent;transition:all 0.15s}
+  .admin-row:hover{border-color:var(--gold)}
+  .admin-row.archived{opacity:0.5}
+  .admin-row-av{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+  .admin-row-info{flex:1}
+  .admin-row-name{font-family:'Playfair Display',serif;font-size:13px;color:var(--forest);font-weight:700}
+  .admin-row-detail{font-size:10px;color:var(--moss)}
+  .admin-row-badge{font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;text-transform:uppercase}
+  .ab-active{background:rgba(74,124,106,0.15);color:var(--moss)}
+  .ab-archived{background:rgba(107,79,58,0.1);color:var(--bark)}
+  .ab-future{background:rgba(201,168,76,0.15);color:#8a6a1a}
+  .add-btn{background:var(--forest);color:var(--gold-light);border:none;border-radius:9px;padding:10px 16px;font-size:13px;font-weight:700;cursor:pointer;width:100%;margin-top:8px}
+
+  /* PHONE VIEW */
+  .phone-ov{position:fixed;inset:0;background:var(--forest-dark);z-index:300;overflow-y:auto;background-image:radial-gradient(ellipse at top,#2C4A3E 0%,transparent 60%);opacity:0;pointer-events:none;transition:opacity 0.25s}
+  .phone-ov.vis{opacity:1;pointer-events:all}
+  .phone-hdr{background:var(--cream);padding:14px 18px;display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid var(--gold);position:sticky;top:0;z-index:10}
+  .phone-hdr h2{font-family:'Playfair Display',serif;font-size:18px;color:var(--forest)}
+  .phone-hdr .psub{font-size:10px;color:var(--moss);letter-spacing:1px;text-transform:uppercase}
+  .phone-close{background:var(--forest);color:var(--gold-light);border:none;border-radius:8px;padding:7px 12px;font-size:11px;font-weight:700;cursor:pointer}
+  .phone-body{padding:16px;display:flex;flex-direction:column;gap:14px}
+  .phone-sec-title{font-family:'Playfair Display',serif;color:var(--gold-light);font-size:15px;margin-bottom:8px}
+  .phone-row{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,0.06);border-radius:10px;padding:10px 12px;border-left:4px solid transparent;margin-bottom:6px}
+  .phone-row.pin{border-left-color:var(--ok)}
+  .phone-row.pout{border-left-color:rgba(255,255,255,0.08)}
+  .phone-av{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+  .phone-name{flex:1;color:rgba(255,255,255,0.9);font-weight:700;font-size:13px}
+  .phone-detail{font-size:10px;color:rgba(255,255,255,0.45)}
+
+  /* MODALS */
+  .overlay{position:fixed;inset:0;background:rgba(15,32,24,0.93);display:flex;align-items:center;justify-content:center;z-index:200;padding:16px;backdrop-filter:blur(8px);opacity:0;pointer-events:none;transition:opacity 0.22s}
+  .overlay.vis{opacity:1;pointer-events:all}
+  .pin-modal{background:var(--cream);border-radius:22px;padding:26px 22px;width:100%;max-width:320px;text-align:center;box-shadow:0 24px 64px rgba(0,0,0,0.55);border-top:6px solid var(--gold);transform:translateY(18px);transition:transform 0.22s}
+  .overlay.vis .pin-modal{transform:translateY(0)}
+  .act-modal{background:var(--cream);border-radius:22px;padding:26px 22px;width:100%;max-width:320px;text-align:center;box-shadow:0 24px 64px rgba(0,0,0,0.5);border-top:6px solid var(--gold);transform:translateY(18px);transition:transform 0.22s}
+  .overlay.vis .act-modal{transform:translateY(0)}
+  .setpin-modal{background:var(--cream);border-radius:22px;padding:26px 22px;width:100%;max-width:320px;text-align:center;box-shadow:0 24px 64px rgba(0,0,0,0.55);border-top:6px solid var(--moss);transform:translateY(18px);transition:transform 0.22s}
+  .overlay.vis .setpin-modal{transform:translateY(0)}
+  .admin-modal{background:var(--cream);border-radius:22px;padding:24px 20px;width:100%;max-width:420px;box-shadow:0 24px 64px rgba(0,0,0,0.55);border-top:6px solid var(--moss);transform:translateY(18px);transition:transform 0.22s;overflow-y:auto;max-height:90vh}
+  .overlay.vis .admin-modal{transform:translateY(0)}
+  .od-modal{background:var(--cream);border-radius:22px;padding:26px 22px;width:100%;max-width:380px;text-align:center;box-shadow:0 24px 64px rgba(0,0,0,0.5);border-top:6px solid var(--moss);transform:translateY(18px);transition:transform 0.22s}
+  .overlay.vis .od-modal{transform:translateY(0)}
+
+  .pm-av{width:60px;height:60px;border-radius:50%;margin:0 auto 10px;display:flex;align-items:center;justify-content:center;font-size:26px}
+  .pm-name{font-family:'Playfair Display',serif;font-size:19px;color:var(--forest);margin-bottom:3px}
+  .pm-sub{font-size:11px;color:var(--moss);margin-bottom:18px}
+  .sp-step{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--moss);margin-bottom:4px}
+  .pin-dots{display:flex;gap:11px;justify-content:center;margin-bottom:14px}
+  .pd{width:15px;height:15px;border-radius:50%;background:var(--parchment);border:2px solid var(--sage);transition:all 0.14s}
+  .pd.filled{background:var(--forest);border-color:var(--forest)}
+  .pd.err{background:var(--error);border-color:var(--error)}
+  .pin-err{font-size:11px;color:var(--error);font-weight:700;min-height:16px;margin-bottom:10px}
+  .keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:11px}
+  .key{background:var(--forest);color:var(--cream);border:none;border-radius:11px;padding:15px 8px;font-family:'Playfair Display',serif;font-size:21px;font-weight:700;cursor:pointer;transition:all 0.13s}
+  .key:active{transform:scale(0.93);background:var(--forest-dark)}
+  .key.kdel{background:var(--parchment);color:var(--bark);font-size:17px;grid-column:3}
+  .key.kzero{grid-column:2}
+  .pin-cancel{width:100%;padding:12px;border:1.5px solid var(--sage);border-radius:11px;background:transparent;color:var(--moss);font-family:'Lato',sans-serif;font-size:13px;font-weight:700;cursor:pointer}
+  .act-name{font-family:'Playfair Display',serif;font-size:19px;color:var(--forest);margin-bottom:4px}
+  .act-sub{font-size:11px;color:var(--moss);margin-bottom:12px}
+  .act-time{font-family:'Playfair Display',serif;font-size:30px;color:var(--forest);font-weight:700}
+  .act-date{font-size:10px;color:var(--bark);letter-spacing:1px;text-transform:uppercase;margin-bottom:18px}
+  .act-warn{background:rgba(192,57,43,0.08);border:1px solid rgba(192,57,43,0.2);border-radius:9px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:var(--error)}
+  .act-warn strong{font-size:13px;display:block;margin-bottom:2px}
+  .act-btn{display:block;width:100%;padding:14px;border:none;border-radius:12px;font-family:'Lato',sans-serif;font-size:14px;font-weight:700;letter-spacing:0.5px;cursor:pointer;margin-bottom:8px;transition:all 0.15s}
+  .act-btn:active{transform:scale(0.98)}
+  .btn-in{background:var(--forest);color:var(--gold-light)}
+  .btn-out{background:var(--gold);color:var(--forest)}
+  .btn-cx{background:transparent;color:var(--moss);border:1px solid var(--sage)}
+
+  /* ADMIN FORM */
+  .af-title{font-family:'Playfair Display',serif;font-size:18px;color:var(--forest);margin-bottom:16px}
+  .af-group{margin-bottom:12px}
+  .af-label{font-size:11px;font-weight:700;color:var(--moss);letter-spacing:0.5px;text-transform:uppercase;margin-bottom:4px;display:block}
+  .af-input{width:100%;padding:10px 12px;border:2px solid var(--sage);border-radius:9px;font-family:'Lato',sans-serif;font-size:13px;background:var(--parchment);outline:none;transition:border-color 0.15s}
+  .af-input:focus{border-color:var(--forest)}
+  .af-select{width:100%;padding:10px 12px;border:2px solid var(--sage);border-radius:9px;font-family:'Lato',sans-serif;font-size:13px;background:var(--parchment);outline:none}
+  .af-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .af-days{display:flex;gap:6px;flex-wrap:wrap}
+  .af-day{padding:6px 10px;border:2px solid var(--sage);border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;background:var(--parchment);color:var(--bark);transition:all 0.15s}
+  .af-day.sel{background:var(--forest);color:var(--gold-light);border-color:var(--forest)}
+  .af-emoji-grid{display:grid;grid-template-columns:repeat(8,1fr);gap:6px;margin-top:6px}
+  .af-emoji-btn{padding:6px;border:2px solid var(--parchment);border-radius:8px;font-size:18px;cursor:pointer;background:var(--parchment);text-align:center;transition:all 0.15s}
+  .af-emoji-btn.sel{border-color:var(--forest);background:#e0ede8}
+  .af-save{width:100%;padding:13px;border:none;border-radius:11px;background:var(--forest);color:var(--gold-light);font-family:'Lato',sans-serif;font-size:14px;font-weight:700;cursor:pointer;margin-top:4px}
+  .af-archive{width:100%;padding:11px;border:1.5px solid var(--error);border-radius:11px;background:transparent;color:var(--error);font-family:'Lato',sans-serif;font-size:13px;font-weight:700;cursor:pointer;margin-top:8px}
+  .af-cancel{width:100%;padding:11px;border:1.5px solid var(--sage);border-radius:11px;background:transparent;color:var(--moss);font-family:'Lato',sans-serif;font-size:13px;font-weight:700;cursor:pointer;margin-top:6px}
+
+  /* OD */
+  .od-title{font-family:'Playfair Display',serif;font-size:19px;color:var(--forest);margin-bottom:8px}
+  .od-sub{font-size:12px;color:var(--bark);margin-bottom:20px;line-height:1.6}
+  .od-btn{width:100%;padding:13px;border:none;border-radius:11px;background:var(--forest);color:var(--gold-light);font-family:'Lato',sans-serif;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:8px}
+  .od-skip{background:transparent;color:var(--moss);border:1.5px solid var(--sage)}
+
+  /* MISC */
+  @keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-7px)}40%{transform:translateX(7px)}60%{transform:translateX(-5px)}80%{transform:translateX(5px)}}
+  .shake{animation:shake 0.38s ease}
+  .flash{position:fixed;top:68px;left:50%;transform:translateX(-50%) translateY(-14px);background:var(--forest);color:var(--gold-light);padding:10px 20px;border-radius:30px;font-weight:700;font-size:12px;border:2px solid var(--gold);opacity:0;pointer-events:none;transition:all 0.28s;z-index:999;white-space:nowrap;box-shadow:0 4px 20px rgba(0,0,0,0.3)}
+  .flash.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .empty{color:rgba(255,255,255,0.3);font-size:13px;text-align:center;padding:24px 0}
+  .coming-soon{background:rgba(44,74,62,0.9);border-radius:9px;padding:10px 14px;color:var(--gold-light);font-size:11px;text-align:center;border:1px solid rgba(201,168,76,0.25);margin-top:8px}
+  .save-indicator{font-size:10px;color:var(--ok);font-weight:700;margin-left:8px}
+  .footer-note{text-align:center;color:rgba(255,255,255,0.15);font-size:9px;letter-spacing:1px;padding:8px 0 18px;text-transform:uppercase}
+</style>
+</head>
+<body>
+<div class="flash" id="flash"></div>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="logo-area">
+    <div class="logo-leaf">🌿</div>
+    <div class="logo-text"><h1>Little Puddings</h1><p>Sign In &amp; Out</p></div>
+  </div>
+  <div class="header-right">
+    <button class="mgr-btn" id="mgrBtn" onclick="mgrBtnClick()">⚙ Manager</button>
+    <div class="htime">
+      <div class="time" id="clock">--:--</div>
+      <div class="date" id="dateDisp">--</div>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+  <!-- STATUS -->
+  <div class="status-bar">
+    <div class="sdot"></div>
+    <div class="stext">
+      <strong id="inCount">0</strong> children in ·
+      <strong id="staffCount">0</strong> staff on duty ·
+      <strong id="flagCount">0</strong> early/late flags
+    </div>
+    <div class="od-badge od-off" id="odBadge" onclick="openOD()">☁ Connect OneDrive</div>
+  </div>
+
+  <!-- MANAGER BANNER -->
+  <div class="mgr-banner" id="mgrBanner" style="display:none">
+    <div class="mgr-banner-text">⚙ Manager Mode · <span id="mgrDateLabel"></span><span class="save-indicator" id="saveIndicator" style="display:none">✓ Saved to OneDrive</span></div>
+    <button class="mgr-small-btn" onclick="openPhone()">📱 Register</button>
+    <button class="mgr-exit-btn" onclick="exitManager()">Exit</button>
+  </div>
+
+  <!-- DATE NAV -->
+  <div class="date-nav" id="dateNav" style="display:none">
+    <button class="dnav-btn" onclick="changeDay(-1)">◀</button>
+    <div class="dnav-label" id="dateNavLabel">--</div>
+    <button class="dnav-btn" onclick="changeDay(1)">▶</button>
+    <button class="today-btn" onclick="goToday()">Today</button>
+  </div>
+
+  <!-- TABS -->
+  <div class="tabs" id="tabBar">
+    <button class="tab active" onclick="setTab('children')">Children</button>
+    <button class="tab" onclick="setTab('staff')">Staff</button>
+    <button class="tab mgr-only" onclick="setTab('log')"      style="display:none">Log</button>
+    <button class="tab mgr-only" onclick="setTab('invoice')"  style="display:none">Invoices</button>
+    <button class="tab mgr-only" onclick="setTab('override')" style="display:none">Day Changes</button>
+    <button class="tab mgr-only" onclick="setTab('admin')"    style="display:none">Admin</button>
+    <button class="tab mgr-only" onclick="setTab('settings')" style="display:none">Settings</button>
+  </div>
+
+  <!-- CHILDREN -->
+  <div id="panel-children"><div id="eySection"></div><div id="schoolSection"></div></div>
+
+  <!-- STAFF -->
+  <div id="panel-staff" style="display:none">
+    <div class="sec-head"><div class="sec-label">Staff</div><div class="sec-line"></div></div>
+    <div class="sec-sub">Tap your name · PIN required</div>
+    <div class="staff-list" id="staffList"></div>
+  </div>
+
+  <!-- LOG -->
+  <div id="panel-log" style="display:none">
+    <div class="sec-head">
+      <div class="sec-label">Register — <span id="logDateLabel">--</span></div>
+      <div class="sec-line"></div>
+      <div class="sec-count" id="logCount">0 entries</div>
+    </div>
+    <div class="sec-sub">Exact times · all PIN-verified · 🔒</div>
+    <div class="log-wrap" id="logWrap"><div class="empty">No entries yet</div></div>
+  </div>
+
+  <!-- INVOICE -->
+  <div id="panel-invoice" style="display:none">
+    <div class="sec-head"><div class="sec-label">Invoice Preview</div><div class="sec-line"></div></div>
+    <div class="sec-sub">Auto-calculated from attendance</div>
+    <div id="invoiceList"></div>
+    <div class="coming-soon">💡 Connected to OneDrive — each sign in/out writes directly to each child's Excel workbook automatically</div>
+  </div>
+
+  <!-- DAY CHANGES -->
+  <div id="panel-override" style="display:none">
+    <div class="sec-head"><div class="sec-label">Day Changes</div><div class="sec-line"></div></div>
+    <div class="sec-sub">One-off additions or removals for this date only — resets automatically</div>
+    <div class="ov-section"><div class="ov-title">➕ Add a child for today</div><div class="ov-grid" id="addGrid"></div></div>
+    <div class="ov-section"><div class="ov-title">✏ Scheduled today — tap to remove</div><div class="ov-grid" id="removeGrid"></div></div>
+  </div>
+
+  <!-- ADMIN -->
+  <div id="panel-admin" style="display:none">
+    <div class="sec-head"><div class="sec-label">Admin</div><div class="sec-line"></div></div>
+    <div class="sec-sub">Add, edit, or archive children and staff</div>
+    <div class="admin-section">
+      <div class="admin-title">Children</div>
+      <div class="admin-list" id="adminChildList"></div>
+      <button class="add-btn" onclick="openAdminForm('child',null)">＋ Add New Child</button>
+    </div>
+    <div class="admin-section">
+      <div class="admin-title">Staff</div>
+      <div class="admin-list" id="adminStaffList"></div>
+      <button class="add-btn" onclick="openAdminForm('staff',null)">＋ Add New Staff Member</button>
+    </div>
+  </div>
+
+  <!-- SETTINGS -->
+  <div id="panel-settings" style="display:none">
+    <div class="sec-head"><div class="sec-label">Settings</div><div class="sec-line"></div></div>
+    <div class="sec-sub">Override times · Reset PINs</div>
+    <div class="set-section">
+      <div class="set-title">⏱ Override Sign In / Out Time</div>
+      <div class="sec-sub" style="margin-bottom:8px">Select a child then enter the correct time</div>
+      <div class="mgr-ov-grid" id="overrideChildGrid"></div>
+      <div id="overrideTimeRow" style="display:none">
+        <div style="margin-top:12px;margin-bottom:6px;font-size:11px;color:rgba(255,255,255,0.5)">Selected: <strong id="overrideChildName" style="color:var(--gold-light)">--</strong></div>
+        <div class="time-row">
+          <input class="time-inp" id="overrideTimeIn" type="time" placeholder="Sign in">
+          <input class="time-inp" id="overrideTimeOut" type="time" placeholder="Sign out">
+          <button class="apply-btn" onclick="applyOverrideTime()">Apply</button>
+        </div>
+      </div>
+    </div>
+    <div class="set-section">
+      <div class="set-title">🔑 Reset PIN to 0000</div>
+      <div class="sec-sub" style="margin-bottom:8px">Tap a name to reset — they'll be prompted to set a new PIN on next sign in</div>
+      <div class="pin-reset-grid" id="pinResetGrid"></div>
+    </div>
+  </div>
+</div>
+<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027</div>
+
+<!-- PHONE VIEW -->
+<div class="phone-ov" id="phoneOv">
+  <div class="phone-hdr">
+    <div><h2>Live Register</h2><div class="psub" id="phoneSub">--</div></div>
+    <button class="phone-close" onclick="closePhone()">✕ Close</button>
+  </div>
+  <div class="phone-body">
+    <div><div class="phone-sec-title">Early Years — In Setting</div><div id="pEYIn"></div></div>
+    <div><div class="phone-sec-title">School Children — In Setting</div><div id="pSchIn"></div></div>
+    <div><div class="phone-sec-title">Staff on Duty</div><div id="pStaffOn"></div></div>
+    <div><div class="phone-sec-title" style="color:rgba(255,255,255,0.4)">Expected but Not Yet In</div><div id="pOut"></div></div>
+  </div>
+</div>
+
+<!-- PIN OVERLAY -->
+<div class="overlay" id="pinOv">
+  <div class="pin-modal" id="pinModal">
+    <div class="pm-av" id="pmAv"></div>
+    <div class="pm-name" id="pmName">--</div>
+    <div class="pm-sub" id="pmSub">Enter your 4-digit PIN</div>
+    <div class="pin-dots"><div class="pd" id="pd0"></div><div class="pd" id="pd1"></div><div class="pd" id="pd2"></div><div class="pd" id="pd3"></div></div>
+    <div class="pin-err" id="pinErr"></div>
+    <div class="keypad">
+      <button class="key" onclick="kp('1')">1</button><button class="key" onclick="kp('2')">2</button><button class="key" onclick="kp('3')">3</button>
+      <button class="key" onclick="kp('4')">4</button><button class="key" onclick="kp('5')">5</button><button class="key" onclick="kp('6')">6</button>
+      <button class="key" onclick="kp('7')">7</button><button class="key" onclick="kp('8')">8</button><button class="key" onclick="kp('9')">9</button>
+      <button class="key kzero" onclick="kp('0')">0</button><button class="key kdel" onclick="kd()">⌫</button>
+    </div>
+    <button class="pin-cancel" onclick="closePin()">Cancel</button>
+  </div>
+</div>
+
+<!-- ACTION OVERLAY -->
+<div class="overlay" id="actOv">
+  <div class="act-modal">
+    <div class="pm-av" id="actAv"></div>
+    <div class="act-name" id="actName">--</div>
+    <div class="act-sub" id="actSub">PIN verified ✓</div>
+    <div class="act-time" id="actTime">--:--</div>
+    <div class="act-date" id="actDate">--</div>
+    <div class="act-warn" id="actWarn" style="display:none"><strong id="actWarnTitle">--</strong><span id="actWarnDetail">--</span></div>
+    <button class="act-btn btn-in" id="actBtnIn" onclick="confirmAction(true)">✓ Sign In</button>
+    <button class="act-btn btn-out" id="actBtnOut" onclick="confirmAction(false)">✗ Sign Out</button>
+    <button class="act-btn btn-cx" onclick="closeAction()">Cancel</button>
+  </div>
+</div>
+
+<!-- SET PIN OVERLAY -->
+<div class="overlay" id="setPinOv">
+  <div class="setpin-modal">
+    <div class="pm-av" id="spAv"></div>
+    <div class="sp-step" id="spStep">Step 1 of 2</div>
+    <div class="pm-name" id="spName">--</div>
+    <div class="pm-sub" id="spSub">Choose a new 4-digit PIN</div>
+    <div class="pin-dots"><div class="pd" id="spd0"></div><div class="pd" id="spd1"></div><div class="pd" id="spd2"></div><div class="pd" id="spd3"></div></div>
+    <div class="pin-err" id="spErr"></div>
+    <div class="keypad">
+      <button class="key" onclick="skp('1')">1</button><button class="key" onclick="skp('2')">2</button><button class="key" onclick="skp('3')">3</button>
+      <button class="key" onclick="skp('4')">4</button><button class="key" onclick="skp('5')">5</button><button class="key" onclick="skp('6')">6</button>
+      <button class="key" onclick="skp('7')">7</button><button class="key" onclick="skp('8')">8</button><button class="key" onclick="skp('9')">9</button>
+      <button class="key kzero" onclick="skp('0')">0</button><button class="key kdel" onclick="skd()">⌫</button>
+    </div>
+  </div>
+</div>
+
+<!-- MANAGER PIN OVERLAY -->
+<div class="overlay" id="mgrPinOv">
+  <div class="pin-modal">
+    <div class="pm-av" style="background:var(--forest);color:var(--gold-light);font-size:22px;font-family:'Playfair Display',serif;font-weight:700;width:60px;height:60px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 10px">⚙</div>
+    <div class="pm-name">Manager Access</div>
+    <div class="pm-sub">Enter manager PIN</div>
+    <div class="pin-dots"><div class="pd" id="mpd0"></div><div class="pd" id="mpd1"></div><div class="pd" id="mpd2"></div><div class="pd" id="mpd3"></div></div>
+    <div class="pin-err" id="mgrPinErr"></div>
+    <div class="keypad">
+      <button class="key" onclick="mkp('1')">1</button><button class="key" onclick="mkp('2')">2</button><button class="key" onclick="mkp('3')">3</button>
+      <button class="key" onclick="mkp('4')">4</button><button class="key" onclick="mkp('5')">5</button><button class="key" onclick="mkp('6')">6</button>
+      <button class="key" onclick="mkp('7')">7</button><button class="key" onclick="mkp('8')">8</button><button class="key" onclick="mkp('9')">9</button>
+      <button class="key kzero" onclick="mkp('0')">0</button><button class="key kdel" onclick="mkd()">⌫</button>
+    </div>
+    <button class="pin-cancel" onclick="closeMgrPin()">Cancel</button>
+  </div>
+</div>
+
+<!-- ADMIN FORM OVERLAY -->
+<div class="overlay" id="adminFormOv">
+  <div class="admin-modal" id="adminModal">
+    <div class="af-title" id="afTitle">Add Child</div>
+    <div class="af-group">
+      <label class="af-label">Name</label>
+      <input class="af-input" id="afName" type="text" placeholder="First name">
+    </div>
+    <div class="af-row">
+      <div class="af-group">
+        <label class="af-label">Type</label>
+        <select class="af-select" id="afType" onchange="renderAdminForm()">
+          <option value="ey">Early Years</option>
+          <option value="school">School</option>
+          <option value="staff">Staff</option>
+        </select>
+      </div>
+      <div class="af-group" id="afBillingGroup">
+        <label class="af-label">Billing</label>
+        <select class="af-select" id="afBilling">
+          <option value="funded">Funded only</option>
+          <option value="wraparound">Funded + wrap</option>
+          <option value="fullday">Full day fee</option>
+          <option value="halfday">Half day fee</option>
+          <option value="varies">Varies</option>
+        </select>
+      </div>
+      <div class="af-group" id="afRoleGroup" style="display:none">
+        <label class="af-label">Role</label>
+        <select class="af-select" id="afRole">
+          <option value="Registered Childminder">Registered Childminder</option>
+          <option value="Level 4 Educator">Level 4 Educator</option>
+          <option value="Level 3 Educator">Level 3 Educator</option>
+          <option value="Early Years Apprentice">Early Years Apprentice</option>
+        </select>
+      </div>
+    </div>
+    <div class="af-group">
+      <label class="af-label">Days attending</label>
+      <div class="af-days" id="afDays">
+        <div class="af-day" data-day="1" onclick="toggleDay(1)">Mon</div>
+        <div class="af-day" data-day="2" onclick="toggleDay(2)">Tue</div>
+        <div class="af-day" data-day="3" onclick="toggleDay(3)">Wed</div>
+        <div class="af-day" data-day="4" onclick="toggleDay(4)">Thu</div>
+        <div class="af-day" data-day="5" onclick="toggleDay(5)">Fri</div>
+      </div>
+    </div>
+    <div class="af-row">
+      <div class="af-group">
+        <label class="af-label">Start time</label>
+        <input class="af-input" id="afStartTime" type="time" value="08:00">
+      </div>
+      <div class="af-group">
+        <label class="af-label">End time</label>
+        <input class="af-input" id="afEndTime" type="time" value="17:00">
+      </div>
+    </div>
+    <div class="af-row">
+      <div class="af-group">
+        <label class="af-label">Start date</label>
+        <input class="af-input" id="afStartDate" type="date">
+      </div>
+      <div class="af-group">
+        <label class="af-label">End date (if known)</label>
+        <input class="af-input" id="afEndDate" type="date" placeholder="Leave blank if ongoing">
+      </div>
+    </div>
+    <div class="af-group" id="afTermGroup">
+      <label class="af-label">Attendance</label>
+      <select class="af-select" id="afTermTime">
+        <option value="false">All year round</option>
+        <option value="true">Term time only</option>
+        <option value="holidays">School holidays only</option>
+      </select>
+    </div>
+    <div class="af-group">
+      <label class="af-label">Notes</label>
+      <input class="af-input" id="afNotes" type="text" placeholder="e.g. 2yr funding, siblings, etc.">
+    </div>
+    <div class="af-group">
+      <label class="af-label">Emoji</label>
+      <div class="af-emoji-grid" id="afEmojiGrid">
+        🌱🌿🌸🌺🌻🌼🍃🍂🌊🦔🐸🐝🦋🚂🐛🦚🦊🌍⭐🚀🌈⚡🌙🌟🕊️🦁🌷🌹🐠🦋🐞🦎
+      </div>
+    </div>
+    <button class="af-save" onclick="saveAdminForm()">Save</button>
+    <button class="af-archive" id="afArchiveBtn" onclick="archiveEntity()" style="display:none">Archive (remove from register)</button>
+    <button class="af-cancel" onclick="closeAdminForm()">Cancel</button>
+  </div>
+</div>
+
+<!-- OD OVERLAY -->
+<div class="overlay" id="odOv">
+  <div class="od-modal">
+    <div style="font-size:36px;margin-bottom:10px">☁</div>
+    <div class="od-title">Connect to OneDrive</div>
+    <div class="od-sub">Sign in with your Little Puddings Microsoft 365 account. Attendance data will save automatically to your <strong>2026–2027 INVOICES</strong> folder.</div>
+    <button class="od-btn" onclick="initiateODAuth()">Sign in with Microsoft →</button>
+    <button class="od-btn od-skip" onclick="closeOD()">Set up later</button>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════
+// MICROSOFT AUTH CONFIG
+// ════════════════════════════════════════════════
+const MSAL_CONFIG = {
+  auth: {
+    clientId: '30882fd2-f130-45d5-b13e-81d47a18f64d',
+    authority: 'https://login.microsoftonline.com/f0e76f61-d34c-467f-880b-46ce5e527811',
+    redirectUri: window.location.href.split('?')[0].split('#')[0],
+  },
+  cache: { cacheLocation: 'localStorage', storeAuthStateInCookie: false }
+};
+const GRAPH_SCOPES = ['Files.ReadWrite','User.Read'];
+let msalInstance = null;
+let odAccessToken = null;
+let odConnected = false;
+
+async function initMSAL() {
+  try {
+    msalInstance = new msal.PublicClientApplication(MSAL_CONFIG);
+    await msalInstance.initialize();
+    // Handle redirect response
+    const resp = await msalInstance.handleRedirectPromise();
+    if (resp && resp.accessToken) {
+      odAccessToken = resp.accessToken;
+      odConnected = true;
+      updateODBadge();
+      showFlash('✓ Connected to OneDrive');
+    }
+    // Check if already signed in
+    const accounts = msalInstance.getAllAccounts();
+    if (accounts.length > 0) {
+      try {
+        const silent = await msalInstance.acquireTokenSilent({ scopes: GRAPH_SCOPES, account: accounts[0] });
+        odAccessToken = silent.accessToken;
+        odConnected = true;
+        updateODBadge();
+      } catch(e) { /* silent fail */ }
+    }
+  } catch(e) { console.warn('MSAL init:', e); }
+}
+
+async function initiateODAuth() {
+  closeOD();
+  if (!msalInstance) { showFlash('Auth not ready — please refresh'); return; }
+  try {
+    const resp = await msalInstance.loginPopup({ scopes: GRAPH_SCOPES });
+    odAccessToken = resp.accessToken;
+    odConnected = true;
+    updateODBadge();
+    showFlash('✓ Connected to OneDrive');
+  } catch(e) { showFlash('Sign in cancelled or failed'); }
+}
+
+function updateODBadge() {
+  const b = document.getElementById('odBadge');
+  if (odConnected) {
+    b.textContent = '☁ OneDrive Connected';
+    b.className = 'od-badge od-on';
+    b.onclick = null;
+  } else {
+    b.textContent = '☁ Connect OneDrive';
+    b.className = 'od-badge od-off';
+    b.onclick = openOD;
+  }
+}
+
+// ════════════════════════════════════════════════
+// GRAPH API — Write to Excel
+// ════════════════════════════════════════════════
+async function writeToExcel(child, date, att) {
+  if (!odConnected || !odAccessToken) return;
+  try {
+    const fileName = encodeURIComponent(`${child.name} - Invoice - 2026-2027.xlsx`);
+    const folderPath = '2026-2027 INVOICES';
+    const tab = MONTH_TABS[date.getMonth()+1];
+    const dayRow = date.getDate() + 4; // Row offset — date 1 = row 5 in template
+
+    // Find attendance column (col H = index 7 in template = early/late)
+    // Col E = attendance Y/N, Col J = early drop off/late collection
+    const earlyBlocks = att.earlyMins > 0 ? blk(att.earlyMins) : 0;
+    const lateBlocks  = att.lateMins  > 0 ? blk(att.lateMins)  : 0;
+    const totalBlocks = earlyBlocks + lateBlocks;
+
+    const updates = [];
+    // Mark attendance Y
+    if (att.signInTime) {
+      updates.push({ address: `${tab}!E${dayRow}`, values: [['Y']] });
+    }
+    // Write early/late blocks
+    if (totalBlocks > 0) {
+      updates.push({ address: `${tab}!J${dayRow}`, values: [[totalBlocks]] });
+    }
+
+    for (const upd of updates) {
+      const url = `https://graph.microsoft.com/v1.0/me/drive/root:/${folderPath}/${fileName}:/workbook/worksheets('${tab}')/range(address='${upd.address}')`;
+      await fetch(url, {
+        method: 'PATCH',
+        headers: { 'Authorization': `Bearer ${odAccessToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ values: upd.values })
+      });
+    }
+
+    // Save full register entry to master log
+    await saveRegisterEntry(child, date, att);
+
+    document.getElementById('saveIndicator').style.display = 'inline';
+    setTimeout(() => document.getElementById('saveIndicator').style.display = 'none', 3000);
+  } catch(e) { console.error('Graph write error:', e); }
+}
+
+async function saveRegisterEntry(child, date, att) {
+  if (!odConnected || !odAccessToken) return;
+  try {
+    // Save to a master register file: LP Register 2026-2027.xlsx
+    const fileName = encodeURIComponent('LP Register 2026-2027.xlsx');
+    const folderPath = '2026-2027 INVOICES';
+    // Append row to Sheet1
+    const row = [
+      dk(date), DAYS[date.getDay()],
+      child.name, child.type==='ey'?'Early Years':'School',
+      att.signInTime||'', att.signOutTime||'',
+      att.earlyMins||0, att.lateMins||0,
+      att.earlyMins>0?blk(att.earlyMins):0,
+      att.lateMins>0?blk(att.lateMins):0,
+      (att.earlyMins>0?blk(att.earlyMins):0 + att.lateMins>0?blk(att.lateMins):0) * 5,
+      'PIN verified'
+    ];
+    // Note: in production this would append to the register file
+    // For now logged to console — full implementation requires knowing the next empty row
+    console.log('Register entry:', row);
+  } catch(e) { console.error('Register save error:', e); }
+}
+
+// ════════════════════════════════════════════════
+// CONSTANTS
+// ════════════════════════════════════════════════
+const MANAGER_PIN = '6927';
+const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const MONTH_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const MONTH_TABS  = ['','JAN27','FEB27','MAR27','APR26','MAY26','JUN26','JUL26','AUG26','SEP26','OCT26','NOV26','DEC26'];
+const GRACE = { '08:30': 3 };
+const TERM_DATES = [
+  [new Date(2026,3,22),new Date(2026,4,22)],
+  [new Date(2026,5,1), new Date(2026,6,22)],
+  [new Date(2026,8,1), new Date(2026,10,22)],
+  [new Date(2026,10,30),new Date(2026,11,18)],
+  [new Date(2027,0,5), new Date(2027,1,12)],
+  [new Date(2027,1,22),new Date(2027,2,28)],
+];
+function isTerm(d)    { return TERM_DATES.some(([s,e])=>d>=s&&d<=e); }
+function isHoliday(d) { return !isTerm(d); }
+const AC = ['#2C4A3E','#4A7C6A','#6B4F3A','#7FA99A','#C9A84C','#5a6e5a','#8B6914','#3d7a6a','#7a4f2e','#4e7a5a','#6a3d2e'];
+const EMOJIS = ['🌱','🌿','🌸','🌺','🌻','🌼','🍃','🍂','🌊','🦔','🐸','🐝','🦋','🚂','🐛','🦚','🦊','🌍','⭐','🚀','🌈','⚡','🌙','🌟','🕊️','🦁','🌷','🌹','🐠','🐞','🦎'];
+
+// ════════════════════════════════════════════════
+// DATA — children stored as mutable array so admin can add/edit
+// ════════════════════════════════════════════════
+let CHILDREN = [
+  {id:'mia',      name:'Mia',         emoji:'🌸',type:'ey',  ao:1,  color:AC[0], pin:'1001',days:[1,3],      cs:'07:30',ce:'17:30',billing:'funded',    ay:false,hb:null,      notes:'9mth funding',                              startDate:'2025-09-01',endDate:null,archived:false},
+  {id:'luke',     name:'Luke',        emoji:'🌊',type:'ey',  ao:2,  color:AC[1], pin:'1002',days:[1,2,3,4],  cs:'07:30',ce:'17:30',billing:'wraparound',ay:false,hb:null,      notes:'9mth funding 7.5hrs/day',                   startDate:'2025-09-01',endDate:null,archived:false},
+  {id:'oliver',   name:'Oliver',      emoji:'🦔',type:'ey',  ao:3,  color:AC[2], pin:'1003',days:[2,3],      cs:'08:00',ce:'17:30',billing:'fullday',   ay:true, hb:'fullday', notes:'Under 2, full day, 9mth funding from Sep 26',startDate:'2026-05-18',endDate:null,archived:false},
+  {id:'sama',     name:'Sama',        emoji:'🌺',type:'ey',  ao:4,  color:AC[3], pin:'1004',days:[1,2,3,4],  cs:'08:00',ce:'16:00',billing:'wraparound',ay:false,hb:null,      notes:'9mth funding',                              startDate:'2025-09-01',endDate:null,archived:false},
+  {id:'holly',    name:'Holly',       emoji:'🍃',type:'ey',  ao:5,  color:AC[4], pin:'1005',days:[1,2,3,4,5],cs:'08:30',ce:'17:30',billing:'wraparound',ay:true, hb:'fullday', notes:'2yr funding + wrap',                        startDate:'2025-09-01',endDate:null,archived:false},
+  {id:'arlo',     name:'Arlo',        emoji:'🌱',type:'ey',  ao:6,  color:AC[5], pin:'1006',days:[1,2,4],    cs:'08:00',ce:'16:30',billing:'funded',    ay:false,hb:null,      notes:'2yr funding only',                          startDate:'2025-09-01',endDate:null,archived:false},
+  {id:'aureliusz',name:'Aureliusz',   emoji:'🌻',type:'ey',  ao:7,  color:AC[6], pin:'1007',days:[4,5],      cs:'08:30',ce:'16:00',billing:'funded',    ay:false,hb:null,      notes:'2yr funding only',                          startDate:'2025-09-01',endDate:null,archived:false},
+  {id:'james',    name:'James',       emoji:'🐸',type:'ey',  ao:8,  color:AC[7], pin:'1008',days:[1,3],      cs:'07:30',ce:'17:30',billing:'funded',    ay:false,hb:null,      notes:'2yr funding only',                          startDate:'2025-09-01',endDate:null,archived:false},
+  {id:'frankie',  name:'Frankie',     emoji:'🚂',type:'ey',  ao:9,  color:AC[8], pin:'1009',days:[1,2,3,4,5],cs:'08:00',ce:'17:00',billing:'wraparound',ay:true, hb:'fullday', notes:'Wrap around now, funded only from June term',startDate:'2025-09-01',endDate:null,archived:false},
+  {id:'frederick',name:'Frederick',   emoji:'🐛',type:'ey',  ao:10, color:AC[9], pin:'1010',days:[3,4],      cs:'08:00',ce:'17:00',billing:'wraparound',ay:true, hb:'fullday', notes:'2yr funding + wrap',                        startDate:'2025-09-01',endDate:null,archived:false},
+  {id:'jean',     name:'Jean',        emoji:'🌿',type:'ey',  ao:11, color:AC[10],pin:'1011',days:[1,2,3,4,5],cs:'08:30',ce:'16:30',billing:'wraparound',ay:true, hb:'fullday', notes:'3yr 15hrs funding',                          startDate:'2025-09-01',endDate:null,archived:false},
+  {id:'joshua',   name:'Joshua',      emoji:'🐝',type:'ey',  ao:12, color:AC[0], pin:'1012',days:[4,5],      cs:'08:30',ce:'17:30',billing:'wraparound',ay:false,hb:null,      notes:'3yr funding 3.15hrs',                        startDate:'2025-09-01',endDate:null,archived:false},
+  {id:'margaret', name:'Margaret',    emoji:'🌼',type:'ey',  ao:13, color:AC[1], pin:'1013',days:[1,2,3,4,5],cs:'08:10',ce:'14:20',billing:'wraparound',ay:true, hb:'halfday', notes:'3yr funding',                               startDate:'2025-09-01',endDate:null,archived:false},
+  {id:'ashraf',   name:'Ashraf',      emoji:'🌍',type:'ey',  ao:14, color:AC[2], pin:'1014',days:[1,2],      cs:'08:30',ce:'14:30',billing:'halfday',   ay:true, hb:'halfday', notes:'Half day fee',                               startDate:'2025-09-01',endDate:null,archived:false},
+  {id:'diora',    name:'Diora',       emoji:'🦚',type:'ey',  ao:15, color:AC[3], pin:'1015',days:[1,2,3,4],  cs:'07:30',ce:'17:00',billing:'fullday',   ay:true, hb:'fullday', notes:'4yr funding, all year round',               startDate:'2025-09-01',endDate:null,archived:false},
+  {id:'rory',     name:'Rory',        emoji:'🦊',type:'ey',  ao:16, color:AC[4], pin:'1016',days:[2,3,4,5],  cs:'07:45',ce:'17:15',billing:'wraparound',ay:false,hb:null,      notes:'4yr funding 7.5hrs/day',                    startDate:'2025-09-01',endDate:null,archived:false},
+  {id:'alara',    name:'Alara',       emoji:'⭐',type:'school',ao:1, color:AC[5], pin:'2001',days:[1,2,3,4,5],cs:'07:30',ce:'16:30',billing:'wraparound',ay:false,hb:null,      notes:'Before school daily, after school Mon only', startDate:'2025-09-01',endDate:null,archived:false},
+  {id:'bernard',  name:'Bernard',     emoji:'🚀',type:'school',ao:2, color:AC[6], pin:'2002',days:[1,2,3,4,5],cs:'07:30',ce:'17:30',billing:'wraparound',ay:false,hb:null,      notes:'Before and after school',                   startDate:'2025-09-01',endDate:null,archived:false},
+  {id:'bonnie',   name:'Bonnie',      emoji:'🌈',type:'school',ao:3, color:AC[7], pin:'2003',days:[2,3,4,5], cs:'07:30',ce:'08:55',billing:'wraparound',ay:false,hb:null,       notes:'Before school Tue-Fri',                     startDate:'2025-09-01',endDate:null,archived:false},
+  {id:'douglas',  name:'Douglas',     emoji:'⚡',type:'school',ao:4, color:AC[8], pin:'2004',days:[1,2,3,4,5],cs:'07:30',ce:'17:30',billing:'wraparound',ay:false,hb:null,      notes:'Before and after school, same as Bernard',  startDate:'2025-09-01',endDate:null,archived:false},
+  {id:'ellia',    name:'Ellia',       emoji:'🌙',type:'school',ao:5, color:AC[9], pin:'2005',days:[1,2,3,4,5],cs:'08:00',ce:'17:00',billing:'fullday',   ay:false,hb:'fullday', notes:'Holidays only',                             startDate:'2025-09-01',endDate:null,archived:false},
+  {id:'evelyndad',name:'Evelyn (Dad)',emoji:'🌟',type:'school',ao:6, color:AC[10],pin:'2006',days:[3],        cs:'15:25',ce:'17:00',billing:'wraparound',ay:false,hb:null,       notes:'After school Wed, billed to Dad',           startDate:'2025-09-01',endDate:null,archived:false},
+  {id:'evelynmum',name:'Evelyn (Mum)',emoji:'🌟',type:'school',ao:7, color:AC[10],pin:'2007',days:[1,2,3,4,5],cs:'08:00',ce:'17:30',billing:'varies',    ay:false,hb:null,       notes:'Min 4hrs/week, billed to Mum',              startDate:'2025-09-01',endDate:null,archived:false},
+  {id:'hope',     name:'Hope',        emoji:'🕊️',type:'school',ao:8, color:AC[0], pin:'2008',days:[1,2,3,4,5],cs:'07:30',ce:'17:00',billing:'wraparound',ay:false,hb:null,      notes:'Before and after school',                   startDate:'2025-09-01',endDate:null,archived:false},
+  {id:'norman',   name:'Norman',      emoji:'🦁',type:'school',ao:9, color:AC[1], pin:'2009',days:[1,2,3,4,5],cs:'07:30',ce:'17:00',billing:'wraparound',ay:false,hb:null,      notes:'Before and after school',                   startDate:'2025-09-01',endDate:null,archived:false},
+  {id:'thear',    name:'Thea R',      emoji:'🌷',type:'school',ao:10,color:AC[2], pin:'2010',days:[1,2,3,4,5],cs:'08:00',ce:'17:00',billing:'fullday',   ay:false,hb:'fullday', notes:'Holidays only',                             startDate:'2025-09-01',endDate:null,archived:false},
+  {id:'theat',    name:'Thea T',      emoji:'🌹',type:'school',ao:11,color:AC[3], pin:'2011',days:[1,2,3,4,5],cs:'08:00',ce:'17:00',billing:'fullday',   ay:false,hb:'fullday', notes:'Holidays only',                             startDate:'2025-09-01',endDate:null,archived:false},
+];
+
+let STAFF = [
+  {id:'sussie',    name:'Sussie',    role:'Registered Childminder', color:AC[0],pin:'5840',sch:{1:{s:'07:15',e:'18:00'},2:{s:'07:15',e:'18:00'},3:{s:'07:15',e:'18:00'},4:{s:'07:15',e:'18:00'},5:{s:'07:15',e:'18:00'}},archived:false},
+  {id:'claire',    name:'Claire',    role:'Level 4 Educator',       color:AC[1],pin:'1111',sch:{1:{s:'08:00',e:'17:00'},3:{s:'08:00',e:'16:15'},4:{s:'08:00',e:'16:15'}},archived:false},
+  {id:'courtney',  name:'Courtney',  role:'Level 3 Educator',       color:AC[2],pin:'2222',sch:{2:{s:'07:30',e:'17:00'},3:{s:'07:30',e:'17:00'},4:{s:'07:30',e:'17:00'},5:{s:'08:00',e:'16:30'}},archived:false},
+  {id:'alexandra', name:'Alexandra', role:'Early Years Apprentice', color:AC[3],pin:'3333',sch:{1:{s:'07:30',e:'16:30'},2:{s:'08:00',e:'16:30'},5:{s:'08:30',e:'15:00'}},archived:false},
+  {id:'chloe',     name:'Chloe',     role:'Early Years Apprentice', color:AC[4],pin:'4444',sch:{1:{s:'07:45',e:'17:15'},2:{s:'07:45',e:'17:15'},3:{s:'07:30',e:'12:30'}},archived:false},
+  {id:'leah',      name:'Leah',      role:'Early Years Apprentice', color:AC[5],pin:'5555',sch:{3:{s:'12:30',e:'17:00'},4:{s:'07:30',e:'17:00'},5:{s:'07:30',e:'17:30'}},archived:false},
+];
+
+// ════════════════════════════════════════════════
+// STATE
+// ════════════════════════════════════════════════
+let viewDate = new Date(); viewDate.setHours(0,0,0,0);
+let managerMode = false;
+let currentTab = 'children';
+let attendance = {};
+let staffLog = {};
+let eventLog = {};
+let overrides = {};
+let pinTarget = null, pinEntry = '', pinShaking = false;
+let mgrPinEntry = '', mgrPinShaking = false;
+let actionTarget = null;
+let setPinTarget = null, spEntry = '', spFirst = '', spShaking = false;
+let overrideSelectedChild = null;
+let pinCustomised = {};
+let adminEditTarget = null; // {type, id} or null for new
+let adminFormDays = [];
+let adminFormEmoji = '🌱';
+
+function isPinDefault(type,id){ return !pinCustomised[type+'_'+id]; }
+function markPinCustomised(type,id){ pinCustomised[type+'_'+id]=true; }
+
+// ════════════════════════════════════════════════
+// HELPERS
+// ════════════════════════════════════════════════
+function dk(d){ return `${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`; }
+function p2(n){ return String(n).padStart(2,'0'); }
+// Exact time to the minute — no rounding
+function ts(d){ return `${p2(d.getHours())}:${p2(d.getMinutes())}`; }
+function pm(s){ const[h,m]=s.split(':').map(Number);return h*60+m; }
+function blk(m){ return Math.ceil(m/15); }
+function cost(m){ return blk(m)*5; }
+function fmins(m){ if(m<60)return `${m}min`;const h=Math.floor(m/60),r=m%60;return r?`${h}hr ${r}min`:`${h}hr`; }
+function graceMins(cs){ return GRACE[cs]||0; }
+
+function getAtt(cid,d){
+  const k=dk(d);
+  if(!attendance[cid])attendance[cid]={};
+  if(!attendance[cid][k])attendance[cid][k]={signedIn:false,signInTime:null,signOutTime:null,earlyMins:0,lateMins:0};
+  return attendance[cid][k];
+}
+function getSLog(sid,d){
+  const k=dk(d);
+  if(!staffLog[sid])staffLog[sid]={};
+  if(!staffLog[sid][k])staffLog[sid][k]={clockedIn:false,clockInTime:null,clockOutTime:null,lateInMins:0,earlyOutMins:0};
+  return staffLog[sid][k];
+}
+function getLog(d){ const k=dk(d);if(!eventLog[k])eventLog[k]=[];return eventLog[k]; }
+function getOv(d){ const k=dk(d);if(!overrides[k])overrides[k]={};return overrides[k]; }
+
+function childScheduledToday(c,d){
+  if(c.archived)return false;
+  if(c.startDate && dk(d)<c.startDate)return false;
+  if(c.endDate   && dk(d)>c.endDate)  return false;
+  const dow=d.getDay();
+  const ov=getOv(d);
+  if(ov[c.id]==='add')return true;
+  if(ov[c.id]==='remove')return false;
+  if(!c.days.includes(dow))return false;
+  if(['ellia','thear','theat'].includes(c.id))return isHoliday(d);
+  if(c.ay===false||c.ay==='true')return isTerm(d);
+  if(c.ay==='holidays')return isHoliday(d);
+  return true;
+}
+function staffScheduledToday(s,d){ return !s.archived && !!s.sch[d.getDay()]; }
+
+// ════════════════════════════════════════════════
+// CLOCK — exact to the minute, no rounding
+// ════════════════════════════════════════════════
+function updateClock(){
+  const n=new Date();
+  document.getElementById('clock').textContent=ts(n);
+  document.getElementById('dateDisp').textContent=`${DAYS[n.getDay()].slice(0,3)} ${n.getDate()} ${MONTH_SHORT[n.getMonth()]}`;
+}
+updateClock(); setInterval(updateClock,1000);
+
+// ════════════════════════════════════════════════
+// MANAGER MODE
+// ════════════════════════════════════════════════
+function mgrBtnClick(){ if(managerMode){exitManager();return;} mgrPinEntry='';updateMgrDots();document.getElementById('mgrPinErr').textContent='';document.getElementById('mgrPinOv').classList.add('vis'); }
+function closeMgrPin(){ document.getElementById('mgrPinOv').classList.remove('vis');mgrPinEntry='';updateMgrDots(); }
+function mkp(d){ if(mgrPinEntry.length>=4||mgrPinShaking)return;mgrPinEntry+=d;updateMgrDots();if(mgrPinEntry.length===4)setTimeout(checkMgrPin,110); }
+function mkd(){ mgrPinEntry=mgrPinEntry.slice(0,-1);updateMgrDots();document.getElementById('mgrPinErr').textContent=''; }
+function updateMgrDots(){ for(let i=0;i<4;i++){const el=document.getElementById('mpd'+i);el.classList.toggle('filled',i<mgrPinEntry.length);el.classList.remove('err');} }
+function checkMgrPin(){
+  if(mgrPinEntry===MANAGER_PIN){ closeMgrPin();enterManager(); }
+  else{ mgrPinShaking=true;for(let i=0;i<4;i++)document.getElementById('mpd'+i).classList.add('err');document.getElementById('mgrPinErr').textContent='Incorrect PIN';setTimeout(()=>{mgrPinShaking=false;mgrPinEntry='';updateMgrDots();},450); }
+}
+function enterManager(){
+  managerMode=true;
+  document.getElementById('mgrBtn').classList.add('active');
+  document.getElementById('mgrBanner').style.display='flex';
+  document.getElementById('dateNav').style.display='flex';
+  document.querySelectorAll('.mgr-only').forEach(el=>el.style.display='');
+  updateDateNav();renderAll();showFlash('⚙ Manager mode unlocked');
+}
+function exitManager(){
+  managerMode=false;
+  document.getElementById('mgrBtn').classList.remove('active');
+  document.getElementById('mgrBanner').style.display='none';
+  document.getElementById('dateNav').style.display='none';
+  document.querySelectorAll('.mgr-only').forEach(el=>el.style.display='none');
+  if(!['children','staff'].includes(currentTab))setTab('children');
+  renderAll();
+}
+
+// ════════════════════════════════════════════════
+// DATE NAV
+// ════════════════════════════════════════════════
+function updateDateNav(){
+  const d=viewDate,isToday=dk(d)===dk(new Date());
+  const label=isToday?`Today — ${DAYS[d.getDay()]} ${d.getDate()} ${MONTH_SHORT[d.getMonth()]}`:`${DAYS[d.getDay()]} ${d.getDate()} ${MONTH_SHORT[d.getMonth()]} ${d.getFullYear()}`;
+  document.getElementById('dateNavLabel').textContent=label;
+  document.getElementById('mgrDateLabel').textContent=label;
+}
+function changeDay(dir){ viewDate=new Date(viewDate.getTime()+dir*86400000);updateDateNav();renderAll(); }
+function goToday(){ viewDate=new Date();viewDate.setHours(0,0,0,0);updateDateNav();renderAll(); }
+
+// ════════════════════════════════════════════════
+// TABS
+// ════════════════════════════════════════════════
+function setTab(t){
+  currentTab=t;
+  ['children','staff','log','invoice','override','admin','settings'].forEach((p,i)=>{
+    document.getElementById('panel-'+p).style.display=p===t?'':'none';
+    document.querySelectorAll('.tab')[i].classList.toggle('active',p===t);
+  });
+  if(t==='log')renderLog();
+  if(t==='invoice')renderInvoice();
+  if(t==='override')renderOverride();
+  if(t==='admin')renderAdmin();
+  if(t==='settings')renderSettings();
+}
+
+// ════════════════════════════════════════════════
+// RENDER CHILDREN
+// ════════════════════════════════════════════════
+function renderChildren(){
+  const eyToday  = CHILDREN.filter(c=>c.type==='ey'     &&childScheduledToday(c,viewDate)).sort((a,b)=>a.ao-b.ao);
+  const schToday = CHILDREN.filter(c=>c.type==='school' &&childScheduledToday(c,viewDate)).sort((a,b)=>a.ao-b.ao);
+  function grp(list,label){
+    if(!list.length)return`<div class="empty" style="padding:12px 0">No ${label.toLowerCase()} attending today</div>`;
+    const inN=list.filter(c=>getAtt(c.id,viewDate).signedIn).length;
+    return`<div class="sec-head"><div class="sec-label">${label}</div><div class="sec-line"></div><div class="sec-count">${inN}/${list.length} in</div></div>
+    <div class="sec-sub">Tap a name · PIN required · times recorded to the exact minute</div>
+    <div class="children-grid">${list.map(c=>{
+      const att=getAtt(c.id,viewDate),ov=getOv(viewDate)[c.id],hasExtra=att.earlyMins>0||att.lateMins>0;
+      return`<div class="child-card ${att.signedIn?'in':''} ${ov==='add'?'override':''}" onclick="openPin('child','${c.id}')">
+        ${hasExtra?'<div class="early-flag"></div>':''}
+        <div class="child-avatar" style="background:${c.color}">${c.emoji}</div>
+        <div class="child-name">${c.name}</div>
+        <span class="child-badge ${att.signedIn?'badge-in':'badge-out'}">${att.signedIn?'In':'Out'}</span>
+        ${att.signInTime?`<div class="child-time">in ${att.signInTime}${att.signOutTime?' · out '+att.signOutTime:''}</div>`:''}
+      </div>`;
+    }).join('')}</div>`;
+  }
+  document.getElementById('eySection').innerHTML=grp(eyToday,'Early Years');
+  document.getElementById('schoolSection').innerHTML=grp(schToday,'School Children');
+}
+
+// ════════════════════════════════════════════════
+// RENDER STAFF
+// ════════════════════════════════════════════════
+function renderStaff(){
+  const todayStaff=STAFF.filter(s=>staffScheduledToday(s,viewDate));
+  const el=document.getElementById('staffList');
+  if(!todayStaff.length){el.innerHTML='<div class="empty">No staff scheduled today</div>';return;}
+  const isToday=dk(viewDate)===dk(new Date());
+  el.innerHTML=todayStaff.map(s=>{
+    const log=getSLog(s.id,viewDate),dow=viewDate.getDay(),sched=s.sch[dow];
+    const nowMins=new Date().getHours()*60+new Date().getMinutes();
+    const isLate=isToday&&!log.clockedIn&&sched&&nowMins>pm(sched.s);
+    return`<div class="staff-card ${log.clockedIn?'in':isLate?'late':''}" onclick="openPin('staff','${s.id}')">
+      <div class="staff-avatar" style="background:${s.color}">${s.name.charAt(0)}</div>
+      <div class="staff-info">
+        <div class="staff-name">${s.name}</div>
+        <div class="staff-role">${s.role}</div>
+        ${log.clockInTime?`<div class="staff-clock">In ${log.clockInTime}${log.clockOutTime?' · Out '+log.clockOutTime:''}</div>`:''}
+        ${log.lateInMins>0?`<div class="staff-late-note">⚠ ${log.lateInMins}min late</div>`:''}
+      </div>
+      <div class="staff-sbadge ${log.clockedIn?'sb-in':isLate?'sb-late':'sb-out'}">${log.clockedIn?'● In':isLate?'⚠ Late':'○ Out'}</div>
+    </div>`;
+  }).join('');
+}
+
+// ════════════════════════════════════════════════
+// RENDER LOG
+// ════════════════════════════════════════════════
+function renderLog(){
+  const log=getLog(viewDate),el=document.getElementById('logWrap');
+  const d=viewDate;
+  document.getElementById('logDateLabel').textContent=`${DAYS[d.getDay()]} ${d.getDate()} ${MONTH_SHORT[d.getMonth()]} ${d.getFullYear()}`;
+  document.getElementById('logCount').textContent=`${log.length} entr${log.length===1?'y':'ies'}`;
+  if(!log.length){el.innerHTML='<div class="empty">No entries for this day</div>';return;}
+  el.innerHTML=log.map(e=>`<div class="log-entry">
+    <div class="log-dot ${e.action==='in'?'ld-in':e.action==='override'?'ld-ov':'ld-out'}"></div>
+    <div class="log-name">${e.name}</div>
+    <div class="log-detail">${e.type==='staff'?'clocked':'signed'} ${e.action}${e.note?' ('+e.note+')':''}</div>
+    ${e.extra>0?`<div class="log-extra">+${e.extra}m · £${cost(e.extra).toFixed(2)}</div>`:''}
+    <div class="log-time">${e.time}</div>
+    <div style="font-size:10px">🔒</div>
+  </div>`).join('');
+}
+
+// ════════════════════════════════════════════════
+// RENDER INVOICE
+// ════════════════════════════════════════════════
+function renderInvoice(){
+  const el=document.getElementById('invoiceList');
+  const attended=CHILDREN.filter(c=>getAtt(c.id,viewDate).signInTime);
+  if(!attended.length){el.innerHTML='<div class="empty" style="background:rgba(255,255,255,0.04);border-radius:12px;padding:24px">No children signed in yet</div>';return;}
+  el.innerHTML=attended.map(c=>{
+    const att=getAtt(c.id,viewDate);
+    const eb=att.earlyMins>0?blk(att.earlyMins):0,lb=att.lateMins>0?blk(att.lateMins):0;
+    const bt=isHoliday(viewDate)?(c.hb||c.billing):c.billing;
+    let sc=0;if(bt==='fullday')sc=60;else if(bt==='halfday')sc=40;
+    return`<div class="inv-card">
+      <div class="inv-header"><div class="inv-name">${c.emoji} ${c.name}</div><div class="inv-badge">${c.notes}</div></div>
+      <div class="inv-row"><span>Sign in</span><span>${att.signInTime||'—'}</span></div>
+      <div class="inv-row"><span>Sign out</span><span>${att.signOutTime||'—'}</span></div>
+      ${eb>0?`<div class="inv-row hl"><span>Early (${att.earlyMins}min → ${eb} block${eb!==1?'s':''})</span><span>£${(eb*5).toFixed(2)}</span></div>`:''}
+      ${lb>0?`<div class="inv-row hl"><span>Late (${att.lateMins}min → ${lb} block${lb!==1?'s':''})</span><span>£${(lb*5).toFixed(2)}</span></div>`:''}
+      <div class="inv-row"><span>Session (${bt})</span><span>${sc>0?'£'+sc.toFixed(2):'Funded'}</span></div>
+      <div class="inv-row total"><span>Day total</span><span>£${(sc+(eb+lb)*5).toFixed(2)}</span></div>
+    </div>`;
+  }).join('');
+}
+
+// ════════════════════════════════════════════════
+// RENDER OVERRIDE
+// ════════════════════════════════════════════════
+function renderOverride(){
+  const ov=getOv(viewDate);
+  const scheduled=CHILDREN.filter(c=>childScheduledToday(c,viewDate));
+  const notSched=CHILDREN.filter(c=>!c.archived&&!childScheduledToday(c,viewDate));
+  document.getElementById('addGrid').innerHTML=notSched.length?notSched.map(c=>`
+    <div class="ov-card ${ov[c.id]==='add'?'added':''}" onclick="toggleOverride('${c.id}','add')">
+      <div class="ov-av" style="width:32px;height:32px;border-radius:50%;background:${c.color};display:flex;align-items:center;justify-content:center;font-size:16px;margin:0 auto 4px">${c.emoji}</div>
+      <div class="ov-name">${c.name}</div>
+      <div class="ov-action ${ov[c.id]==='add'?'ov-add-c':'ov-norm'}">${ov[c.id]==='add'?'✓ Added':'+ Add'}</div>
+    </div>`).join(''):'<div style="color:rgba(255,255,255,0.3);font-size:12px;padding:8px">All children scheduled today</div>';
+  document.getElementById('removeGrid').innerHTML=scheduled.length?scheduled.map(c=>`
+    <div class="ov-card ${ov[c.id]==='remove'?'removed':''}" onclick="toggleOverride('${c.id}','remove')">
+      <div class="ov-av" style="width:32px;height:32px;border-radius:50%;background:${c.color};display:flex;align-items:center;justify-content:center;font-size:16px;margin:0 auto 4px">${c.emoji}</div>
+      <div class="ov-name">${c.name}</div>
+      <div class="ov-action ${ov[c.id]==='remove'?'ov-rem-c':'ov-norm'}">${ov[c.id]==='remove'?'✗ Removed':'Scheduled'}</div>
+    </div>`).join(''):'<div style="color:rgba(255,255,255,0.3);font-size:12px;padding:8px">No children scheduled today</div>';
+}
+function toggleOverride(cid,action){
+  const ov=getOv(viewDate);
+  if(ov[cid]===action)delete ov[cid]; else ov[cid]=action;
+  renderOverride();renderChildren();updateStatusBar();
+  const c=CHILDREN.find(x=>x.id===cid);
+  showFlash(action==='add'?`${c.emoji} ${c.name} added for today`:`${c.emoji} ${c.name} removed from today`);
+}
+
+// ════════════════════════════════════════════════
+// RENDER ADMIN
+// ════════════════════════════════════════════════
+function renderAdmin(){
+  const childList=document.getElementById('adminChildList');
+  const staffList=document.getElementById('adminStaffList');
+  childList.innerHTML=CHILDREN.map(c=>{
+    const today=childScheduledToday(c,viewDate);
+    const badge=c.archived?'ab-archived':c.startDate&&dk(new Date())<c.startDate?'ab-future':'ab-active';
+    const label=c.archived?'Archived':c.startDate&&dk(new Date())<c.startDate?'Future starter':'Active';
+    return`<div class="admin-row ${c.archived?'archived':''}" onclick="openAdminForm('child','${c.id}')">
+      <div class="admin-row-av" style="background:${c.color}">${c.emoji}</div>
+      <div class="admin-row-info">
+        <div class="admin-row-name">${c.name}</div>
+        <div class="admin-row-detail">${c.type==='ey'?'Early Years':'School'} · ${c.notes}</div>
+      </div>
+      <span class="admin-row-badge ${badge}">${label}</span>
+    </div>`;
+  }).join('');
+  staffList.innerHTML=STAFF.map(s=>`
+    <div class="admin-row ${s.archived?'archived':''}" onclick="openAdminForm('staff','${s.id}')">
+      <div class="admin-row-av" style="background:${s.color};font-family:'Playfair Display',serif;font-size:14px;font-weight:700;color:white">${s.name.charAt(0)}</div>
+      <div class="admin-row-info">
+        <div class="admin-row-name">${s.name}</div>
+        <div class="admin-row-detail">${s.role}</div>
+      </div>
+      <span class="admin-row-badge ${s.archived?'ab-archived':'ab-active'}">${s.archived?'Archived':'Active'}</span>
+    </div>`).join('');
+}
+
+// ════════════════════════════════════════════════
+// ADMIN FORM
+// ════════════════════════════════════════════════
+function openAdminForm(type, id){
+  adminEditTarget={type,id};
+  adminFormDays=[];
+  // Build emoji grid
+  const grid=document.getElementById('afEmojiGrid');
+  grid.innerHTML=EMOJIS.map(e=>`<div class="af-emoji-btn ${adminFormEmoji===e?'sel':''}" onclick="selectEmoji('${e}')">${e}</div>`).join('');
+
+  if(id){
+    const entity=type==='child'?CHILDREN.find(x=>x.id===id):STAFF.find(x=>x.id===id);
+    document.getElementById('afTitle').textContent=`Edit — ${entity.name}`;
+    document.getElementById('afName').value=entity.name;
+    document.getElementById('afType').value=type==='staff'?'staff':entity.type;
+    if(type==='child'){
+      document.getElementById('afBilling').value=entity.billing;
+      document.getElementById('afStartTime').value=entity.cs;
+      document.getElementById('afEndTime').value=entity.ce;
+      document.getElementById('afTermTime').value=entity.ay===true?'false':entity.ay==='holidays'?'holidays':'true';
+      adminFormDays=[...entity.days];
+    } else {
+      document.getElementById('afRole').value=entity.role;
+      // Parse staff schedule into days
+      adminFormDays=Object.keys(entity.sch).map(Number);
+      const firstDay=adminFormDays[0];
+      if(firstDay!==undefined){
+        document.getElementById('afStartTime').value=entity.sch[firstDay].s;
+        document.getElementById('afEndTime').value=entity.sch[firstDay].e;
+      }
+    }
+    document.getElementById('afStartDate').value=entity.startDate||'';
+    document.getElementById('afEndDate').value=entity.endDate||'';
+    document.getElementById('afNotes').value=entity.notes||'';
+    adminFormEmoji=entity.emoji||'🌱';
+    document.getElementById('afArchiveBtn').style.display='block';
+    document.getElementById('afArchiveBtn').textContent=entity.archived?'Restore to register':'Archive (remove from register)';
+  } else {
+    document.getElementById('afTitle').textContent=type==='staff'?'Add Staff Member':'Add Child';
+    document.getElementById('afName').value='';
+    document.getElementById('afStartDate').value='';
+    document.getElementById('afEndDate').value='';
+    document.getElementById('afNotes').value='';
+    document.getElementById('afArchiveBtn').style.display='none';
+    adminFormEmoji='🌱';
+  }
+  renderAdminForm();
+  updateDayButtons();
+  document.getElementById('adminFormOv').classList.add('vis');
+}
+function renderAdminForm(){
+  const type=document.getElementById('afType').value;
+  document.getElementById('afBillingGroup').style.display=type==='staff'?'none':'block';
+  document.getElementById('afRoleGroup').style.display=type==='staff'?'block':'none';
+  document.getElementById('afTermGroup').style.display=type==='staff'?'none':'block';
+}
+function closeAdminForm(){ document.getElementById('adminFormOv').classList.remove('vis'); adminEditTarget=null; }
+function toggleDay(d){
+  const idx=adminFormDays.indexOf(d);
+  if(idx>=0)adminFormDays.splice(idx,1); else adminFormDays.push(d);
+  updateDayButtons();
+}
+function updateDayButtons(){
+  document.querySelectorAll('.af-day').forEach(btn=>{
+    const d=parseInt(btn.dataset.day);
+    btn.classList.toggle('sel',adminFormDays.includes(d));
+  });
+}
+function selectEmoji(e){
+  adminFormEmoji=e;
+  document.querySelectorAll('.af-emoji-btn').forEach(btn=>btn.classList.toggle('sel',btn.textContent===e));
+}
+function saveAdminForm(){
+  const type=document.getElementById('afType').value;
+  const name=document.getElementById('afName').value.trim();
+  if(!name){showFlash('Please enter a name');return;}
+  if(adminFormDays.length===0){showFlash('Please select at least one day');return;}
+
+  if(type==='staff'){
+    const role=document.getElementById('afRole').value;
+    const st=document.getElementById('afStartTime').value;
+    const et=document.getElementById('afEndTime').value;
+    const sch={};
+    adminFormDays.forEach(d=>sch[d]={s:st,e:et});
+
+    if(adminEditTarget&&adminEditTarget.id){
+      const s=STAFF.find(x=>x.id===adminEditTarget.id);
+      s.name=name;s.role=role;s.sch=sch;
+      s.startDate=document.getElementById('afStartDate').value||null;
+      s.endDate=document.getElementById('afEndDate').value||null;
+      showFlash(`✓ ${name} updated`);
+    } else {
+      STAFF.push({id:'staff_'+Date.now(),name,role,color:AC[STAFF.length%AC.length],pin:'0000',sch,archived:false,
+        startDate:document.getElementById('afStartDate').value||null,
+        endDate:document.getElementById('afEndDate').value||null});
+      showFlash(`✓ ${name} added`);
+    }
+  } else {
+    const cs=document.getElementById('afStartTime').value;
+    const ce=document.getElementById('afEndTime').value;
+    const billing=document.getElementById('afBilling').value;
+    const ayVal=document.getElementById('afTermTime').value;
+    const ay=ayVal==='false'?true:ayVal==='holidays'?'holidays':false;
+    const notes=document.getElementById('afNotes').value;
+
+    if(adminEditTarget&&adminEditTarget.id){
+      const c=CHILDREN.find(x=>x.id===adminEditTarget.id);
+      c.name=name;c.emoji=adminFormEmoji;c.type=type;c.days=adminFormDays;
+      c.cs=cs;c.ce=ce;c.billing=billing;c.ay=ay;c.notes=notes;
+      c.startDate=document.getElementById('afStartDate').value||null;
+      c.endDate=document.getElementById('afEndDate').value||null;
+      showFlash(`✓ ${name} updated`);
+    } else {
+      const maxAo=CHILDREN.filter(c=>c.type===type).reduce((m,c)=>Math.max(m,c.ao),0);
+      CHILDREN.push({id:'child_'+Date.now(),name,emoji:adminFormEmoji,type,ao:maxAo+1,
+        color:AC[CHILDREN.length%AC.length],pin:'0000',days:adminFormDays,
+        cs,ce,billing,ay,hb:billing==='funded'?null:billing,notes,
+        startDate:document.getElementById('afStartDate').value||null,
+        endDate:document.getElementById('afEndDate').value||null,archived:false});
+      showFlash(`✓ ${name} added`);
+    }
+  }
+  closeAdminForm();
+  renderAll();
+}
+function archiveEntity(){
+  if(!adminEditTarget||!adminEditTarget.id)return;
+  const type=adminEditTarget.type==='staff'?'staff':'child';
+  const entity=type==='staff'?STAFF.find(x=>x.id===adminEditTarget.id):CHILDREN.find(x=>x.id===adminEditTarget.id);
+  entity.archived=!entity.archived;
+  showFlash(entity.archived?`${entity.name} archived`:`${entity.name} restored`);
+  closeAdminForm();renderAll();
+}
+
+// ════════════════════════════════════════════════
+// RENDER SETTINGS
+// ════════════════════════════════════════════════
+function renderSettings(){
+  const scheduled=CHILDREN.filter(c=>childScheduledToday(c,viewDate));
+  document.getElementById('overrideChildGrid').innerHTML=scheduled.length?scheduled.map(c=>{
+    const att=getAtt(c.id,viewDate),sel=overrideSelectedChild===c.id;
+    return`<div class="mgr-ov-card ${sel?'selected':''}" onclick="selectOverrideChild('${c.id}')">
+      <div class="mgr-ov-av" style="background:${c.color}">${c.emoji}</div>
+      <div class="mgr-ov-name">${c.name}</div>
+      <div class="mgr-ov-status" style="color:${att.signInTime?'var(--ok)':'var(--bark)'}">
+        ${att.signInTime?'In '+att.signInTime:'Not in'}${att.signOutTime?' · Out '+att.signOutTime:''}
+      </div>
+    </div>`;}).join(''):'<div class="empty">No children scheduled today</div>';
+
+  if(overrideSelectedChild){
+    document.getElementById('overrideTimeRow').style.display='block';
+    const c=CHILDREN.find(x=>x.id===overrideSelectedChild),att=getAtt(overrideSelectedChild,viewDate);
+    document.getElementById('overrideChildName').textContent=c.name;
+    document.getElementById('overrideTimeIn').value=att.signInTime||'';
+    document.getElementById('overrideTimeOut').value=att.signOutTime||'';
+  } else {
+    document.getElementById('overrideTimeRow').style.display='none';
+  }
+
+  const everyone=[
+    ...CHILDREN.filter(c=>!c.archived).map(c=>({type:'child',id:c.id,name:c.name,role:c.notes,color:c.color,emoji:c.emoji})),
+    ...STAFF.filter(s=>!s.archived).map(s=>({type:'staff',id:s.id,name:s.name,role:s.role,color:s.color,emoji:null}))
+  ];
+  document.getElementById('pinResetGrid').innerHTML=everyone.map(p=>{
+    const isDef=isPinDefault(p.type,p.id);
+    const av=p.emoji?`<div style="width:32px;height:32px;border-radius:50%;background:${p.color};display:flex;align-items:center;justify-content:center;font-size:16px;margin:0 auto 4px">${p.emoji}</div>`
+      :`<div style="width:32px;height:32px;border-radius:50%;background:${p.color};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:white;font-family:'Playfair Display',serif;margin:0 auto 4px">${p.name.charAt(0)}</div>`;
+    return`<div class="pr-card" onclick="resetPin('${p.type}','${p.id}')">
+      ${av}<div class="pr-name">${p.name}</div>
+      <div class="pr-role">${p.role.split(' ').slice(0,2).join(' ')}</div>
+      <div class="pr-status ${isDef?'prs-def':'prs-set'}">${isDef?'⚠ Default':'✓ Custom'}</div>
+    </div>`;
+  }).join('');
+}
+function selectOverrideChild(cid){ overrideSelectedChild=overrideSelectedChild===cid?null:cid;renderSettings(); }
+function applyOverrideTime(){
+  if(!overrideSelectedChild)return;
+  const c=CHILDREN.find(x=>x.id===overrideSelectedChild),att=getAtt(overrideSelectedChild,viewDate);
+  const inVal=document.getElementById('overrideTimeIn').value;
+  const outVal=document.getElementById('overrideTimeOut').value;
+  if(inVal){att.signInTime=inVal;att.signedIn=true;const grace=graceMins(c.cs),thresh=pm(c.cs)-grace,inMins=pm(inVal);att.earlyMins=inMins<thresh?thresh-inMins:0;}
+  if(outVal){att.signOutTime=outVal;att.signedIn=false;const outMins=pm(outVal);att.lateMins=outMins>pm(c.ce)?outMins-pm(c.ce):0;}
+  getLog(viewDate).unshift({name:c.name,type:'child',action:'override',time:inVal||outVal,extra:0,verified:true,note:'Manager override'});
+  showFlash(`⚙ ${c.name}'s times updated`);
+  overrideSelectedChild=null;renderSettings();renderChildren();updateStatusBar();
+  if(odConnected)writeToExcel(c,viewDate,att);
+}
+function resetPin(type,id){
+  const e=type==='child'?CHILDREN.find(x=>x.id===id):STAFF.find(x=>x.id===id);
+  e.pin='0000';delete pinCustomised[type+'_'+id];
+  showFlash(`🔑 ${e.name}'s PIN reset to 0000`);renderSettings();
+}
+
+// ════════════════════════════════════════════════
+// STATUS BAR
+// ════════════════════════════════════════════════
+function updateStatusBar(){
+  document.getElementById('inCount').textContent=CHILDREN.filter(c=>getAtt(c.id,viewDate).signedIn).length;
+  document.getElementById('staffCount').textContent=STAFF.filter(s=>getSLog(s.id,viewDate).clockedIn).length;
+  document.getElementById('flagCount').textContent=CHILDREN.filter(c=>{const a=getAtt(c.id,viewDate);return a.earlyMins>0||a.lateMins>0;}).length;
+}
+
+// ════════════════════════════════════════════════
+// PIN
+// ════════════════════════════════════════════════
+function openPin(type,id){
+  pinTarget={type,id};pinEntry='';
+  const e=type==='child'?CHILDREN.find(x=>x.id===id):STAFF.find(x=>x.id===id);
+  const av=document.getElementById('pmAv');
+  av.style.cssText=`width:60px;height:60px;border-radius:50%;background:${e.color};display:flex;align-items:center;justify-content:center;margin:0 auto 10px;`;
+  if(type==='child'){av.style.fontSize='26px';av.textContent=e.emoji;}
+  else{av.style.fontSize='22px';av.style.color='white';av.style.fontFamily="'Playfair Display',serif";av.style.fontWeight='700';av.textContent=e.name.charAt(0);}
+  document.getElementById('pmName').textContent=e.name;
+  document.getElementById('pmSub').textContent='Enter your 4-digit PIN';
+  document.getElementById('pinErr').textContent='';
+  updatePinDots();
+  document.getElementById('pinOv').classList.add('vis');
+}
+function closePin(){ document.getElementById('pinOv').classList.remove('vis');pinTarget=null;pinEntry=''; }
+function updatePinDots(){ for(let i=0;i<4;i++){const d=document.getElementById('pd'+i);d.classList.toggle('filled',i<pinEntry.length);d.classList.remove('err');} }
+function kp(d){ if(pinEntry.length>=4||pinShaking)return;pinEntry+=d;updatePinDots();if(pinEntry.length===4)setTimeout(checkPin,110); }
+function kd(){ pinEntry=pinEntry.slice(0,-1);updatePinDots();document.getElementById('pinErr').textContent=''; }
+function checkPin(){
+  const e=pinTarget.type==='child'?CHILDREN.find(x=>x.id===pinTarget.id):STAFF.find(x=>x.id===pinTarget.id);
+  if(pinEntry===e.pin){
+    const t=pinTarget.type,id=pinTarget.id;closePin();
+    if(isPinDefault(t,id))openSetPin(t,id); else openAction(t,id);
+  } else {
+    pinShaking=true;
+    for(let i=0;i<4;i++)document.getElementById('pd'+i).classList.add('err');
+    document.getElementById('pinModal').classList.add('shake');
+    document.getElementById('pinErr').textContent='Incorrect PIN — please try again';
+    setTimeout(()=>{document.getElementById('pinModal').classList.remove('shake');pinShaking=false;pinEntry='';updatePinDots();},450);
+  }
+}
+
+// ════════════════════════════════════════════════
+// SET PIN
+// ════════════════════════════════════════════════
+function openSetPin(type,id){
+  setPinTarget={type,id};spEntry='';spFirst='';
+  const e=type==='child'?CHILDREN.find(x=>x.id===id):STAFF.find(x=>x.id===id);
+  const av=document.getElementById('spAv');
+  av.style.cssText=`width:60px;height:60px;border-radius:50%;background:${e.color};display:flex;align-items:center;justify-content:center;margin:0 auto 10px;`;
+  if(type==='child'){av.style.fontSize='26px';av.textContent=e.emoji;}
+  else{av.style.fontSize='22px';av.style.color='white';av.style.fontFamily="'Playfair Display',serif";av.style.fontWeight='700';av.textContent=e.name.charAt(0);}
+  document.getElementById('spName').textContent=e.name;
+  document.getElementById('spStep').textContent='Step 1 of 2';
+  document.getElementById('spSub').textContent='Your PIN has been reset. Choose a new 4-digit PIN';
+  document.getElementById('spErr').textContent='';
+  updateSpDots();
+  document.getElementById('setPinOv').classList.add('vis');
+}
+function updateSpDots(){ for(let i=0;i<4;i++){const d=document.getElementById('spd'+i);d.classList.toggle('filled',i<spEntry.length);d.classList.remove('err');} }
+function skp(d){ if(spEntry.length>=4||spShaking)return;spEntry+=d;updateSpDots();if(spEntry.length===4)setTimeout(checkSetPin,110); }
+function skd(){ spEntry=spEntry.slice(0,-1);updateSpDots();document.getElementById('spErr').textContent=''; }
+function checkSetPin(){
+  if(!spFirst){
+    spFirst=spEntry;spEntry='';
+    document.getElementById('spStep').textContent='Step 2 of 2';
+    document.getElementById('spSub').textContent='Enter your new PIN again to confirm';
+    document.getElementById('spErr').textContent='';
+    updateSpDots();
+  } else {
+    if(spEntry===spFirst){
+      const{type,id}=setPinTarget;
+      const e=type==='child'?CHILDREN.find(x=>x.id===id):STAFF.find(x=>x.id===id);
+      e.pin=spEntry;markPinCustomised(type,id);
+      document.getElementById('setPinOv').classList.remove('vis');
+      showFlash(`🔑 PIN set for ${e.name}`);
+      openAction(type,id);
+    } else {
+      spShaking=true;
+      for(let i=0;i<4;i++)document.getElementById('spd'+i).classList.add('err');
+      document.getElementById('spErr').textContent="PINs don't match — start again";
+      setTimeout(()=>{spShaking=false;spEntry='';spFirst='';document.getElementById('spStep').textContent='Step 1 of 2';document.getElementById('spSub').textContent='Choose a new 4-digit PIN';updateSpDots();},500);
+    }
+  }
+}
+
+// ════════════════════════════════════════════════
+// ACTION MODAL — exact time, no rounding
+// ════════════════════════════════════════════════
+function openAction(type,id){
+  actionTarget={type,id};
+  const now=new Date();
+  const e=type==='child'?CHILDREN.find(x=>x.id===id):STAFF.find(x=>x.id===id);
+  const av=document.getElementById('actAv');
+  av.style.cssText=`width:60px;height:60px;border-radius:50%;background:${e.color};display:flex;align-items:center;justify-content:center;margin:0 auto 10px;`;
+  if(type==='child'){av.style.fontSize='26px';av.textContent=e.emoji;}
+  else{av.style.fontSize='22px';av.style.color='white';av.style.fontFamily="'Playfair Display',serif";av.style.fontWeight='700';av.textContent=e.name.charAt(0);}
+  document.getElementById('actName').textContent=e.name;
+  // Exact time shown — to the minute
+  document.getElementById('actTime').textContent=ts(now);
+  document.getElementById('actDate').textContent=`${DAYS[now.getDay()]} ${now.getDate()} ${MONTH_SHORT[now.getMonth()]} ${now.getFullYear()}`;
+  const warn=document.getElementById('actWarn');warn.style.display='none';
+  const nowMins=now.getHours()*60+now.getMinutes();
+
+  if(type==='child'){
+    const att=getAtt(id,viewDate),isIn=att.signedIn;
+    document.getElementById('actSub').textContent=(isIn?'Currently signed IN':'Currently signed OUT')+' · PIN verified ✓';
+    document.getElementById('actBtnIn').style.display=isIn?'none':'block';
+    document.getElementById('actBtnOut').style.display=isIn?'block':'none';
+    document.getElementById('actBtnIn').textContent='✓ Sign In';
+    document.getElementById('actBtnOut').textContent='✗ Sign Out';
+    if(!isIn){
+      const grace=graceMins(e.cs),thresh=pm(e.cs)-grace;
+      if(nowMins<thresh){const early=thresh-nowMins,b=blk(early);warn.style.display='block';document.getElementById('actWarnTitle').textContent=`⚠ Early arrival — ${fmins(early)} early`;document.getElementById('actWarnDetail').textContent=`${b} block${b!==1?'s':''} · £${cost(early).toFixed(2)} added to invoice`;}
+    } else {
+      if(nowMins>pm(e.ce)){const late=nowMins-pm(e.ce),b=blk(late);warn.style.display='block';document.getElementById('actWarnTitle').textContent=`⚠ Late collection — ${fmins(late)} late`;document.getElementById('actWarnDetail').textContent=`${b} block${b!==1?'s':''} · £${cost(late).toFixed(2)} added to invoice`;}
+    }
+  } else {
+    const log=getSLog(id,viewDate),isIn=log.clockedIn;
+    document.getElementById('actSub').textContent=(isIn?'Currently CLOCKED IN':'Currently CLOCKED OUT')+' · PIN verified ✓';
+    document.getElementById('actBtnIn').style.display=isIn?'none':'block';
+    document.getElementById('actBtnOut').style.display=isIn?'block':'none';
+    document.getElementById('actBtnIn').textContent='✓ Clock In';
+    document.getElementById('actBtnOut').textContent='✗ Clock Out';
+    if(!isIn){
+      const dow=viewDate.getDay(),sched=e.sch[dow];
+      if(sched&&nowMins>pm(sched.s)){const late=nowMins-pm(sched.s);warn.style.display='block';document.getElementById('actWarnTitle').textContent=`⚠ Late clock-in — ${fmins(late)} late`;document.getElementById('actWarnDetail').textContent=`Contracted start: ${sched.s} · Actual: ${ts(now)}`;}
+    }
+  }
+  document.getElementById('actOv').classList.add('vis');
+}
+function closeAction(){ document.getElementById('actOv').classList.remove('vis');actionTarget=null; }
+
+function confirmAction(isIn){
+  if(!actionTarget)return;
+  const now=new Date(),t=ts(now),nowMins=now.getHours()*60+now.getMinutes();
+  const{type,id}=actionTarget;
+
+  if(type==='child'){
+    const c=CHILDREN.find(x=>x.id===id),att=getAtt(id,viewDate);
+    const grace=graceMins(c.cs),thresh=pm(c.cs)-grace;
+    if(isIn){att.signedIn=true;att.signInTime=t;if(nowMins<thresh)att.earlyMins=thresh-nowMins;}
+    else{att.signedIn=false;att.signOutTime=t;if(nowMins>pm(c.ce))att.lateMins=nowMins-pm(c.ce);}
+    const extra=isIn?att.earlyMins:att.lateMins;
+    getLog(viewDate).unshift({name:c.name,type:'child',action:isIn?'in':'out',time:t,extra,verified:true});
+    showFlash(`${c.emoji} ${c.name} signed ${isIn?'IN':'OUT'} at ${t}${extra>0?' · ⚠ £'+cost(extra).toFixed(2):''}`);
+    if(odConnected)writeToExcel(c,viewDate,att);
+  } else {
+    const s=STAFF.find(x=>x.id===id),log=getSLog(id,viewDate);
+    const dow=viewDate.getDay(),sched=s.sch[dow];
+    if(isIn){log.clockedIn=true;log.clockInTime=t;if(sched&&nowMins>pm(sched.s))log.lateInMins=nowMins-pm(sched.s);}
+    else{log.clockedIn=false;log.clockOutTime=t;if(sched&&nowMins<pm(sched.e))log.earlyOutMins=pm(sched.e)-nowMins;}
+    getLog(viewDate).unshift({name:s.name,type:'staff',action:isIn?'in':'out',time:t,extra:0,verified:true});
+    showFlash(`${s.name} clocked ${isIn?'IN':'OUT'} at ${t}${log.lateInMins>0?' · ⚠ '+log.lateInMins+'min late':''}`);
+  }
+  closeAction();updateStatusBar();renderAll();
+}
+
+// ════════════════════════════════════════════════
+// PHONE VIEW
+// ════════════════════════════════════════════════
+function openPhone(){
+  const d=viewDate;
+  document.getElementById('phoneSub').textContent=`${DAYS[d.getDay()]} ${d.getDate()} ${MONTH_SHORT[d.getMonth()]} — ${dk(d)===dk(new Date())?'LIVE':'Historical'}`;
+  const eyIn=CHILDREN.filter(c=>c.type==='ey'&&getAtt(c.id,d).signedIn).sort((a,b)=>a.ao-b.ao);
+  const schIn=CHILDREN.filter(c=>c.type==='school'&&getAtt(c.id,d).signedIn).sort((a,b)=>a.ao-b.ao);
+  const stOn=STAFF.filter(s=>getSLog(s.id,d).clockedIn);
+  const notIn=CHILDREN.filter(c=>childScheduledToday(c,d)&&!getAtt(c.id,d).signedIn).sort((a,b)=>a.ao-b.ao);
+  const cRow=(c,isIn)=>{const att=getAtt(c.id,d);return`<div class="phone-row ${isIn?'pin':'pout'}">
+    <div class="phone-av" style="background:${c.color};${!isIn?'opacity:0.4':''}">${c.emoji}</div>
+    <div><div class="phone-name" style="${!isIn?'color:rgba(255,255,255,0.4)':''}">${c.name}</div>${isIn?`<div class="phone-detail">in ${att.signInTime}${att.earlyMins>0?' · ⚠ early':''}</div>`:''}</div>
+    <div style="font-size:10px;font-weight:700;color:${isIn?'#5fcf80':'rgba(255,255,255,0.3)'}">${isIn?'● In':'○ Out'}</div>
+  </div>`;};
+  document.getElementById('pEYIn').innerHTML=eyIn.length?eyIn.map(c=>cRow(c,true)).join(''):'<div class="phone-detail" style="padding:8px">None in</div>';
+  document.getElementById('pSchIn').innerHTML=schIn.length?schIn.map(c=>cRow(c,true)).join(''):'<div class="phone-detail" style="padding:8px">None in</div>';
+  document.getElementById('pStaffOn').innerHTML=stOn.length?stOn.map(s=>{const log=getSLog(s.id,d);return`<div class="phone-row pin">
+    <div class="phone-av" style="background:${s.color};font-family:'Playfair Display',serif;font-size:15px;font-weight:700;color:white">${s.name.charAt(0)}</div>
+    <div><div class="phone-name">${s.name}</div><div class="phone-detail">${s.role} · in ${log.clockInTime}${log.lateInMins>0?' · ⚠ '+log.lateInMins+'min late':''}</div></div>
+  </div>`;}).join(''):'<div class="phone-detail" style="padding:8px">No staff clocked in</div>';
+  document.getElementById('pOut').innerHTML=notIn.length?notIn.map(c=>cRow(c,false)).join(''):'<div class="phone-detail" style="padding:8px">All children are in ✓</div>';
+  document.getElementById('phoneOv').classList.add('vis');
+}
+function closePhone(){ document.getElementById('phoneOv').classList.remove('vis'); }
+
+// ════════════════════════════════════════════════
+// OD
+// ════════════════════════════════════════════════
+function openOD(){ document.getElementById('odOv').classList.add('vis'); }
+function closeOD(){ document.getElementById('odOv').classList.remove('vis'); }
+
+// ════════════════════════════════════════════════
+// FLASH
+// ════════════════════════════════════════════════
+function showFlash(msg){ const f=document.getElementById('flash');f.textContent=msg;f.classList.add('show');setTimeout(()=>f.classList.remove('show'),3000); }
+
+// ════════════════════════════════════════════════
+// RENDER ALL
+// ════════════════════════════════════════════════
+function renderAll(){
+  renderChildren();renderStaff();updateStatusBar();
+  if(currentTab==='log')renderLog();
+  if(currentTab==='invoice')renderInvoice();
+  if(currentTab==='override')renderOverride();
+  if(currentTab==='admin')renderAdmin();
+  if(currentTab==='settings')renderSettings();
+}
+
+// Mark all existing PINs as customised so set-PIN only fires after a manager reset
+CHILDREN.forEach(c=>markPinCustomised('child',c.id));
+STAFF.forEach(s=>markPinCustomised('staff',s.id));
+
+// Init MSAL and render
+initMSAL().then(()=>renderAll());
+</script>
+</body>
+</html>
