@@ -636,12 +636,9 @@ async function initiateODAuth() {
   closeOD();
   if (!msalInstance) { showFlash('Auth not ready — please refresh'); return; }
   try {
-    const resp = await msalInstance.loginPopup({ scopes: GRAPH_SCOPES });
-    odAccessToken = resp.accessToken;
-    odConnected = true;
-    updateODBadge();
-    showFlash('✓ Connected to OneDrive');
-  } catch(e) { showFlash('Sign in cancelled or failed'); }
+    await msalInstance.loginRedirect({ scopes: GRAPH_SCOPES });
+    // Page will redirect to Microsoft and back — token handled in initMSAL
+  } catch(e) { showFlash('Sign in failed — please try again'); console.error(e); }
 }
 
 function updateODBadge() {
