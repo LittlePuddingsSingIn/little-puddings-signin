@@ -797,7 +797,12 @@ async function syncWithOneDrive() {
       }
       // For children & staff — use remote if local hasn't changed since last sync
       if (remoteData.CHILDREN && remoteData.CHILDREN.length > 0 && !dataDirty) CHILDREN = remoteData.CHILDREN;
-      if (remoteData.STAFF && remoteData.STAFF.length > 0 && !dataDirty) STAFF = remoteData.STAFF;
+      if (remoteData.STAFF && remoteData.STAFF.length > 0 && !dataDirty) {
+        // Only use remote staff if it has the new payroll fields
+        if (remoteData.STAFF[0].hourlyRate !== undefined) {
+          STAFF = remoteData.STAFF;
+        }
+      }
       if (remoteData.pinCustomised) pinCustomised = { ...remoteData.pinCustomised, ...pinCustomised };
     }
     
