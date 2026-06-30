@@ -324,6 +324,7 @@
     <button class="tab mgr-only" onclick="setTab('invoice')"  style="display:none">Invoices</button>
     <button class="tab mgr-only" onclick="setTab('override')" style="display:none">Day Changes</button>
     <button class="tab mgr-only" onclick="setTab('admin')"    style="display:none">Admin</button>
+    <button class="tab mgr-only" onclick="setTab('payroll')"  style="display:none">Payroll</button>
     <button class="tab mgr-only" onclick="setTab('settings')" style="display:none">Settings</button>
   </div>
 
@@ -379,6 +380,14 @@
       <div class="admin-list" id="adminStaffList"></div>
       <button class="add-btn" onclick="openAdminForm('staff',null)">＋ Add New Staff Member</button>
     </div>
+  </div>
+
+  <!-- PAYROLL -->
+  <div id="panel-payroll" style="display:none">
+    <div class="sec-head"><div class="sec-label">Payroll & Time Sheets</div><div class="sec-line"></div></div>
+    <div class="sec-sub">Staff hours, leave balances, sick days, overtime</div>
+    <div id="payrollOverview"></div>
+    <div id="payrollDetail" style="display:none"></div>
   </div>
 
   <!-- SETTINGS -->
@@ -583,6 +592,36 @@
   </div>
 </div>
 
+<!-- LEAVE ENTRY MODAL -->
+<div class="overlay" id="leaveOv">
+  <div class="admin-modal" style="max-width:380px">
+    <div class="af-title" id="leaveTitle">Record Leave</div>
+    <div class="sec-sub" style="margin-bottom:12px;color:var(--moss)" id="leaveSubtitle">--</div>
+    <div class="af-group">
+      <label class="af-label">Type</label>
+      <div id="leaveTypeGrid" style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:6px"></div>
+    </div>
+    <div class="af-row">
+      <div class="af-group">
+        <label class="af-label">Date</label>
+        <input class="af-input" id="leaveDate" type="date">
+      </div>
+      <div class="af-group">
+        <label class="af-label">Hours</label>
+        <input class="af-input" id="leaveHours" type="number" step="0.25" placeholder="e.g. 10">
+      </div>
+    </div>
+    <div class="af-group">
+      <label class="af-label">Note (optional)</label>
+      <input class="af-input" id="leaveNote" type="text" placeholder="e.g. dentist">
+    </div>
+    <div id="leaveBalanceInfo" style="background:var(--cream);border-left:4px solid var(--gold);padding:10px 12px;border-radius:8px;margin-bottom:12px;font-size:12px;color:var(--bark)"></div>
+    <button class="af-save" onclick="saveLeave()">Save Entry</button>
+    <button class="af-archive" id="leaveClearBtn" onclick="clearLeaveEntry()" style="display:none">Clear Entry</button>
+    <button class="af-cancel" onclick="closeLeave()">Cancel</button>
+  </div>
+</div>
+
 <!-- AD HOC TIMES MODAL -->
 <div class="overlay" id="adhocOv">
   <div class="admin-modal" style="max-width:340px">
@@ -748,6 +787,14 @@ async function syncWithOneDrive() {
       if (remoteData.overrides) overrides = { ...remoteData.overrides, ...overrides };
       if (remoteData.absences) absences = { ...remoteData.absences, ...absences };
       if (remoteData.collectedFromSchool) collectedFromSchool = { ...remoteData.collectedFromSchool, ...collectedFromSchool };
+      if (remoteData.timesheet) {
+        Object.keys(remoteData.timesheet).forEach(sid => {
+          if (!timesheet[sid]) timesheet[sid] = {};
+          Object.keys(remoteData.timesheet[sid]).forEach(dkk => {
+            if (!timesheet[sid][dkk]) timesheet[sid][dkk] = remoteData.timesheet[sid][dkk];
+          });
+        });
+      }
       // For children & staff — use remote if local hasn't changed since last sync
       if (remoteData.CHILDREN && remoteData.CHILDREN.length > 0 && !dataDirty) CHILDREN = remoteData.CHILDREN;
       if (remoteData.STAFF && remoteData.STAFF.length > 0 && !dataDirty) STAFF = remoteData.STAFF;
@@ -757,7 +804,7 @@ async function syncWithOneDrive() {
     // Push merged state back to OneDrive
     const payload = JSON.stringify({
       CHILDREN, STAFF, attendance, staffLog, eventLog, overrides, absences,
-      collectedFromSchool, pinCustomised, lastUpdated: new Date().toISOString()
+      collectedFromSchool, pinCustomised, timesheet, lastUpdated: new Date().toISOString()
     });
     
     const uploadUrl = `https://graph.microsoft.com/v1.0/me/drive/root:/${SYNC_FOLDER}/${encodeURIComponent(SYNC_FILE)}:/content`;
@@ -942,13 +989,16 @@ let CHILDREN = [
 ];
 
 let STAFF = [
-  {id:'sussie',    name:'Sussie',    role:'Registered Childminder', color:AC[0],pin:'5840',sch:{1:{s:'07:15',e:'18:00'},2:{s:'07:15',e:'18:00'},3:{s:'07:15',e:'18:00'},4:{s:'07:15',e:'18:00'},5:{s:'07:15',e:'18:00'}},archived:false},
-  {id:'claire',    name:'Claire',    role:'Level 4 Educator',       color:AC[1],pin:'1111',sch:{1:{s:'08:00',e:'17:00'},3:{s:'08:00',e:'16:15'},4:{s:'08:00',e:'16:15'}},archived:false},
-  {id:'courtney',  name:'Courtney',  role:'Level 3 Educator',       color:AC[2],pin:'2222',sch:{2:{s:'07:30',e:'17:00'},3:{s:'07:30',e:'17:00'},4:{s:'07:30',e:'17:00'},5:{s:'08:00',e:'16:30'}},archived:false},
-  {id:'alexandra', name:'Alexandra', role:'Early Years Apprentice', color:AC[3],pin:'3333',sch:{1:{s:'07:30',e:'16:30'},2:{s:'08:00',e:'16:30'},5:{s:'08:30',e:'15:00'}},archived:false},
-  {id:'chloe',     name:'Chloe',     role:'Early Years Apprentice', color:AC[4],pin:'4444',sch:{1:{s:'07:45',e:'17:15'},2:{s:'07:45',e:'17:15'},3:{s:'07:30',e:'12:30'}},archived:false},
-  {id:'leah',      name:'Leah',      role:'Early Years Apprentice', color:AC[5],pin:'5555',sch:{3:{s:'12:30',e:'17:00'},4:{s:'07:30',e:'17:00'},5:{s:'07:30',e:'17:30'}},archived:false},
+  {id:'sussie',    name:'Sussie',    role:'Registered Childminder', color:AC[0],pin:'5840',sch:{1:{s:'07:30',e:'17:30'},2:{s:'07:30',e:'17:30'},3:{s:'07:30',e:'17:30'},4:{s:'07:30',e:'17:30'},5:{s:'07:30',e:'17:30'}},archived:false,hourlyRate:15.50,paidHoursPerWeek:16,actualHoursPerWeek:50,annualLeaveHours:280,startDate:'2025-04-01',isApprentice:false},
+  {id:'claire',    name:'Claire',    role:'Level 4 Educator',       color:AC[1],pin:'1111',sch:{1:{s:'08:00',e:'17:00'},3:{s:'08:00',e:'16:15'},4:{s:'08:00',e:'16:15'}},archived:false,hourlyRate:14.50,paidHoursPerWeek:26,actualHoursPerWeek:26,annualLeaveHours:96.2,startDate:'2025-04-01',isApprentice:false},
+  {id:'courtney',  name:'Courtney',  role:'Level 3 Educator',       color:AC[2],pin:'2222',sch:{2:{s:'07:30',e:'17:00'},3:{s:'07:30',e:'17:00'},4:{s:'07:30',e:'17:00'},5:{s:'08:00',e:'16:30'}},archived:false,hourlyRate:13.00,paidHoursPerWeek:37,actualHoursPerWeek:37,annualLeaveHours:192.4,startDate:'2025-04-01',isApprentice:false},
+  {id:'alexandra', name:'Alexandra', role:'Early Years Apprentice', color:AC[3],pin:'3333',sch:{1:{s:'07:30',e:'16:30'},2:{s:'08:00',e:'16:30'},5:{s:'08:30',e:'15:00'}},archived:false,hourlyRate:8.00,paidHoursPerWeek:24,actualHoursPerWeek:24,annualLeaveHours:152,startDate:'2026-05-11',isApprentice:true,collegeStartDate:'2026-07-06'},
+  {id:'chloe',     name:'Chloe',     role:'Early Years Apprentice', color:AC[4],pin:'4444',sch:{1:{s:'07:45',e:'17:15'},2:{s:'07:45',e:'17:15'},3:{s:'07:30',e:'12:30'}},archived:false,hourlyRate:8.00,paidHoursPerWeek:24,actualHoursPerWeek:24,annualLeaveHours:168,startDate:'2025-09-01',isApprentice:true,collegeStartDate:'2026-07-06'},
+  {id:'leah',      name:'Leah',      role:'Early Years Apprentice', color:AC[5],pin:'5555',sch:{3:{s:'12:30',e:'17:00'},4:{s:'07:30',e:'17:00'},5:{s:'07:30',e:'17:30'}},archived:false,hourlyRate:8.00,paidHoursPerWeek:24,actualHoursPerWeek:24,annualLeaveHours:168,startDate:'2025-09-01',isApprentice:true,collegeStartDate:'2026-07-06'},
 ];
+
+// Staff timesheet entries — [staffId][dateKey] = { type: 'worked'|'annual'|'sick'|'unpaid'|'bank'|'offthejob', hours: number, note: '' }
+let timesheet = {};
 
 // ════════════════════════════════════════════════
 // STATE
@@ -1142,7 +1192,7 @@ function goToday(){ viewDate=new Date();viewDate.setHours(0,0,0,0);updateDateNav
 // ════════════════════════════════════════════════
 function setTab(t){
   currentTab=t;
-  ['children','staff','log','invoice','override','admin','settings'].forEach((p,i)=>{
+  ['children','staff','log','invoice','override','admin','payroll','settings'].forEach((p,i)=>{
     document.getElementById('panel-'+p).style.display=p===t?'':'none';
     document.querySelectorAll('.tab')[i].classList.toggle('active',p===t);
   });
@@ -1150,6 +1200,7 @@ function setTab(t){
   if(t==='invoice')renderInvoice();
   if(t==='override')renderOverride();
   if(t==='admin')renderAdmin();
+  if(t==='payroll')renderPayroll();
   if(t==='settings')renderSettings();
 }
 
@@ -1611,7 +1662,344 @@ function archiveEntity(){
 // ════════════════════════════════════════════════
 // RENDER SETTINGS
 // ════════════════════════════════════════════════
-function renderSettings(){
+// ════════════════════════════════════════════════
+// PAYROLL & TIME SHEETS
+// ════════════════════════════════════════════════
+const LEAVE_TYPES = {
+  worked:    { label: 'Worked',         emoji: '✓',  color: '#5fcf80' },
+  annual:    { label: 'Annual Leave',   emoji: '🏖️', color: '#7FA99A' },
+  sick:      { label: 'Sick (SSP)',     emoji: '🤒', color: '#e67e22' },
+  unpaid:    { label: 'Unpaid Leave',   emoji: '⏸',  color: '#6B4F3A' },
+  bank:      { label: 'Bank Holiday',   emoji: '🎉', color: '#C9A84C' },
+  offthejob: { label: 'Off-the-Job',    emoji: '📚', color: '#4A7C6A' }
+};
+
+function getTs(staffId, d) {
+  const k = dk(d);
+  if (!timesheet[staffId]) return null;
+  return timesheet[staffId][k] || null;
+}
+function setTs(staffId, d, entry) {
+  const k = dk(d);
+  if (!timesheet[staffId]) timesheet[staffId] = {};
+  timesheet[staffId][k] = entry;
+  dataDirty = true;
+}
+function clearTs(staffId, d) {
+  const k = dk(d);
+  if (timesheet[staffId] && timesheet[staffId][k]) {
+    delete timesheet[staffId][k];
+    dataDirty = true;
+  }
+}
+
+// Calculate worked hours from clock-in/out times
+function calcWorkedHours(staffId, d) {
+  const log = getSLog(staffId, d);
+  if (log.clockInTime && log.clockOutTime) {
+    return (pm(log.clockOutTime) - pm(log.clockInTime)) / 60;
+  }
+  return 0;
+}
+
+// Get leave year (April to March) totals for a staff member
+function getYearTotals(staffId, refDate) {
+  const fyStart = getFinancialYearStart(refDate);
+  const fyEnd = getFinancialYearEnd(refDate);
+  let worked = 0, annual = 0, sick = 0, unpaid = 0, bank = 0, offthejob = 0;
+  
+  // Sum from manual timesheet entries
+  if (timesheet[staffId]) {
+    Object.keys(timesheet[staffId]).forEach(dkk => {
+      const aDate = new Date(dkk);
+      if (aDate >= fyStart && aDate <= fyEnd) {
+        const e = timesheet[staffId][dkk];
+        if (e.type === 'worked') worked += e.hours;
+        else if (e.type === 'annual') annual += e.hours;
+        else if (e.type === 'sick') sick += e.hours;
+        else if (e.type === 'unpaid') unpaid += e.hours;
+        else if (e.type === 'bank') bank += e.hours;
+        else if (e.type === 'offthejob') offthejob += e.hours;
+      }
+    });
+  }
+  
+  // Sum worked hours from actual clock-in/out logs
+  if (staffLog[staffId]) {
+    Object.keys(staffLog[staffId]).forEach(dkk => {
+      const aDate = new Date(dkk);
+      if (aDate >= fyStart && aDate <= fyEnd) {
+        // Only count if there's no manual override for this day
+        if (!timesheet[staffId] || !timesheet[staffId][dkk]) {
+          const hrs = calcWorkedHours(staffId, aDate);
+          worked += hrs;
+        }
+      }
+    });
+  }
+  
+  return { worked, annual, sick, unpaid, bank, offthejob };
+}
+
+// Get current month totals
+function getMonthTotals(staffId, refDate) {
+  const monthStart = new Date(refDate.getFullYear(), refDate.getMonth(), 1);
+  const monthEnd = new Date(refDate.getFullYear(), refDate.getMonth()+1, 0);
+  let worked = 0, annual = 0, sick = 0, unpaid = 0, bank = 0, offthejob = 0;
+  
+  if (timesheet[staffId]) {
+    Object.keys(timesheet[staffId]).forEach(dkk => {
+      const aDate = new Date(dkk);
+      if (aDate >= monthStart && aDate <= monthEnd) {
+        const e = timesheet[staffId][dkk];
+        if (e.type === 'worked') worked += e.hours;
+        else if (e.type === 'annual') annual += e.hours;
+        else if (e.type === 'sick') sick += e.hours;
+        else if (e.type === 'unpaid') unpaid += e.hours;
+        else if (e.type === 'bank') bank += e.hours;
+        else if (e.type === 'offthejob') offthejob += e.hours;
+      }
+    });
+  }
+  
+  if (staffLog[staffId]) {
+    Object.keys(staffLog[staffId]).forEach(dkk => {
+      const aDate = new Date(dkk);
+      if (aDate >= monthStart && aDate <= monthEnd) {
+        if (!timesheet[staffId] || !timesheet[staffId][dkk]) {
+          worked += calcWorkedHours(staffId, aDate);
+        }
+      }
+    });
+  }
+  
+  return { worked, annual, sick, unpaid, bank, offthejob };
+}
+
+function renderPayroll() {
+  const refDate = viewDate;
+  const monthName = MONTH_SHORT[refDate.getMonth()];
+  const fyStart = getFinancialYearStart(refDate);
+  const fyLabel = `${fyStart.getFullYear()}–${fyStart.getFullYear()+1}`;
+  
+  const html = `<div style="margin-bottom:14px">
+    <div style="font-size:11px;color:rgba(255,255,255,0.5);letter-spacing:0.5px;text-transform:uppercase">Leave year ${fyLabel} · Showing ${monthName} totals</div>
+  </div>
+  ${STAFF.filter(s=>!s.archived).map(s=>{
+    const month = getMonthTotals(s.id, refDate);
+    const year = getYearTotals(s.id, refDate);
+    const leaveRemaining = (s.annualLeaveHours || 0) - year.annual - year.bank;
+    const leavePct = ((year.annual + year.bank) / (s.annualLeaveHours || 1)) * 100;
+    const monthExpected = (s.paidHoursPerWeek || 0) * 4.33;
+    const isLeaveLow = leaveRemaining < ((s.annualLeaveHours || 0) * 0.25);
+    return `<div onclick="openStaffDetail('${s.id}')" style="background:var(--cream);border-radius:13px;padding:14px;margin-bottom:10px;cursor:pointer;border-left:5px solid ${s.color};transition:transform 0.15s">
+      <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:10px">
+        <div>
+          <div style="font-family:'Playfair Display',serif;font-size:16px;color:var(--forest);font-weight:700">${s.name}</div>
+          <div style="font-size:10px;color:var(--moss);letter-spacing:0.5px;text-transform:uppercase">${s.role} · £${s.hourlyRate.toFixed(2)}/hr · ${s.paidHoursPerWeek}hrs/wk</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-family:'Playfair Display',serif;font-size:18px;color:var(--forest);font-weight:700">${month.worked.toFixed(1)}<span style="font-size:11px;color:var(--moss)"> hrs</span></div>
+          <div style="font-size:9px;color:var(--moss);text-transform:uppercase">${monthName} worked</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;font-size:11px">
+        <div style="background:rgba(127,169,154,0.15);border-radius:7px;padding:6px 8px;text-align:center">
+          <div style="font-weight:700;color:${isLeaveLow?'var(--error)':'var(--moss)'};font-size:13px">${leaveRemaining.toFixed(1)}h</div>
+          <div style="font-size:9px;color:var(--bark);text-transform:uppercase">Leave left</div>
+        </div>
+        <div style="background:rgba(230,126,34,0.15);border-radius:7px;padding:6px 8px;text-align:center">
+          <div style="font-weight:700;color:var(--warn);font-size:13px">${year.sick.toFixed(1)}h</div>
+          <div style="font-size:9px;color:var(--bark);text-transform:uppercase">Sick YTD</div>
+        </div>
+        <div style="background:rgba(107,79,58,0.15);border-radius:7px;padding:6px 8px;text-align:center">
+          <div style="font-weight:700;color:var(--bark);font-size:13px">${year.unpaid.toFixed(1)}h</div>
+          <div style="font-size:9px;color:var(--bark);text-transform:uppercase">Unpaid YTD</div>
+        </div>
+        <div style="background:rgba(201,168,76,0.15);border-radius:7px;padding:6px 8px;text-align:center">
+          <div style="font-weight:700;color:var(--gold);font-size:13px">${(year.offthejob).toFixed(1)}h</div>
+          <div style="font-size:9px;color:var(--bark);text-transform:uppercase">${s.isApprentice?'Off-job':'Other'}</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('')}
+  <div style="background:rgba(255,255,255,0.04);border-radius:11px;padding:12px;text-align:center;font-size:11px;color:rgba(255,255,255,0.5);margin-top:10px">
+    Tap any staff member to record leave, sick, or adjust hours
+  </div>`;
+  
+  document.getElementById('payrollOverview').innerHTML = html;
+  document.getElementById('payrollDetail').style.display = 'none';
+  document.getElementById('payrollOverview').style.display = 'block';
+}
+
+let detailStaffId = null;
+function openStaffDetail(staffId) {
+  detailStaffId = staffId;
+  const s = STAFF.find(x=>x.id===staffId);
+  const refDate = viewDate;
+  const month = getMonthTotals(staffId, refDate);
+  const year = getYearTotals(staffId, refDate);
+  const leaveRemaining = (s.annualLeaveHours || 0) - year.annual - year.bank;
+  const monthName = MONTH_SHORT[refDate.getMonth()];
+  const fyStart = getFinancialYearStart(refDate);
+  const fyLabel = `${fyStart.getFullYear()}–${fyStart.getFullYear()+1}`;
+  
+  // Build recent timesheet entries for this month
+  const monthStart = new Date(refDate.getFullYear(), refDate.getMonth(), 1);
+  const monthEnd = new Date(refDate.getFullYear(), refDate.getMonth()+1, 0);
+  const entries = [];
+  for (let d = new Date(monthStart); d <= monthEnd; d.setDate(d.getDate()+1)) {
+    const dkk = dk(d);
+    const manual = timesheet[staffId] ? timesheet[staffId][dkk] : null;
+    const log = staffLog[staffId] ? staffLog[staffId][dkk] : null;
+    if (manual) {
+      entries.push({date: new Date(d), type: manual.type, hours: manual.hours, note: manual.note});
+    } else if (log && log.clockInTime) {
+      const hrs = calcWorkedHours(staffId, d);
+      entries.push({date: new Date(d), type: 'worked', hours: hrs, clockIn: log.clockInTime, clockOut: log.clockOutTime, late: log.lateInMins});
+    }
+  }
+  entries.sort((a,b)=>b.date - a.date);
+  
+  const html = `<div style="margin-bottom:12px;display:flex;justify-content:space-between;align-items:center">
+    <button onclick="closeStaffDetail()" style="background:rgba(255,255,255,0.08);color:var(--gold-light);border:none;border-radius:8px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer">← Back</button>
+    <div style="text-align:right">
+      <div style="font-family:'Playfair Display',serif;color:var(--gold-light);font-size:15px">${s.name}</div>
+      <div style="font-size:10px;color:rgba(255,255,255,0.5)">${monthName} ${refDate.getFullYear()}</div>
+    </div>
+  </div>
+  
+  <!-- Summary cards -->
+  <div style="background:var(--cream);border-radius:13px;padding:14px;margin-bottom:10px">
+    <div style="font-family:'Playfair Display',serif;font-size:13px;color:var(--forest);margin-bottom:10px">${monthName} ${refDate.getFullYear()} — at a glance</div>
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px">
+      <div style="background:rgba(127,169,154,0.1);border-radius:9px;padding:10px"><div style="font-size:10px;color:var(--moss);text-transform:uppercase">Worked this month</div><div style="font-family:'Playfair Display',serif;font-size:20px;color:var(--forest);font-weight:700">${month.worked.toFixed(1)} hrs</div><div style="font-size:10px;color:var(--bark)">£${(month.worked * s.hourlyRate).toFixed(2)} at £${s.hourlyRate}/hr</div></div>
+      <div style="background:rgba(230,126,34,0.08);border-radius:9px;padding:10px"><div style="font-size:10px;color:var(--moss);text-transform:uppercase">Contracted</div><div style="font-family:'Playfair Display',serif;font-size:20px;color:var(--forest);font-weight:700">${(s.paidHoursPerWeek*4.33).toFixed(1)} hrs</div><div style="font-size:10px;color:var(--bark)">${s.paidHoursPerWeek} hrs × 4.33 wks</div></div>
+    </div>
+  </div>
+  
+  <!-- Year totals -->
+  <div style="background:var(--cream);border-radius:13px;padding:14px;margin-bottom:10px">
+    <div style="font-family:'Playfair Display',serif;font-size:13px;color:var(--forest);margin-bottom:10px">Leave Year ${fyLabel}</div>
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;font-size:12px">
+      <div><strong>Annual leave allowance:</strong> ${(s.annualLeaveHours || 0).toFixed(1)} hrs</div>
+      <div><strong>Used:</strong> ${(year.annual + year.bank).toFixed(1)} hrs (${year.annual.toFixed(1)} AL + ${year.bank.toFixed(1)} BH)</div>
+      <div><strong>Remaining:</strong> <span style="color:${leaveRemaining<((s.annualLeaveHours||0)*0.25)?'var(--error)':'var(--ok)'};font-weight:700">${leaveRemaining.toFixed(1)} hrs</span></div>
+      <div><strong>Sick (SSP):</strong> ${year.sick.toFixed(1)} hrs</div>
+      <div><strong>Unpaid leave:</strong> ${year.unpaid.toFixed(1)} hrs</div>
+      <div><strong>${s.isApprentice ? 'Off-the-job' : 'Other'}:</strong> ${year.offthejob.toFixed(1)} hrs</div>
+    </div>
+  </div>
+  
+  <!-- Add entry button -->
+  <button onclick="openLeaveEntry('${staffId}')" style="width:100%;padding:13px;background:var(--forest);color:var(--gold-light);border:none;border-radius:11px;font-weight:700;cursor:pointer;margin-bottom:14px">＋ Record Leave / Sick / Override Day</button>
+  
+  <!-- Entries -->
+  <div style="background:var(--cream);border-radius:13px;padding:14px;margin-bottom:10px">
+    <div style="font-family:'Playfair Display',serif;font-size:13px;color:var(--forest);margin-bottom:10px">${monthName} entries</div>
+    ${entries.length ? entries.map(e=>{
+      const lt = LEAVE_TYPES[e.type];
+      return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--parchment);font-size:12px">
+        <div style="width:28px;height:28px;border-radius:50%;background:${lt.color};display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0">${lt.emoji}</div>
+        <div style="flex:1">
+          <div style="font-weight:700;color:var(--forest)">${DAYS[e.date.getDay()].slice(0,3)} ${e.date.getDate()} ${MONTH_SHORT[e.date.getMonth()]} · ${lt.label}</div>
+          <div style="font-size:10px;color:var(--moss)">${e.clockIn ? 'In ' + e.clockIn + ' · Out ' + (e.clockOut || 'still in') : ''}${e.late > 0 ? ' · ⚠ ' + e.late + 'min late' : ''}${e.note ? ' · ' + e.note : ''}</div>
+        </div>
+        <div style="font-weight:700;color:var(--forest)">${e.hours.toFixed(1)}h</div>
+      </div>`;
+    }).join('') : '<div style="color:var(--moss);font-size:12px;padding:8px">No entries yet this month</div>'}
+  </div>`;
+  
+  document.getElementById('payrollDetail').innerHTML = html;
+  document.getElementById('payrollDetail').style.display = 'block';
+  document.getElementById('payrollOverview').style.display = 'none';
+}
+
+function closeStaffDetail() {
+  detailStaffId = null;
+  renderPayroll();
+}
+
+let leaveTarget = null;
+let leaveSelectedType = null;
+function openLeaveEntry(staffId) {
+  leaveTarget = staffId;
+  leaveSelectedType = null;
+  const s = STAFF.find(x=>x.id===staffId);
+  document.getElementById('leaveTitle').textContent = `${s.name} — Record Entry`;
+  document.getElementById('leaveSubtitle').textContent = `Pick the type then enter the date and hours`;
+  document.getElementById('leaveDate').value = dk(viewDate);
+  document.getElementById('leaveHours').value = '';
+  document.getElementById('leaveNote').value = '';
+  document.getElementById('leaveClearBtn').style.display = 'none';
+  renderLeaveTypeGrid();
+  updateLeaveBalanceInfo();
+  document.getElementById('leaveOv').classList.add('vis');
+}
+function renderLeaveTypeGrid() {
+  document.getElementById('leaveTypeGrid').innerHTML = Object.entries(LEAVE_TYPES).map(([key, t]) => 
+    `<div onclick="selectLeaveType('${key}')" style="padding:10px 8px;border:2px solid ${leaveSelectedType===key?t.color:'var(--sage)'};background:${leaveSelectedType===key?t.color+'22':'var(--parchment)'};border-radius:9px;text-align:center;cursor:pointer">
+      <div style="font-size:18px;margin-bottom:2px">${t.emoji}</div>
+      <div style="font-size:10px;font-weight:700;color:var(--forest)">${t.label}</div>
+    </div>`
+  ).join('');
+}
+function selectLeaveType(type) {
+  leaveSelectedType = type;
+  renderLeaveTypeGrid();
+  updateLeaveBalanceInfo();
+}
+function updateLeaveBalanceInfo() {
+  const info = document.getElementById('leaveBalanceInfo');
+  if (!leaveTarget || !leaveSelectedType) { info.style.display = 'none'; return; }
+  const s = STAFF.find(x=>x.id===leaveTarget);
+  const year = getYearTotals(s.id, viewDate);
+  const lt = LEAVE_TYPES[leaveSelectedType];
+  if (leaveSelectedType === 'annual' || leaveSelectedType === 'bank') {
+    const used = year.annual + year.bank;
+    const remaining = (s.annualLeaveHours || 0) - used;
+    info.innerHTML = `<strong>Annual leave balance:</strong> ${remaining.toFixed(1)}h remaining of ${(s.annualLeaveHours || 0).toFixed(1)}h. ${remaining <= 20 ? '⚠ Approaching limit.' : ''}`;
+  } else if (leaveSelectedType === 'sick') {
+    info.innerHTML = `<strong>Sick hours this year:</strong> ${year.sick.toFixed(1)}h. SSP applied by accountant; pay deducted at £${s.hourlyRate}/hr.`;
+  } else if (leaveSelectedType === 'unpaid') {
+    info.innerHTML = `<strong>Unpaid leave this year:</strong> ${year.unpaid.toFixed(1)}h. Pay deducted at £${s.hourlyRate}/hr.`;
+  } else if (leaveSelectedType === 'offthejob') {
+    info.innerHTML = `<strong>Off-the-job hours this year:</strong> ${year.offthejob.toFixed(1)}h.${s.isApprentice ? ' (Apprenticeship protected training time)' : ''}`;
+  } else {
+    info.innerHTML = `<strong>Type:</strong> ${lt.label}`;
+  }
+  info.style.display = 'block';
+}
+function saveLeave() {
+  if (!leaveTarget || !leaveSelectedType) { showFlash('Please select a type'); return; }
+  const dateVal = document.getElementById('leaveDate').value;
+  const hoursVal = parseFloat(document.getElementById('leaveHours').value);
+  const noteVal = document.getElementById('leaveNote').value;
+  if (!dateVal || isNaN(hoursVal) || hoursVal <= 0) { showFlash('Please enter a date and hours'); return; }
+  const d = new Date(dateVal);
+  setTs(leaveTarget, d, { type: leaveSelectedType, hours: hoursVal, note: noteVal });
+  const s = STAFF.find(x=>x.id===leaveTarget);
+  const lt = LEAVE_TYPES[leaveSelectedType];
+  showFlash(`${lt.emoji} ${s.name} — ${hoursVal}h ${lt.label} recorded`);
+  closeLeave();
+  if (detailStaffId) openStaffDetail(detailStaffId); else renderPayroll();
+  if (odConnected) syncWithOneDrive();
+}
+function clearLeaveEntry() {
+  const dateVal = document.getElementById('leaveDate').value;
+  if (!leaveTarget || !dateVal) return;
+  clearTs(leaveTarget, new Date(dateVal));
+  showFlash('Entry cleared');
+  closeLeave();
+  if (detailStaffId) openStaffDetail(detailStaffId); else renderPayroll();
+}
+function closeLeave() {
+  document.getElementById('leaveOv').classList.remove('vis');
+  leaveTarget = null;
+  leaveSelectedType = null;
+}
+
+
   const scheduled=CHILDREN.filter(c=>childScheduledToday(c,viewDate));
   const collected=getCollected(viewDate);
 
@@ -1981,6 +2369,7 @@ function renderAll(){
   if(currentTab==='invoice')renderInvoice();
   if(currentTab==='override')renderOverride();
   if(currentTab==='admin')renderAdmin();
+  if(currentTab==='payroll')renderPayroll();
   if(currentTab==='settings')renderSettings();
 }
 
