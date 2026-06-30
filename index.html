@@ -298,6 +298,7 @@
       <strong id="flagCount">0</strong> early/late flags
     </div>
     <div class="od-badge od-off" id="odBadge" onclick="openOD()">☁ Connect OneDrive</div>
+    <span id="syncIndicator" style="display:none;font-size:10px;color:var(--ok);font-weight:700;margin-left:8px"></span>
   </div>
 
   <!-- MANAGER BANNER -->
@@ -358,7 +359,8 @@
   <!-- DAY CHANGES -->
   <div id="panel-override" style="display:none">
     <div class="sec-head"><div class="sec-label">Day Changes</div><div class="sec-line"></div></div>
-    <div class="sec-sub">One-off additions or removals for this date only — resets automatically</div>
+    <div class="sec-sub">Mark absences, add or remove children for this date only</div>
+    <div class="ov-section"><div class="ov-title">🏖️ Mark as absent today</div><div id="absenceGrid"></div></div>
     <div class="ov-section"><div class="ov-title">➕ Add a child for today</div><div class="ov-grid" id="addGrid"></div></div>
     <div class="ov-section"><div class="ov-title">✏ Scheduled today — tap to remove</div><div class="ov-grid" id="removeGrid"></div></div>
   </div>
@@ -581,6 +583,25 @@
   </div>
 </div>
 
+<!-- ABSENCE MODAL -->
+<div class="overlay" id="absenceOv">
+  <div class="admin-modal" style="max-width:380px">
+    <div class="af-title" id="absTitle">Mark Absent</div>
+    <div class="af-group">
+      <label class="af-label">Reason</label>
+      <div id="absenceReasonGrid" style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:6px"></div>
+    </div>
+    <div class="af-group">
+      <label class="af-label">Note (optional)</label>
+      <input class="af-input" id="absNote" type="text" placeholder="e.g. dentist appointment">
+    </div>
+    <div id="absAllowanceInfo" style="background:var(--cream);border-left:4px solid var(--gold);padding:10px 12px;border-radius:8px;margin-bottom:12px;font-size:12px;color:var(--bark);display:none"></div>
+    <button class="af-save" id="absSaveBtn" onclick="saveAbsence()">Save Absence</button>
+    <button class="af-archive" id="absClearBtn" onclick="clearAbsenceAction()" style="display:none">Clear Absence</button>
+    <button class="af-cancel" onclick="closeAbsence()">Cancel</button>
+  </div>
+</div>
+
 <!-- OD OVERLAY -->
 <div class="overlay" id="odOv">
   <div class="od-modal">
@@ -630,6 +651,7 @@ async function initMSAL() {
       odConnected = true;
       updateODBadge();
       showFlash('✓ Connected to OneDrive');
+      startSync();
     }
     // Check if already signed in
     const accounts = msalInstance.getAllAccounts();
@@ -639,6 +661,7 @@ async function initMSAL() {
         odAccessToken = silent.accessToken;
         odConnected = true;
         updateODBadge();
+        startSync();
       } catch(e) { /* silent fail */ }
     }
   } catch(e) { console.warn('MSAL init:', e); }
@@ -664,6 +687,94 @@ function updateODBadge() {
     b.className = 'od-badge od-off';
     b.onclick = openOD;
   }
+}
+
+// ════════════════════════════════════════════════
+// ONEDRIVE SYNC — shared data file for multi-device
+// ════════════════════════════════════════════════
+const SYNC_FILE = 'Little Puddings - App Data.json';
+const SYNC_FOLDER = '2026-2027 INVOICES';
+
+async function syncWithOneDrive() {
+  if (!odConnected || !odAccessToken || syncInProgress) return;
+  syncInProgress = true;
+  try {
+    // Pull latest from OneDrive
+    const url = `https://graph.microsoft.com/v1.0/me/drive/root:/${SYNC_FOLDER}/${encodeURIComponent(SYNC_FILE)}:/content`;
+    const resp = await fetch(url, { headers: { 'Authorization': `Bearer ${odAccessToken}` } });
+    
+    if (resp.ok) {
+      const remoteData = await resp.json();
+      // Merge: parent input (attendance) wins; manager input (children/staff/absences) wins from most recent device
+      if (remoteData.attendance) {
+        // Merge attendance — most recent sign-in/out wins per child per date
+        Object.keys(remoteData.attendance).forEach(cid => {
+          if (!attendance[cid]) attendance[cid] = {};
+          Object.keys(remoteData.attendance[cid]).forEach(dkk => {
+            const remote = remoteData.attendance[cid][dkk];
+            const local = attendance[cid][dkk];
+            if (!local || (remote.signInTime && !local.signInTime) || (remote.signOutTime && !local.signOutTime)) {
+              attendance[cid][dkk] = remote;
+            }
+          });
+        });
+      }
+      if (remoteData.staffLog) staffLog = { ...remoteData.staffLog, ...staffLog };
+      if (remoteData.eventLog) {
+        Object.keys(remoteData.eventLog).forEach(dkk => {
+          if (!eventLog[dkk]) eventLog[dkk] = remoteData.eventLog[dkk];
+        });
+      }
+      if (remoteData.overrides) overrides = { ...remoteData.overrides, ...overrides };
+      if (remoteData.absences) absences = { ...remoteData.absences, ...absences };
+      if (remoteData.collectedFromSchool) collectedFromSchool = { ...remoteData.collectedFromSchool, ...collectedFromSchool };
+      // For children & staff — use remote if local hasn't changed since last sync
+      if (remoteData.CHILDREN && remoteData.CHILDREN.length > 0 && !dataDirty) CHILDREN = remoteData.CHILDREN;
+      if (remoteData.STAFF && remoteData.STAFF.length > 0 && !dataDirty) STAFF = remoteData.STAFF;
+      if (remoteData.pinCustomised) pinCustomised = { ...remoteData.pinCustomised, ...pinCustomised };
+    }
+    
+    // Push merged state back to OneDrive
+    const payload = JSON.stringify({
+      CHILDREN, STAFF, attendance, staffLog, eventLog, overrides, absences,
+      collectedFromSchool, pinCustomised, lastUpdated: new Date().toISOString()
+    });
+    
+    const uploadUrl = `https://graph.microsoft.com/v1.0/me/drive/root:/${SYNC_FOLDER}/${encodeURIComponent(SYNC_FILE)}:/content`;
+    await fetch(uploadUrl, {
+      method: 'PUT',
+      headers: { 'Authorization': `Bearer ${odAccessToken}`, 'Content-Type': 'application/json' },
+      body: payload
+    });
+    
+    lastSyncTime = new Date();
+    dataDirty = false;
+    updateSyncIndicator();
+    renderAll();
+  } catch(e) {
+    console.error('Sync error:', e);
+  }
+  syncInProgress = false;
+}
+
+function updateSyncIndicator() {
+  const el = document.getElementById('syncIndicator');
+  if (!el) return;
+  if (lastSyncTime) {
+    el.textContent = '✓ Synced ' + ts(lastSyncTime);
+    el.style.display = 'inline';
+    setTimeout(() => { if (el) el.style.display = 'none'; }, 3000);
+  }
+}
+
+// Start sync every 30 seconds when connected
+let syncInterval = null;
+function startSync() {
+  if (syncInterval) clearInterval(syncInterval);
+  // Initial sync
+  setTimeout(syncWithOneDrive, 2000);
+  // Then every 30 seconds
+  syncInterval = setInterval(syncWithOneDrive, 30000);
 }
 
 // ════════════════════════════════════════════════
@@ -823,11 +934,74 @@ let attendance = {};
 let staffLog = {};
 let eventLog = {};
 let overrides = {};
+let absences = {}; // [dateKey][childId] = {reason, note}
 let collectedFromSchool = {}; // [dateKey][childId] = true — skip afternoon auto sign-in
 let pinTarget = null, pinEntry = '', pinShaking = false;
 let mgrPinEntry = '', mgrPinShaking = false;
 let actionTarget = null;
 let setPinTarget = null, spEntry = '', spFirst = '', spShaking = false;
+// Sync state
+let lastSyncTime = null;
+let syncInProgress = false;
+let dataDirty = false; // local changes pending upload
+
+// Absence reasons
+const ABSENCE_REASONS = {
+  holiday: { label: 'Holiday', emoji: '🏖️', color: '#7FA99A' },
+  illness: { label: 'Off ill', emoji: '🤒', color: '#e67e22' },
+  family: { label: 'Family event', emoji: '👨‍👩‍👧', color: '#C9A84C' },
+  unauthorised: { label: 'No show', emoji: '❓', color: '#c0392b' },
+  other: { label: 'Other', emoji: '✏️', color: '#6B4F3A' }
+};
+
+// Financial year for absence tracking — April to March
+function getFinancialYearStart(d){
+  const y = d.getMonth() >= 3 ? d.getFullYear() : d.getFullYear()-1;
+  return new Date(y, 3, 1);
+}
+function getFinancialYearEnd(d){
+  const y = d.getMonth() >= 3 ? d.getFullYear()+1 : d.getFullYear();
+  return new Date(y, 2, 31);
+}
+
+// Only all-year-round children get holiday allowance — 2 half-fee days per contracted day per year
+function getHolidayAllowance(c){
+  if(c.ay === true || c.ay === 'holidays') return 0;
+  return c.days.length * 2;
+}
+
+// Count holiday days used in this financial year
+function getHolidayUsed(cid, d){
+  const fyStart = getFinancialYearStart(d);
+  const fyEnd = getFinancialYearEnd(d);
+  let used = 0;
+  Object.keys(absences).forEach(dkk => {
+    const aDate = new Date(dkk);
+    if(aDate >= fyStart && aDate <= fyEnd && absences[dkk][cid] && absences[dkk][cid].reason === 'holiday') used++;
+  });
+  return used;
+}
+
+function getAbsence(cid, d) {
+  const k = dk(d);
+  if(!absences[k]) return null;
+  return absences[k][cid] || null;
+}
+
+function setAbsence(cid, d, reason, note) {
+  const k = dk(d);
+  if(!absences[k]) absences[k] = {};
+  absences[k][cid] = { reason, note: note || '' };
+  dataDirty = true;
+}
+
+function clearAbsence(cid, d) {
+  const k = dk(d);
+  if(absences[k] && absences[k][cid]) {
+    delete absences[k][cid];
+    dataDirty = true;
+  }
+}
 let overrideSelectedChild = null;
 let pinCustomised = {};
 let adminEditTarget = null; // {type, id} or null for new
@@ -962,6 +1136,15 @@ function renderChildren(){
     <div class="sec-sub">Tap a name · PIN required · times recorded to the exact minute</div>
     <div class="children-grid">${list.map(c=>{
       const att=getAtt(c.id,viewDate),ov=getOv(viewDate)[c.id],hasExtra=att.earlyMins>0||att.lateMins>0;
+      const abs=getAbsence(c.id,viewDate);
+      if(abs){
+        const r=ABSENCE_REASONS[abs.reason];
+        return`<div class="child-card" style="opacity:0.55;border-color:${r.color};border-style:dashed">
+          <div class="child-avatar" style="background:${c.color}">${c.emoji}</div>
+          <div class="child-name">${c.name}</div>
+          <span class="child-badge" style="background:${r.color}22;color:${r.color}">${r.emoji} ${r.label}</span>
+        </div>`;
+      }
       return`<div class="child-card ${att.signedIn?'in':''} ${ov==='add'?'override':''}" onclick="openPin('child','${c.id}')">
         ${hasExtra?'<div class="early-flag"></div>':''}
         <div class="child-avatar" style="background:${c.color}">${c.emoji}</div>
@@ -1050,6 +1233,18 @@ function renderOverride(){
   const ov=getOv(viewDate);
   const scheduled=CHILDREN.filter(c=>childScheduledToday(c,viewDate));
   const notSched=CHILDREN.filter(c=>!c.archived&&!childScheduledToday(c,viewDate));
+  
+  // Absence grid
+  document.getElementById('absenceGrid').innerHTML = scheduled.length ? `<div class="ov-grid">${scheduled.map(c=>{
+    const abs = getAbsence(c.id, viewDate);
+    const reasonInfo = abs ? ABSENCE_REASONS[abs.reason] : null;
+    return `<div class="ov-card ${abs?'removed':''}" onclick="openAbsence('${c.id}')" style="${abs?'border-color:'+reasonInfo.color:''}">
+      <div class="ov-av" style="width:32px;height:32px;border-radius:50%;background:${c.color};display:flex;align-items:center;justify-content:center;font-size:16px;margin:0 auto 4px">${c.emoji}</div>
+      <div class="ov-name">${c.name}</div>
+      <div class="ov-action" style="color:${abs?reasonInfo.color:'var(--moss)'}">${abs?reasonInfo.emoji+' '+reasonInfo.label:'Tap to mark absent'}</div>
+    </div>`;
+  }).join('')}</div>` : '<div style="color:rgba(255,255,255,0.3);font-size:12px;padding:8px">No children scheduled today</div>';
+  
   document.getElementById('addGrid').innerHTML=notSched.length?notSched.map(c=>`
     <div class="ov-card ${ov[c.id]==='add'?'added':''}" onclick="toggleOverride('${c.id}','add')">
       <div class="ov-av" style="width:32px;height:32px;border-radius:50%;background:${c.color};display:flex;align-items:center;justify-content:center;font-size:16px;margin:0 auto 4px">${c.emoji}</div>
@@ -1063,12 +1258,94 @@ function renderOverride(){
       <div class="ov-action ${ov[c.id]==='remove'?'ov-rem-c':'ov-norm'}">${ov[c.id]==='remove'?'✗ Removed':'Scheduled'}</div>
     </div>`).join(''):'<div style="color:rgba(255,255,255,0.3);font-size:12px;padding:8px">No children scheduled today</div>';
 }
+
+// ════════════════════════════════════════════════
+// ABSENCE MODAL
+// ════════════════════════════════════════════════
+let absenceTarget = null;
+let selectedAbsenceReason = null;
+
+function openAbsence(cid) {
+  absenceTarget = cid;
+  const c = CHILDREN.find(x=>x.id===cid);
+  const existing = getAbsence(cid, viewDate);
+  selectedAbsenceReason = existing ? existing.reason : null;
+  
+  document.getElementById('absTitle').textContent = `${c.emoji} ${c.name} — Mark Absent`;
+  document.getElementById('absNote').value = existing ? existing.note : '';
+  document.getElementById('absClearBtn').style.display = existing ? 'block' : 'none';
+  
+  // Build reason buttons
+  document.getElementById('absenceReasonGrid').innerHTML = Object.entries(ABSENCE_REASONS).map(([key, r]) => 
+    `<div onclick="selectAbsenceReason('${key}')" style="padding:12px 8px;border:2px solid ${selectedAbsenceReason===key?r.color:'var(--sage)'};background:${selectedAbsenceReason===key?r.color+'22':'var(--parchment)'};border-radius:9px;text-align:center;cursor:pointer;transition:all 0.15s">
+      <div style="font-size:22px;margin-bottom:3px">${r.emoji}</div>
+      <div style="font-size:11px;font-weight:700;color:var(--forest)">${r.label}</div>
+    </div>`
+  ).join('');
+  
+  // Show holiday allowance if relevant
+  const info = document.getElementById('absAllowanceInfo');
+  if (selectedAbsenceReason === 'holiday') {
+    const allowance = getHolidayAllowance(c);
+    const used = getHolidayUsed(cid, viewDate);
+    if (allowance > 0) {
+      const remaining = allowance - used;
+      const fyStart = getFinancialYearStart(viewDate);
+      info.innerHTML = `<strong>Half-fee allowance</strong> for ${fyStart.getFullYear()}–${fyStart.getFullYear()+1}: <strong>${used}/${allowance}</strong> days used. ${remaining > 0 ? remaining + ' days remaining at half fee.' : 'Allowance used — this day billed in full.'}${used >= allowance-2 && remaining > 0 ? ' ⚠ Approaching limit.' : ''}`;
+    } else {
+      info.innerHTML = `<strong>Term-time only child</strong> — no half-fee holiday allowance. This day will be billed in full.`;
+    }
+    info.style.display = 'block';
+  } else {
+    info.style.display = 'none';
+  }
+  
+  document.getElementById('absenceOv').classList.add('vis');
+}
+
+function selectAbsenceReason(reason) {
+  selectedAbsenceReason = reason;
+  openAbsence(absenceTarget); // Re-render to update selection
+}
+
+function saveAbsence() {
+  if (!absenceTarget || !selectedAbsenceReason) { showFlash('Please select a reason'); return; }
+  const note = document.getElementById('absNote').value;
+  setAbsence(absenceTarget, viewDate, selectedAbsenceReason, note);
+  const c = CHILDREN.find(x=>x.id===absenceTarget);
+  const r = ABSENCE_REASONS[selectedAbsenceReason];
+  // Also add to event log
+  getLog(viewDate).unshift({name:c.name,type:'child',action:'absent',time:ts(new Date()),extra:0,verified:true,note:r.label+(note?' — '+note:'')});
+  showFlash(`${r.emoji} ${c.name} marked as ${r.label}`);
+  closeAbsence();
+  renderOverride(); renderChildren(); updateStatusBar();
+  if(odConnected) syncWithOneDrive();
+}
+
+function clearAbsenceAction() {
+  if (!absenceTarget) return;
+  const c = CHILDREN.find(x=>x.id===absenceTarget);
+  clearAbsence(absenceTarget, viewDate);
+  showFlash(`${c.name}'s absence cleared`);
+  closeAbsence();
+  renderOverride(); renderChildren(); updateStatusBar();
+  if(odConnected) syncWithOneDrive();
+}
+
+function closeAbsence() {
+  document.getElementById('absenceOv').classList.remove('vis');
+  absenceTarget = null;
+  selectedAbsenceReason = null;
+}
+
 function toggleOverride(cid,action){
   const ov=getOv(viewDate);
   if(ov[cid]===action)delete ov[cid]; else ov[cid]=action;
   renderOverride();renderChildren();updateStatusBar();
   const c=CHILDREN.find(x=>x.id===cid);
   showFlash(action==='add'?`${c.emoji} ${c.name} added for today`:`${c.emoji} ${c.name} removed from today`);
+  dataDirty = true;
+  if(odConnected) syncWithOneDrive();
 }
 
 // ════════════════════════════════════════════════
@@ -1224,6 +1501,8 @@ function saveAdminForm(){
     }
   }
   closeAdminForm();
+  dataDirty = true;
+  if(odConnected) syncWithOneDrive();
   renderAll();
 }
 function archiveEntity(){
@@ -1477,7 +1756,8 @@ function confirmAction(isIn){
     const extra=isIn?att.earlyMins:att.lateMins;
     getLog(viewDate).unshift({name:c.name,type:'child',action:isIn?'in':'out',time:t,extra,verified:true});
     showFlash(`${c.emoji} ${c.name} signed ${isIn?'IN':'OUT'} at ${t}${extra>0?' · ⚠ £'+cost(extra).toFixed(2):''}`);
-    if(odConnected)writeToExcel(c,viewDate,att);
+    dataDirty = true;
+    if(odConnected){writeToExcel(c,viewDate,att); syncWithOneDrive();}
   } else {
     const s=STAFF.find(x=>x.id===id),log=getSLog(id,viewDate);
     const dow=viewDate.getDay(),sched=s.sch[dow];
@@ -1485,6 +1765,8 @@ function confirmAction(isIn){
     else{log.clockedIn=false;log.clockOutTime=t;if(sched&&nowMins<pm(sched.e))log.earlyOutMins=pm(sched.e)-nowMins;}
     getLog(viewDate).unshift({name:s.name,type:'staff',action:isIn?'in':'out',time:t,extra:0,verified:true});
     showFlash(`${s.name} clocked ${isIn?'IN':'OUT'} at ${t}${log.lateInMins>0?' · ⚠ '+log.lateInMins+'min late':''}`);
+    dataDirty = true;
+    if(odConnected) syncWithOneDrive();
   }
   closeAction();updateStatusBar();renderAll();
 }
