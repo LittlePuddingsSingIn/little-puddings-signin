@@ -275,7 +275,7 @@
 <!-- HEADER -->
 <div class="header">
   <div class="logo-area">
-    <div class="logo-leaf">🌿</div>
+    <img src="logo.png" alt="Little Puddings" style="width:46px;height:46px;object-fit:contain;flex-shrink:0" onerror="this.outerHTML='<div class=\'logo-leaf\'>🌿</div>'">
     <div class="logo-text"><h1>Little Puddings</h1><p>Sign In &amp; Out</p></div>
   </div>
   <div class="header-right">
@@ -598,8 +598,8 @@
 // ════════════════════════════════════════════════
 const MSAL_CONFIG = {
   auth: {
-    clientId: '30882fd2-f130-45d5-b13e-81d47a18f64d',
-    authority: 'https://login.microsoftonline.com/f0e76f61-d34c-467f-880b-46ce5e527811',
+    clientId: '5a871fc6-d672-401e-a5a7-f9fb349ecc99',
+    authority: 'https://login.microsoftonline.com/a824d7c9-201d-4ae2-afea-e75389e576f0',
     redirectUri: 'https://littlepuddingssingin.github.io/little-puddings-signin/',
   },
   cache: { cacheLocation: 'localStorage', storeAuthStateInCookie: false }
@@ -611,6 +611,16 @@ let odConnected = false;
 
 async function initMSAL() {
   try {
+    // Wait for MSAL library to be available
+    let attempts = 0;
+    while (typeof msal === 'undefined' && attempts < 50) {
+      await new Promise(r => setTimeout(r, 100));
+      attempts++;
+    }
+    if (typeof msal === 'undefined') {
+      console.warn('MSAL library failed to load');
+      return;
+    }
     msalInstance = new msal.PublicClientApplication(MSAL_CONFIG);
     await msalInstance.initialize();
     // Handle redirect response
