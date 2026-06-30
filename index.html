@@ -583,6 +583,26 @@
   </div>
 </div>
 
+<!-- AD HOC TIMES MODAL -->
+<div class="overlay" id="adhocOv">
+  <div class="admin-modal" style="max-width:340px">
+    <div class="af-title" id="adhocTitle">Add for Today</div>
+    <div class="sec-sub" style="margin-bottom:14px;color:var(--moss)">Set the contracted times for this day. Early/late charges will apply if drop off is before or collection is after these times.</div>
+    <div class="af-row">
+      <div class="af-group">
+        <label class="af-label">Start time</label>
+        <input class="af-input" id="adhocStart" type="time" value="08:00">
+      </div>
+      <div class="af-group">
+        <label class="af-label">End time</label>
+        <input class="af-input" id="adhocEnd" type="time" value="17:00">
+      </div>
+    </div>
+    <button class="af-save" onclick="saveAdhocBooking()">Add for Today</button>
+    <button class="af-cancel" onclick="closeAdhoc()">Cancel</button>
+  </div>
+</div>
+
 <!-- ABSENCE MODAL -->
 <div class="overlay" id="absenceOv">
   <div class="admin-modal" style="max-width:380px">
@@ -891,7 +911,7 @@ let CHILDREN = [
   {id:'arlo',     name:'Arlo',        surname:'Turner',      emoji:'🌱',type:'ey',  ao:6,  color:AC[5], pin:'1006',days:[1,2,4],    cs:'08:00',ce:'16:30',billing:'funded',    ay:false,hb:null,      notes:'2yr funding only',                           startDate:'2025-09-01',endDate:null,archived:false},
   {id:'aureliusz',name:'Aureliusz',   surname:'Bingham',     emoji:'🌻',type:'ey',  ao:7,  color:AC[6], pin:'1007',days:[4,5],      cs:'08:30',ce:'16:00',billing:'funded',    ay:false,hb:null,      notes:'2yr funding only',                           startDate:'2025-09-01',endDate:null,archived:false},
   {id:'james',    name:'James',       surname:'Leeder',      emoji:'🐸',type:'ey',  ao:8,  color:AC[7], pin:'1008',days:[1,3],      cs:'07:30',ce:'17:30',billing:'funded',    ay:false,hb:null,      notes:'2yr funding only',                           startDate:'2025-09-01',endDate:null,archived:false},
-  {id:'frankie',  name:'Frankie',     surname:'King',        emoji:'🚂',type:'ey',  ao:9,  color:AC[8], pin:'1009',days:[1,2,3,4,5],cs:'08:00',ce:'17:00',billing:'wraparound',ay:true, hb:'fullday', notes:'Wrap around now, funded only from June term', startDate:'2025-09-01',endDate:null,archived:false},
+  {id:'frankie',  name:'Frankie',     surname:'King',        emoji:'🚂',type:'ey',  ao:9,  color:AC[8], pin:'1009',days:[1,2,4],    cs:'08:00',ce:'17:00',billing:'wraparound',ay:true, hb:'fullday', notes:'Wrap around now, funded only from June term, 3 days/week',startDate:'2025-09-01',endDate:null,archived:false},
   {id:'frederick',name:'Frederick',   surname:'Atkins',      emoji:'🐛',type:'ey',  ao:10, color:AC[9], pin:'1010',days:[3,4],      cs:'08:00',ce:'17:00',billing:'wraparound',ay:true, hb:'fullday', notes:'2yr funding + wrap',                         startDate:'2025-09-01',endDate:null,archived:false},
   {id:'jean',     name:'Jean',        surname:'Haymans',     emoji:'🌿',type:'ey',  ao:11, color:AC[10],pin:'1011',days:[1,2,3,4,5],cs:'08:30',ce:'16:30',billing:'wraparound',ay:true, hb:'fullday', notes:'3yr 15hrs funding',                          startDate:'2025-09-01',endDate:null,archived:false},
   {id:'joshua',   name:'Joshua',      surname:'Dixon',       emoji:'🐝',type:'ey',  ao:12, color:AC[0], pin:'1012',days:[4,5],      cs:'08:30',ce:'17:30',billing:'wraparound',ay:false,hb:null,      notes:'3yr funding 3.15hrs',                        startDate:'2025-09-01',endDate:null,archived:false},
@@ -904,15 +924,21 @@ let CHILDREN = [
   {id:'bernard',  name:'Bernard',     surname:'Burr',          emoji:'🚀',type:'school',ao:2, color:AC[6], pin:'2002',days:[1,2,3,4,5],cs:'07:30',ce:'17:30',billing:'wraparound',ay:false,hb:null,      notes:'Before school daily, after school Wed & Thurs',startDate:'2025-09-01',endDate:null,archived:false,schoolRun:true, afterSchoolDays:[3,4]},
   {id:'bonnie',   name:'Bonnie',      surname:'Stukins',       emoji:'🌈',type:'school',ao:3, color:AC[7], pin:'2003',days:[2,3,4,5], cs:'07:30',ce:'08:55',billing:'wraparound',ay:false,hb:null,       notes:'Before school Tue-Fri only',                   startDate:'2025-09-01',endDate:null,archived:false,schoolRun:true, afterSchoolDays:[]},
   {id:'douglas',  name:'Douglas',     surname:'Burr',          emoji:'⚡',type:'school',ao:4, color:AC[8], pin:'2004',days:[1,2,3,4,5],cs:'07:30',ce:'17:30',billing:'wraparound',ay:false,hb:null,      notes:'Before school daily, after school Wed & Thurs',startDate:'2025-09-01',endDate:null,archived:false,schoolRun:true, afterSchoolDays:[3,4]},
-  {id:'ellia',    name:'Ellia',       surname:'Grigaliunas',   emoji:'🌙',type:'school',ao:5, color:AC[9], pin:'2005',days:[1,2,3,4,5],cs:'08:00',ce:'17:00',billing:'fullday',   ay:false,hb:'fullday', notes:'Holidays only',                                startDate:'2025-09-01',endDate:null,archived:false,schoolRun:false,afterSchoolDays:[]},
+  {id:'ellia',    name:'Ellia',       surname:'Grigaliunas',   emoji:'🌙',type:'school',ao:5, color:AC[9], pin:'2005',days:[],         cs:'08:00',ce:'17:00',billing:'fullday',   ay:'holidays',hb:'fullday',notes:'Ad hoc holiday only',                          startDate:'2025-09-01',endDate:null,archived:false,schoolRun:false,afterSchoolDays:[]},
   {id:'evelyndad',name:'Evelyn',      surname:'Betts -DAD',    emoji:'🌟',type:'school',ao:6, color:AC[10],pin:'2006',days:[3],        cs:'15:25',ce:'17:00',billing:'wraparound',ay:false,hb:null,       notes:'After school Wed, billed to Dad',              startDate:'2025-09-01',endDate:null,archived:false,schoolRun:false,afterSchoolDays:[]},
   {id:'evelynmum',name:'Evelyn',      surname:'Betts -MUM',    emoji:'🌟',type:'school',ao:7, color:AC[10],pin:'2007',days:[1,2,3,4,5],cs:'08:00',ce:'17:30',billing:'varies',    ay:false,hb:null,       notes:'Min 4hrs/week, billed to Mum',                 startDate:'2025-09-01',endDate:null,archived:false,schoolRun:false,afterSchoolDays:[]},
   {id:'harry',    name:'Harry',       surname:'Worsely',       emoji:'🦎',type:'school',ao:8, color:AC[6], pin:'2012',days:[2,3,5],    cs:'07:30',ce:'08:55',billing:'wraparound',ay:false,hb:'fullday',  notes:'Before school Tue/Wed/Fri, hol full days',     startDate:'2025-09-01',endDate:null,archived:false,schoolRun:true, afterSchoolDays:[]},
   {id:'henry',    name:'Henry',       surname:'Chatterton',    emoji:'🌟',type:'ey', ao:17,color:AC[3], pin:'2013',days:[],        cs:'08:00',ce:'17:00',billing:'fullday',   ay:true, hb:'fullday', notes:'Ad hoc only, under 5, full day fee',          startDate:'2025-09-01',endDate:null,archived:false},
   {id:'hope',     name:'Hope',        surname:'Elsom',         emoji:'🕊️',type:'school',ao:10,color:AC[0], pin:'2008',days:[1,2,3,4,5],cs:'07:30',ce:'17:00',billing:'wraparound',ay:false,hb:null,      notes:'Before school daily, after school Tue & Thurs',startDate:'2025-09-01',endDate:null,archived:false,schoolRun:true, afterSchoolDays:[2,4]},
   {id:'norman',   name:'Norman',      surname:'Sadler',        emoji:'🦁',type:'school',ao:11,color:AC[1], pin:'2009',days:[1,2,3,4],  cs:'07:30',ce:'17:00',billing:'wraparound',ay:false,hb:null,       notes:'Before school Mon-Thurs, after school Mon-Wed',startDate:'2025-09-01',endDate:null,archived:false,schoolRun:true, afterSchoolDays:[1,2,3]},
-  {id:'thear',    name:'Thea R',      surname:'Rose',          emoji:'🌷',type:'school',ao:12,color:AC[2], pin:'2010',days:[1,2,3,4,5],cs:'08:00',ce:'17:00',billing:'fullday',   ay:false,hb:'fullday', notes:'Holidays only',                                startDate:'2025-09-01',endDate:null,archived:false,schoolRun:false,afterSchoolDays:[]},
-  {id:'theat',    name:'Thea T',      surname:'Topliss',       emoji:'🌹',type:'school',ao:13,color:AC[3], pin:'2011',days:[1,2,3,4,5],cs:'08:00',ce:'17:00',billing:'fullday',   ay:false,hb:'fullday', notes:'Holidays only',                                startDate:'2025-09-01',endDate:null,archived:false,schoolRun:false,afterSchoolDays:[]},
+  {id:'thear',    name:'Thea R',      surname:'Rose',          emoji:'🌷',type:'school',ao:12,color:AC[2], pin:'2010',days:[],         cs:'08:00',ce:'17:00',billing:'fullday',   ay:'holidays',hb:'fullday',notes:'Ad hoc holiday only',                          startDate:'2025-09-01',endDate:null,archived:false,schoolRun:false,afterSchoolDays:[]},
+  {id:'theat',    name:'Thea T',      surname:'Topliss',       emoji:'🌹',type:'school',ao:13,color:AC[3], pin:'2011',days:[],         cs:'08:00',ce:'17:00',billing:'fullday',   ay:'holidays',hb:'fullday',notes:'Ad hoc holiday only',                          startDate:'2025-09-01',endDate:null,archived:false,schoolRun:false,afterSchoolDays:[]},
+  // New additions
+  {id:'ophelia',  name:'Ophelia',     surname:'Andradottir',   emoji:'🌟',type:'ey', ao:18,color:AC[5], pin:'1018',days:[1,2,3,5],  cs:'07:30',ce:'17:30',billing:'wraparound',ay:true, hb:'fullday', notes:'30hr funded, temp contract ends 24 Jul, ad hoc hols',startDate:'2026-06-29',endDate:'2026-07-24',archived:false},
+  {id:'bailey',   name:'Bailey',      surname:'Lowe',          emoji:'🌱',type:'ey', ao:19,color:AC[6], pin:'1019',days:[],         cs:'08:00',ce:'17:00',billing:'fullday',   ay:'holidays',hb:'fullday',notes:'Ad hoc holiday only',                            startDate:'2025-09-01',endDate:null,archived:false},
+  {id:'bennett',  name:'Bennett',     surname:'Lowe',          emoji:'🦔',type:'school',ao:14,color:AC[6],pin:'2014',days:[],        cs:'08:00',ce:'17:00',billing:'fullday',   ay:'holidays',hb:'fullday',notes:'Ad hoc holiday only',                            startDate:'2025-09-01',endDate:null,archived:false,schoolRun:false,afterSchoolDays:[]},
+  {id:'sebastian',name:'Sebastian',   surname:'McIntyre',      emoji:'🌿',type:'ey', ao:20,color:AC[7], pin:'1020',days:[],         cs:'08:00',ce:'17:00',billing:'fullday',   ay:'holidays',hb:'fullday',notes:'Ad hoc holiday only, 3/4 yr',                    startDate:'2025-09-01',endDate:null,archived:false},
+  {id:'alicja',   name:'Alicja',      surname:'Urbanaviciute', emoji:'🌸',type:'school',ao:15,color:AC[8],pin:'2015',days:[],        cs:'08:00',ce:'17:00',billing:'fullday',   ay:'holidays',hb:'fullday',notes:'Ad hoc holiday only, under 8',                   startDate:'2025-09-01',endDate:null,archived:false,schoolRun:false,afterSchoolDays:[]},
 ];
 
 let STAFF = [
@@ -1045,10 +1071,14 @@ function childScheduledToday(c,d){
   if(c.endDate   && dk(d)>c.endDate)  return false;
   const dow=d.getDay();
   const ov=getOv(d);
-  if(ov[c.id]==='add')return true;
-  if(ov[c.id]==='remove')return false;
+  // Handle both old format (string) and new format (object with action)
+  if(ov[c.id]){
+    const action = typeof ov[c.id] === 'string' ? ov[c.id] : ov[c.id].action;
+    if(action==='add')return true;
+    if(action==='remove')return false;
+  }
+  if(!c.days || c.days.length === 0)return false; // ad hoc only
   if(!c.days.includes(dow))return false;
-  if(['ellia','thear','theat'].includes(c.id))return isHoliday(d);
   if(c.ay===false||c.ay==='true')return isTerm(d);
   if(c.ay==='holidays')return isHoliday(d);
   return true;
@@ -1245,18 +1275,25 @@ function renderOverride(){
     </div>`;
   }).join('')}</div>` : '<div style="color:rgba(255,255,255,0.3);font-size:12px;padding:8px">No children scheduled today</div>';
   
-  document.getElementById('addGrid').innerHTML=notSched.length?notSched.map(c=>`
-    <div class="ov-card ${ov[c.id]==='add'?'added':''}" onclick="toggleOverride('${c.id}','add')">
+  document.getElementById('addGrid').innerHTML=notSched.length?notSched.map(c=>{
+    const ovEntry = ov[c.id];
+    const ovAction = ovEntry ? (typeof ovEntry === 'string' ? ovEntry : ovEntry.action) : null;
+    const timeInfo = ovEntry && typeof ovEntry === 'object' && ovEntry.cs ? ` (${ovEntry.cs}–${ovEntry.ce})` : '';
+    return `<div class="ov-card ${ovAction==='add'?'added':''}" onclick="toggleOverride('${c.id}','add')">
       <div class="ov-av" style="width:32px;height:32px;border-radius:50%;background:${c.color};display:flex;align-items:center;justify-content:center;font-size:16px;margin:0 auto 4px">${c.emoji}</div>
       <div class="ov-name">${c.name}</div>
-      <div class="ov-action ${ov[c.id]==='add'?'ov-add-c':'ov-norm'}">${ov[c.id]==='add'?'✓ Added':'+ Add'}</div>
-    </div>`).join(''):'<div style="color:rgba(255,255,255,0.3);font-size:12px;padding:8px">All children scheduled today</div>';
-  document.getElementById('removeGrid').innerHTML=scheduled.length?scheduled.map(c=>`
-    <div class="ov-card ${ov[c.id]==='remove'?'removed':''}" onclick="toggleOverride('${c.id}','remove')">
+      <div class="ov-action ${ovAction==='add'?'ov-add-c':'ov-norm'}">${ovAction==='add'?'✓ Added'+timeInfo:'+ Add'}</div>
+    </div>`;
+  }).join(''):'<div style="color:rgba(255,255,255,0.3);font-size:12px;padding:8px">All children scheduled today</div>';
+  document.getElementById('removeGrid').innerHTML=scheduled.length?scheduled.map(c=>{
+    const ovEntry = ov[c.id];
+    const ovAction = ovEntry ? (typeof ovEntry === 'string' ? ovEntry : ovEntry.action) : null;
+    return `<div class="ov-card ${ovAction==='remove'?'removed':''}" onclick="toggleOverride('${c.id}','remove')">
       <div class="ov-av" style="width:32px;height:32px;border-radius:50%;background:${c.color};display:flex;align-items:center;justify-content:center;font-size:16px;margin:0 auto 4px">${c.emoji}</div>
       <div class="ov-name">${c.name}</div>
-      <div class="ov-action ${ov[c.id]==='remove'?'ov-rem-c':'ov-norm'}">${ov[c.id]==='remove'?'✗ Removed':'Scheduled'}</div>
-    </div>`).join(''):'<div style="color:rgba(255,255,255,0.3);font-size:12px;padding:8px">No children scheduled today</div>';
+      <div class="ov-action ${ovAction==='remove'?'ov-rem-c':'ov-norm'}">${ovAction==='remove'?'✗ Removed':'Scheduled'}</div>
+    </div>`;
+  }).join(''):'<div style="color:rgba(255,255,255,0.3);font-size:12px;padding:8px">No children scheduled today</div>';
 }
 
 // ════════════════════════════════════════════════
@@ -1338,14 +1375,71 @@ function closeAbsence() {
   selectedAbsenceReason = null;
 }
 
-function toggleOverride(cid,action){
-  const ov=getOv(viewDate);
-  if(ov[cid]===action)delete ov[cid]; else ov[cid]=action;
-  renderOverride();renderChildren();updateStatusBar();
-  const c=CHILDREN.find(x=>x.id===cid);
-  showFlash(action==='add'?`${c.emoji} ${c.name} added for today`:`${c.emoji} ${c.name} removed from today`);
+let adhocTarget = null;
+
+function toggleOverride(cid, action) {
+  const ov = getOv(viewDate);
+  if (action === 'remove') {
+    if (ov[cid] && ov[cid].action === 'remove') delete ov[cid];
+    else ov[cid] = { action: 'remove' };
+    const c = CHILDREN.find(x => x.id === cid);
+    showFlash(`${c.emoji} ${c.name} removed from today`);
+    renderOverride(); renderChildren(); updateStatusBar();
+    dataDirty = true;
+    if (odConnected) syncWithOneDrive();
+  } else if (action === 'add') {
+    // Check if already added
+    if (ov[cid] && ov[cid].action === 'add') {
+      delete ov[cid];
+      const c = CHILDREN.find(x => x.id === cid);
+      showFlash(`${c.emoji} ${c.name} removed from today`);
+      renderOverride(); renderChildren(); updateStatusBar();
+      dataDirty = true;
+      if (odConnected) syncWithOneDrive();
+    } else {
+      // Open time entry modal for ad hoc booking
+      openAdhoc(cid);
+    }
+  }
+}
+
+function openAdhoc(cid) {
+  adhocTarget = cid;
+  const c = CHILDREN.find(x => x.id === cid);
+  document.getElementById('adhocTitle').textContent = `${c.emoji} ${c.name} — Add for Today`;
+  // Default to child's normal contracted times if they have them, otherwise 08:00-17:00
+  document.getElementById('adhocStart').value = c.cs || '08:00';
+  document.getElementById('adhocEnd').value = c.ce || '17:00';
+  document.getElementById('adhocOv').classList.add('vis');
+}
+
+function closeAdhoc() {
+  document.getElementById('adhocOv').classList.remove('vis');
+  adhocTarget = null;
+}
+
+function saveAdhocBooking() {
+  if (!adhocTarget) return;
+  const startTime = document.getElementById('adhocStart').value;
+  const endTime = document.getElementById('adhocEnd').value;
+  if (!startTime || !endTime) { showFlash('Please set both times'); return; }
+  const ov = getOv(viewDate);
+  ov[adhocTarget] = { action: 'add', cs: startTime, ce: endTime };
+  const c = CHILDREN.find(x => x.id === adhocTarget);
+  showFlash(`${c.emoji} ${c.name} added for today, ${startTime}–${endTime}`);
+  closeAdhoc();
+  renderOverride(); renderChildren(); updateStatusBar();
   dataDirty = true;
-  if(odConnected) syncWithOneDrive();
+  if (odConnected) syncWithOneDrive();
+}
+
+// Get effective contracted times for child on this date (override or default)
+function effectiveTimes(c, d) {
+  const ov = getOv(d);
+  if (ov[c.id] && ov[c.id].action === 'add' && ov[c.id].cs && ov[c.id].ce) {
+    return { cs: ov[c.id].cs, ce: ov[c.id].ce };
+  }
+  return { cs: c.cs, ce: c.ce };
 }
 
 // ════════════════════════════════════════════════
@@ -1716,16 +1810,17 @@ function openAction(type,id){
 
   if(type==='child'){
     const att=getAtt(id,viewDate),isIn=att.signedIn;
+    const times = effectiveTimes(e, viewDate);
     document.getElementById('actSub').textContent=(isIn?'Currently signed IN':'Currently signed OUT')+' · PIN verified ✓';
     document.getElementById('actBtnIn').style.display=isIn?'none':'block';
     document.getElementById('actBtnOut').style.display=isIn?'block':'none';
     document.getElementById('actBtnIn').textContent='✓ Sign In';
     document.getElementById('actBtnOut').textContent='✗ Sign Out';
     if(!isIn){
-      const grace=graceMins(e.cs),thresh=pm(e.cs)-grace;
-      if(nowMins<thresh){const early=thresh-nowMins,b=blk(early);warn.style.display='block';document.getElementById('actWarnTitle').textContent=`⚠ Early arrival — ${fmins(early)} early`;document.getElementById('actWarnDetail').textContent=`${b} block${b!==1?'s':''} · £${cost(early).toFixed(2)} added to invoice`;}
+      const grace=graceMins(times.cs),thresh=pm(times.cs)-grace;
+      if(nowMins<thresh){const early=thresh-nowMins,b=blk(early);warn.style.display='block';document.getElementById('actWarnTitle').textContent=`⚠ Early arrival — ${fmins(early)} early`;document.getElementById('actWarnDetail').textContent=`Contracted start: ${times.cs} · ${b} block${b!==1?'s':''} · £${cost(early).toFixed(2)} added to invoice`;}
     } else {
-      if(nowMins>pm(e.ce)){const late=nowMins-pm(e.ce),b=blk(late);warn.style.display='block';document.getElementById('actWarnTitle').textContent=`⚠ Late collection — ${fmins(late)} late`;document.getElementById('actWarnDetail').textContent=`${b} block${b!==1?'s':''} · £${cost(late).toFixed(2)} added to invoice`;}
+      if(nowMins>pm(times.ce)){const late=nowMins-pm(times.ce),b=blk(late);warn.style.display='block';document.getElementById('actWarnTitle').textContent=`⚠ Late collection — ${fmins(late)} late`;document.getElementById('actWarnDetail').textContent=`Contracted end: ${times.ce} · ${b} block${b!==1?'s':''} · £${cost(late).toFixed(2)} added to invoice`;}
     }
   } else {
     const log=getSLog(id,viewDate),isIn=log.clockedIn;
@@ -1750,9 +1845,10 @@ function confirmAction(isIn){
 
   if(type==='child'){
     const c=CHILDREN.find(x=>x.id===id),att=getAtt(id,viewDate);
-    const grace=graceMins(c.cs),thresh=pm(c.cs)-grace;
+    const times = effectiveTimes(c, viewDate);
+    const grace=graceMins(times.cs),thresh=pm(times.cs)-grace;
     if(isIn){att.signedIn=true;att.signInTime=t;if(nowMins<thresh)att.earlyMins=thresh-nowMins;}
-    else{att.signedIn=false;att.signOutTime=t;if(nowMins>pm(c.ce))att.lateMins=nowMins-pm(c.ce);}
+    else{att.signedIn=false;att.signOutTime=t;if(nowMins>pm(times.ce))att.lateMins=nowMins-pm(times.ce);}
     const extra=isIn?att.earlyMins:att.lateMins;
     getLog(viewDate).unshift({name:c.name,type:'child',action:isIn?'in':'out',time:t,extra,verified:true});
     showFlash(`${c.emoji} ${c.name} signed ${isIn?'IN':'OUT'} at ${t}${extra>0?' · ⚠ £'+cost(extra).toFixed(2):''}`);
