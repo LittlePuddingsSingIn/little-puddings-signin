@@ -408,6 +408,7 @@
       </div>
     </div>
     <div class="set-section" id="clearSignInSection"></div>
+    <div class="set-section" id="droppedAtSchoolSection"></div>
     <div class="set-section" id="collectedFromSchoolSection"></div>
     <div class="set-section">
       <div class="set-title">🔑 Reset PIN to 0000</div>
@@ -790,6 +791,7 @@ async function syncWithOneDrive() {
       if (remoteData.overrides) overrides = { ...remoteData.overrides, ...overrides };
       if (remoteData.absences) absences = { ...remoteData.absences, ...absences };
       if (remoteData.collectedFromSchool) collectedFromSchool = { ...remoteData.collectedFromSchool, ...collectedFromSchool };
+      if (remoteData.droppedOffAtSchool) droppedOffAtSchool = { ...remoteData.droppedOffAtSchool, ...droppedOffAtSchool };
       if (remoteData.timesheet) {
         Object.keys(remoteData.timesheet).forEach(sid => {
           if (!timesheet[sid]) timesheet[sid] = {};
@@ -815,7 +817,7 @@ async function syncWithOneDrive() {
     const payload = JSON.stringify({
       dataVersion: DATA_VERSION,
       CHILDREN, STAFF, attendance, staffLog, eventLog, overrides, absences,
-      collectedFromSchool, pinCustomised, timesheet, lastUpdated: new Date().toISOString()
+      collectedFromSchool, droppedOffAtSchool, pinCustomised, timesheet, lastUpdated: new Date().toISOString()
     });
     
     const uploadUrl = `https://graph.microsoft.com/v1.0/me/drive/root:/${SYNC_FOLDER}/${encodeURIComponent(SYNC_FILE)}:/content`;
@@ -992,7 +994,7 @@ let CHILDREN = [
   {id:'thear',    name:'Thea R',      surname:'Rose',          emoji:'🌷',type:'school',ao:12,color:AC[2], pin:'2010',days:[],         cs:'08:00',ce:'17:00',billing:'fullday',   ay:'holidays',hb:'fullday',notes:'Ad hoc holiday only',                          startDate:'2025-09-01',endDate:null,archived:false,schoolRun:false,afterSchoolDays:[]},
   {id:'theat',    name:'Thea T',      surname:'Topliss',       emoji:'🌹',type:'school',ao:13,color:AC[3], pin:'2011',days:[],         cs:'08:00',ce:'17:00',billing:'fullday',   ay:'holidays',hb:'fullday',notes:'Ad hoc holiday only',                          startDate:'2025-09-01',endDate:null,archived:false,schoolRun:false,afterSchoolDays:[]},
   // New additions
-  {id:'ophelia',  name:'Ophelia',     surname:'Andradottir',   emoji:'🌟',type:'ey', ao:18,color:AC[5], pin:'1018',days:[1,2,3,5],  cs:'07:30',ce:'17:30',billing:'wraparound',ay:true, hb:'fullday', notes:'30hr funded, temp contract ends 24 Jul, ad hoc hols',startDate:'2026-06-29',endDate:'2026-07-24',archived:false},
+  {id:'ophelia',  name:'Ophelia',     surname:'Andradottir',   emoji:'🌟',type:'ey', ao:18,color:AC[5], pin:'1018',days:[1,2,3,5],  cs:'07:30',ce:'17:30',billing:'wraparound',ay:false,hb:'fullday', notes:'30hr funded, temp contract ends 24 Jul, ad hoc hols',startDate:'2026-06-29',endDate:'2026-07-24',archived:false},
   {id:'bailey',   name:'Bailey',      surname:'Lowe',          emoji:'🌱',type:'ey', ao:19,color:AC[6], pin:'1019',days:[],         cs:'08:00',ce:'17:00',billing:'fullday',   ay:'holidays',hb:'fullday',notes:'Ad hoc holiday only',                            startDate:'2025-09-01',endDate:null,archived:false},
   {id:'bennett',  name:'Bennett',     surname:'Lowe',          emoji:'🦔',type:'school',ao:14,color:AC[6],pin:'2014',days:[],        cs:'08:00',ce:'17:00',billing:'fullday',   ay:'holidays',hb:'fullday',notes:'Ad hoc holiday only',                            startDate:'2025-09-01',endDate:null,archived:false,schoolRun:false,afterSchoolDays:[]},
   {id:'sebastian',name:'Sebastian',   surname:'McIntyre',      emoji:'🌿',type:'ey', ao:20,color:AC[7], pin:'1020',days:[],         cs:'08:00',ce:'17:00',billing:'fullday',   ay:'holidays',hb:'fullday',notes:'Ad hoc holiday only, 3/4 yr',                    startDate:'2025-09-01',endDate:null,archived:false},
@@ -1016,7 +1018,7 @@ let timesheet = {};
 // ════════════════════════════════════════════════
 // Data version — bump this whenever CHILDREN or STAFF structure changes in the code
 // so that OneDrive syncs pick up the code changes rather than being overwritten
-const DATA_VERSION = 3;
+const DATA_VERSION = 4;
 
 let viewDate = new Date(); viewDate.setHours(0,0,0,0);
 let managerMode = false;
@@ -1027,6 +1029,7 @@ let eventLog = {};
 let overrides = {};
 let absences = {}; // [dateKey][childId] = {reason, note}
 let collectedFromSchool = {}; // [dateKey][childId] = true — skip afternoon auto sign-in
+let droppedOffAtSchool = {}; // [dateKey][childId] = true — skip morning auto sign-out (parent doing school drop)
 let pinTarget = null, pinEntry = '', pinShaking = false;
 let mgrPinEntry = '', mgrPinShaking = false;
 let actionTarget = null;
@@ -1057,7 +1060,9 @@ function getFinancialYearEnd(d){
 
 // Only all-year-round children get holiday allowance — 2 half-fee days per contracted day per year
 function getHolidayAllowance(c){
-  if(c.ay === true || c.ay === 'holidays') return 0;
+  // Term-time only (ay:false) and holidays-only (ay:'holidays') children get no half-fee allowance
+  if(c.ay === false || c.ay === 'holidays') return 0;
+  // All-year-round children get 2 half-fee days per contracted day per year
   return c.days.length * 2;
 }
 
@@ -2078,6 +2083,24 @@ function renderSettings(){
       :'<div style="color:rgba(255,255,255,0.3);font-size:12px;padding:8px">No children signed in today</div>'}`;
   }
 
+  // Dropped off at school section (morning)
+  const morningSchoolRunToday=CHILDREN.filter(c=>c.schoolRun&&c.days.includes(viewDate.getDay())&&childScheduledToday(c,viewDate));
+  const droppedSection=document.getElementById('droppedAtSchoolSection');
+  const dropped=getDropped(viewDate);
+  if(droppedSection){
+    droppedSection.innerHTML=`<div class="set-title">🎒 Parent Dropping Off at School</div>
+      <div class="sec-sub" style="margin-bottom:8px">Tap to mark that a parent is doing the morning school drop — they won't be auto-signed out at 08:55</div>
+      ${morningSchoolRunToday.length?`<div class="mgr-ov-grid">${morningSchoolRunToday.map(c=>`
+        <div class="mgr-ov-card ${dropped[c.id]?'selected':''}" onclick="toggleDroppedOffAtSchool('${c.id}')">
+          <div class="mgr-ov-av" style="background:${c.color}">${c.emoji}</div>
+          <div class="mgr-ov-name">${c.name}</div>
+          <div class="mgr-ov-status" style="color:${dropped[c.id]?'var(--error)':'var(--ok)'}">
+            ${dropped[c.id]?'✗ Parent doing school drop':'✓ Auto sign-out 08:55'}
+          </div>
+        </div>`).join('')}</div>`
+      :'<div style="color:rgba(255,255,255,0.3);font-size:12px;padding:8px">No morning school run children today</div>'}`;
+  }
+
   // Collected from school section
   const schoolRunToday=CHILDREN.filter(c=>c.schoolRun&&c.afterSchoolDays&&c.afterSchoolDays.includes(viewDate.getDay())&&childScheduledToday(c,viewDate));
   const collectedSection=document.getElementById('collectedFromSchoolSection');
@@ -2346,9 +2369,10 @@ function schoolRunTick() {
   const h=now.getHours(), m=now.getMinutes();
   const t=ts(now);
 
-  // 08:55 — auto sign-out all school run children who were signed in this morning
+  // 08:55 — auto sign-out school run children (unless parent is doing the school drop today)
   if(h===8 && m===55) {
-    CHILDREN.filter(c=>c.schoolRun && childScheduledToday(c,now)).forEach(c=>{
+    const dropped = getDropped(now);
+    CHILDREN.filter(c=>c.schoolRun && childScheduledToday(c,now) && !dropped[c.id]).forEach(c=>{
       const att=getAtt(c.id,now);
       if(att.signedIn && att.signInTime) {
         att.signedIn=false; att.signOutTime='08:55';
@@ -2385,6 +2409,20 @@ function toggleCollectedFromSchool(cid) {
   collected[cid]=!collected[cid];
   const c=CHILDREN.find(x=>x.id===cid);
   showFlash(collected[cid]?`${c.emoji} ${c.name} — collected from school today`:`${c.emoji} ${c.name} — will return at 15:25`);
+  dataDirty = true;
+  if(odConnected) syncWithOneDrive();
+  renderSettings();
+}
+
+function getDropped(d){ const k=dk(d);if(!droppedOffAtSchool[k])droppedOffAtSchool[k]={};return droppedOffAtSchool[k]; }
+
+function toggleDroppedOffAtSchool(cid) {
+  const dropped=getDropped(viewDate);
+  dropped[cid]=!dropped[cid];
+  const c=CHILDREN.find(x=>x.id===cid);
+  showFlash(dropped[cid]?`${c.emoji} ${c.name} — parent dropping off at school today`:`${c.emoji} ${c.name} — will be signed out at 08:55`);
+  dataDirty = true;
+  if(odConnected) syncWithOneDrive();
   renderSettings();
 }
 
