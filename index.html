@@ -1013,7 +1013,7 @@ let timesheet = {};
 // ════════════════════════════════════════════════
 // Data version — bump this whenever CHILDREN or STAFF structure changes in the code
 // so that OneDrive syncs pick up the code changes rather than being overwritten
-const DATA_VERSION = 2;
+const DATA_VERSION = 3;
 
 let viewDate = new Date(); viewDate.setHours(0,0,0,0);
 let managerMode = false;
@@ -2386,9 +2386,11 @@ function renderAll(){
   if(currentTab==='settings')renderSettings();
 }
 
-// Mark all existing PINs as customised so set-PIN only fires after a manager reset
-CHILDREN.forEach(c=>markPinCustomised('child',c.id));
-STAFF.forEach(s=>markPinCustomised('staff',s.id));
+// PINs start as "default" so parents and staff will be prompted to set their own
+// personal PIN on first use. Once set, pinCustomised persists via OneDrive sync.
+
+// Safety: make sure no overlays are stuck visible on load
+document.querySelectorAll('.overlay').forEach(el => el.classList.remove('vis'));
 
 // Init MSAL and render
 initMSAL().then(()=>renderAll());
