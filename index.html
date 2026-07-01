@@ -1408,7 +1408,30 @@ function openAbsence(cid) {
 
 function selectAbsenceReason(reason) {
   selectedAbsenceReason = reason;
-  openAbsence(absenceTarget); // Re-render to update selection
+  // Rebuild only the reason buttons (not full modal re-render, to preserve state)
+  const c = CHILDREN.find(x=>x.id===absenceTarget);
+  document.getElementById('absenceReasonGrid').innerHTML = Object.entries(ABSENCE_REASONS).map(([key, r]) => 
+    `<div onclick="selectAbsenceReason('${key}')" style="padding:12px 8px;border:2px solid ${selectedAbsenceReason===key?r.color:'var(--sage)'};background:${selectedAbsenceReason===key?r.color+'22':'var(--parchment)'};border-radius:9px;text-align:center;cursor:pointer;transition:all 0.15s">
+      <div style="font-size:22px;margin-bottom:3px">${r.emoji}</div>
+      <div style="font-size:11px;font-weight:700;color:var(--forest)">${r.label}</div>
+    </div>`
+  ).join('');
+  // Update allowance info if holiday
+  const info = document.getElementById('absAllowanceInfo');
+  if (selectedAbsenceReason === 'holiday') {
+    const allowance = getHolidayAllowance(c);
+    const used = getHolidayUsed(absenceTarget, viewDate);
+    if (allowance > 0) {
+      const remaining = allowance - used;
+      const fyStart = getFinancialYearStart(viewDate);
+      info.innerHTML = `<strong>Half-fee allowance</strong> for ${fyStart.getFullYear()}–${fyStart.getFullYear()+1}: <strong>${used}/${allowance}</strong> days used. ${remaining > 0 ? remaining + ' days remaining at half fee.' : 'Allowance used — this day billed in full.'}${used >= allowance-2 && remaining > 0 ? ' ⚠ Approaching limit.' : ''}`;
+    } else {
+      info.innerHTML = `<strong>Term-time only child</strong> — no half-fee holiday allowance. This day will be billed in full.`;
+    }
+    info.style.display = 'block';
+  } else {
+    info.style.display = 'none';
+  }
 }
 
 function saveAbsence() {
