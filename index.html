@@ -756,6 +756,9 @@ const SYNC_FOLDER = '2026-2027 INVOICES';
 
 async function syncWithOneDrive() {
   if (!odConnected || !odAccessToken || syncInProgress) return;
+  // Don't sync while user has a modal open — it interferes with input
+  const anyModalOpen = document.querySelectorAll('.overlay.vis').length > 0;
+  if (anyModalOpen && !dataDirty) return;
   syncInProgress = true;
   try {
     // Pull latest from OneDrive
