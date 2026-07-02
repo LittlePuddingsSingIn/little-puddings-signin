@@ -72,8 +72,9 @@
   @media(max-width:600px){.children-grid{grid-template-columns:repeat(3,1fr)}}
   .child-card{background:var(--cream);border-radius:12px;padding:11px 8px;text-align:center;cursor:pointer;transition:all 0.18s;border:2.5px solid transparent;position:relative;overflow:hidden}
   .child-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--moss)}
-  .child-card.in{background:#eaf4f0;border-color:var(--moss)}
-  .child-card.in::before{height:5px}
+  .child-card.in{background:linear-gradient(135deg,#c8e6d5 0%,#a8d6be 100%);border-color:var(--forest);box-shadow:0 3px 10px rgba(26,122,74,0.25)}
+  .child-card.in .child-name{color:var(--forest);font-weight:800}
+  .child-card.in::before{height:5px;background:var(--forest)}
   .child-card.override{border-style:dashed;border-color:var(--gold)}
   .child-card:active{transform:scale(0.95)}
   .child-avatar{width:42px;height:42px;border-radius:50%;margin:3px auto 7px;display:flex;align-items:center;justify-content:center;font-size:20px}
@@ -528,6 +529,7 @@
           <option value="wraponly">Wrap around only</option>
           <option value="fullday">Full day fee</option>
           <option value="halfday">Half day fee</option>
+          <option value="holidayfee">Holiday fee (ad hoc)</option>
           <option value="varies">Varies</option>
         </select>
       </div>
@@ -984,25 +986,25 @@ let CHILDREN = [
   {id:'diora',    name:'Diora',       surname:'Maslovskaja', emoji:'🦚',type:'ey',  ao:15, color:AC[3], pin:'1015',days:[1,2,3,4],  cs:'07:30',ce:'17:00',billing:'fullday',   ay:true, hb:'fullday', notes:'4yr funding, all year round',                startDate:'2025-09-01',endDate:null,archived:false},
   {id:'rory',     name:'Rory',        surname:'Dickins',     emoji:'🦊',type:'ey',  ao:16, color:AC[4], pin:'1016',days:[2,3,4,5],  cs:'07:45',ce:'17:15',billing:'wraparound',ay:false,hb:null,      notes:'4yr funding 7.5hrs/day',                     startDate:'2025-09-01',endDate:null,archived:false},
   // School
-  {id:'alara',    name:'Alara',       surname:'Claypole-Demir',emoji:'⭐',type:'school',ao:1, color:AC[5], pin:'2001',days:[1,2,3,5],  cs:'07:30',ce:'16:30',billing:'wraparound',ay:false,hb:null,      notes:'Before school Mon/Tue/Wed/Fri, after school Mon only',   startDate:'2025-09-01',endDate:null,archived:false,schoolRun:true, afterSchoolDays:[1]},
-  {id:'bernard',  name:'Bernard',     surname:'Burr',          emoji:'🚀',type:'school',ao:2, color:AC[6], pin:'2002',days:[1,2,3,4,5],cs:'07:30',ce:'17:30',billing:'wraparound',ay:false,hb:null,      notes:'Before school daily, after school Wed & Thurs',startDate:'2025-09-01',endDate:null,archived:false,schoolRun:true, afterSchoolDays:[3,4]},
-  {id:'bonnie',   name:'Bonnie',      surname:'Stukins',       emoji:'🌈',type:'school',ao:3, color:AC[7], pin:'2003',days:[2,3,4,5], cs:'07:30',ce:'08:55',billing:'wraparound',ay:false,hb:null,       notes:'Before school Tue-Fri only',                   startDate:'2025-09-01',endDate:null,archived:false,schoolRun:true, afterSchoolDays:[]},
-  {id:'douglas',  name:'Douglas',     surname:'Burr',          emoji:'⚡',type:'school',ao:4, color:AC[8], pin:'2004',days:[1,2,3,4,5],cs:'07:30',ce:'17:30',billing:'wraparound',ay:false,hb:null,      notes:'Before school daily, after school Wed & Thurs',startDate:'2025-09-01',endDate:null,archived:false,schoolRun:true, afterSchoolDays:[3,4]},
-  {id:'ellia',    name:'Ellia',       surname:'Grigaliunas',   emoji:'🌙',type:'school',ao:5, color:AC[9], pin:'2005',days:[],         cs:'08:00',ce:'17:00',billing:'fullday',   ay:'holidays',hb:'fullday',notes:'Ad hoc holiday only',                          startDate:'2025-09-01',endDate:null,archived:false,schoolRun:false,afterSchoolDays:[]},
-  {id:'evelyndad',name:'Evelyn (Dad)', surname:'Betts -DAD',    emoji:'🌟',type:'school',ao:6, color:AC[10],pin:'2006',days:[3],        cs:'15:25',ce:'17:00',billing:'wraparound',ay:false,hb:null,       notes:'After school Wed, billed to Dad',              startDate:'2025-09-01',endDate:null,archived:false,schoolRun:true,afterSchoolDays:[3]},
+  {id:'alara',    name:'Alara',       surname:'Claypole-Demir',emoji:'⭐',type:'school',ao:1, color:AC[5], pin:'2001',days:[1,2,3,5],  cs:'07:30',ce:'16:30',billing:'wraponly',ay:false,hb:null,      notes:'Before school Mon/Tue/Wed/Fri, after school Mon only',   startDate:'2025-09-01',endDate:null,archived:false,schoolRun:true, afterSchoolDays:[1]},
+  {id:'bernard',  name:'Bernard',     surname:'Burr',          emoji:'🚀',type:'school',ao:2, color:AC[6], pin:'2002',days:[1,2,3,4,5],cs:'07:30',ce:'17:30',billing:'wraponly',ay:false,hb:null,      notes:'Before school daily, after school Wed & Thurs',startDate:'2025-09-01',endDate:null,archived:false,schoolRun:true, afterSchoolDays:[3,4]},
+  {id:'bonnie',   name:'Bonnie',      surname:'Stukins',       emoji:'🌈',type:'school',ao:3, color:AC[7], pin:'2003',days:[2,3,4,5], cs:'07:30',ce:'08:55',billing:'wraponly',ay:false,hb:null,       notes:'Before school Tue-Fri only',                   startDate:'2025-09-01',endDate:null,archived:false,schoolRun:true, afterSchoolDays:[]},
+  {id:'douglas',  name:'Douglas',     surname:'Burr',          emoji:'⚡',type:'school',ao:4, color:AC[8], pin:'2004',days:[1,2,3,4,5],cs:'07:30',ce:'17:30',billing:'wraponly',ay:false,hb:null,      notes:'Before school daily, after school Wed & Thurs',startDate:'2025-09-01',endDate:null,archived:false,schoolRun:true, afterSchoolDays:[3,4]},
+  {id:'ellia',    name:'Ellia',       surname:'Grigaliunas',   emoji:'🌙',type:'school',ao:5, color:AC[9], pin:'2005',days:[],         cs:'08:00',ce:'17:00',billing:'holidayfee',   ay:'holidays',hb:'fullday',notes:'Ad hoc holiday only',                          startDate:'2025-09-01',endDate:null,archived:false,schoolRun:false,afterSchoolDays:[]},
+  {id:'evelyndad',name:'Evelyn (Dad)', surname:'Betts -DAD',    emoji:'🌟',type:'school',ao:6, color:AC[10],pin:'2006',days:[3],        cs:'15:25',ce:'17:00',billing:'wraponly',ay:false,hb:null,       notes:'After school Wed, billed to Dad',              startDate:'2025-09-01',endDate:null,archived:false,schoolRun:true,afterSchoolDays:[3]},
   {id:'evelynmum',name:'Evelyn (Mum)', surname:'Betts -MUM',    emoji:'🌟',type:'school',ao:7, color:AC[10],pin:'2007',days:[],         cs:'08:00',ce:'17:30',billing:'varies',    ay:false,hb:null,       notes:'Variable hours weekly — add via Day Changes with each day\'s times', startDate:'2025-09-01',endDate:null,archived:false,schoolRun:true,afterSchoolDays:[]},
-  {id:'harry',    name:'Harry',       surname:'Worsely',       emoji:'🦎',type:'school',ao:8, color:AC[6], pin:'2012',days:[2,3,5],    cs:'07:30',ce:'08:55',billing:'wraparound',ay:false,hb:'fullday',  notes:'Before school Tue/Wed/Fri, hol full days',     startDate:'2025-09-01',endDate:null,archived:false,schoolRun:true, afterSchoolDays:[]},
+  {id:'harry',    name:'Harry',       surname:'Worsely',       emoji:'🦎',type:'school',ao:8, color:AC[6], pin:'2012',days:[2,3,5],    cs:'07:30',ce:'08:55',billing:'wraponly',ay:false,hb:'fullday',  notes:'Before school Tue/Wed/Fri, hol full days',     startDate:'2025-09-01',endDate:null,archived:false,schoolRun:true, afterSchoolDays:[]},
   {id:'henry',    name:'Henry',       surname:'Chatterton',    emoji:'🌟',type:'ey', ao:17,color:AC[3], pin:'2013',days:[],        cs:'08:00',ce:'17:00',billing:'fullday',   ay:true, hb:'fullday', notes:'Ad hoc only, under 5, full day fee',          startDate:'2025-09-01',endDate:null,archived:false},
-  {id:'hope',     name:'Hope',        surname:'Elsom',         emoji:'🕊️',type:'school',ao:10,color:AC[0], pin:'2008',days:[1,2,3,4,5],cs:'07:30',ce:'17:00',billing:'wraparound',ay:false,hb:null,      notes:'Before school daily, after school Tue & Thurs',startDate:'2025-09-01',endDate:null,archived:false,schoolRun:true, afterSchoolDays:[2,4]},
-  {id:'norman',   name:'Norman',      surname:'Sadler',        emoji:'🦁',type:'school',ao:11,color:AC[1], pin:'2009',days:[1,2,3,4],  cs:'07:30',ce:'17:00',billing:'wraparound',ay:false,hb:null,       notes:'Before school Mon-Thurs, after school Mon-Wed',startDate:'2025-09-01',endDate:null,archived:false,schoolRun:true, afterSchoolDays:[1,2,3]},
-  {id:'thear',    name:'Thea R',      surname:'Rose',          emoji:'🌷',type:'school',ao:12,color:AC[2], pin:'2010',days:[],         cs:'08:00',ce:'17:00',billing:'fullday',   ay:'holidays',hb:'fullday',notes:'Ad hoc holiday only',                          startDate:'2025-09-01',endDate:null,archived:false,schoolRun:false,afterSchoolDays:[]},
-  {id:'theat',    name:'Thea T',      surname:'Topliss',       emoji:'🌹',type:'school',ao:13,color:AC[3], pin:'2011',days:[],         cs:'08:00',ce:'17:00',billing:'fullday',   ay:'holidays',hb:'fullday',notes:'Ad hoc holiday only',                          startDate:'2025-09-01',endDate:null,archived:false,schoolRun:false,afterSchoolDays:[]},
+  {id:'hope',     name:'Hope',        surname:'Elsom',         emoji:'🕊️',type:'school',ao:10,color:AC[0], pin:'2008',days:[1,2,3,4,5],cs:'07:30',ce:'17:00',billing:'wraponly',ay:false,hb:null,      notes:'Before school daily, after school Tue & Thurs',startDate:'2025-09-01',endDate:null,archived:false,schoolRun:true, afterSchoolDays:[2,4]},
+  {id:'norman',   name:'Norman',      surname:'Sadler',        emoji:'🦁',type:'school',ao:11,color:AC[1], pin:'2009',days:[1,2,3,4],  cs:'07:30',ce:'17:00',billing:'wraponly',ay:false,hb:null,       notes:'Before school Mon-Thurs, after school Mon-Wed',startDate:'2025-09-01',endDate:null,archived:false,schoolRun:true, afterSchoolDays:[1,2,3]},
+  {id:'thear',    name:'Thea R',      surname:'Rose',          emoji:'🌷',type:'school',ao:12,color:AC[2], pin:'2010',days:[],         cs:'08:00',ce:'17:00',billing:'holidayfee',   ay:'holidays',hb:'fullday',notes:'Ad hoc holiday only',                          startDate:'2025-09-01',endDate:null,archived:false,schoolRun:false,afterSchoolDays:[]},
+  {id:'theat',    name:'Thea T',      surname:'Topliss',       emoji:'🌹',type:'school',ao:13,color:AC[3], pin:'2011',days:[],         cs:'08:00',ce:'17:00',billing:'holidayfee',   ay:'holidays',hb:'fullday',notes:'Ad hoc holiday only',                          startDate:'2025-09-01',endDate:null,archived:false,schoolRun:false,afterSchoolDays:[]},
   // New additions
   {id:'ophelia',  name:'Ophelia',     surname:'Andradottir',   emoji:'🌟',type:'ey', ao:18,color:AC[5], pin:'1018',days:[1,2,3,5],  cs:'07:30',ce:'17:30',billing:'wraparound',ay:false,hb:'fullday', notes:'30hr funded, temp contract ends 24 Jul, ad hoc hols',startDate:'2026-06-29',endDate:'2026-07-24',archived:false},
-  {id:'bailey',   name:'Bailey',      surname:'Lowe',          emoji:'🌱',type:'ey', ao:19,color:AC[6], pin:'1019',days:[],         cs:'08:00',ce:'17:00',billing:'fullday',   ay:'holidays',hb:'fullday',notes:'Ad hoc holiday only',                            startDate:'2025-09-01',endDate:null,archived:false},
-  {id:'bennett',  name:'Bennett',     surname:'Lowe',          emoji:'🦔',type:'school',ao:14,color:AC[6],pin:'2014',days:[],        cs:'08:00',ce:'17:00',billing:'fullday',   ay:'holidays',hb:'fullday',notes:'Ad hoc holiday only',                            startDate:'2025-09-01',endDate:null,archived:false,schoolRun:false,afterSchoolDays:[]},
-  {id:'sebastian',name:'Sebastian',   surname:'McIntyre',      emoji:'🌿',type:'ey', ao:20,color:AC[7], pin:'1020',days:[],         cs:'08:00',ce:'17:00',billing:'fullday',   ay:'holidays',hb:'fullday',notes:'Ad hoc holiday only, 3/4 yr',                    startDate:'2025-09-01',endDate:null,archived:false},
-  {id:'alicja',   name:'Alicja',      surname:'Urbanaviciute', emoji:'🌸',type:'school',ao:15,color:AC[8],pin:'2015',days:[],        cs:'08:00',ce:'17:00',billing:'fullday',   ay:'holidays',hb:'fullday',notes:'Ad hoc holiday only, under 8',                   startDate:'2025-09-01',endDate:null,archived:false,schoolRun:false,afterSchoolDays:[]},
+  {id:'bailey',   name:'Bailey',      surname:'Lowe',          emoji:'🌱',type:'ey', ao:19,color:AC[6], pin:'1019',days:[],         cs:'08:00',ce:'17:00',billing:'holidayfee',   ay:'holidays',hb:'fullday',notes:'Ad hoc holiday only',                            startDate:'2025-09-01',endDate:null,archived:false},
+  {id:'bennett',  name:'Bennett',     surname:'Lowe',          emoji:'🦔',type:'school',ao:14,color:AC[6],pin:'2014',days:[],        cs:'08:00',ce:'17:00',billing:'holidayfee',   ay:'holidays',hb:'fullday',notes:'Ad hoc holiday only',                            startDate:'2025-09-01',endDate:null,archived:false,schoolRun:false,afterSchoolDays:[]},
+  {id:'sebastian',name:'Sebastian',   surname:'McIntyre',      emoji:'🌿',type:'ey', ao:20,color:AC[7], pin:'1020',days:[],         cs:'08:00',ce:'17:00',billing:'holidayfee',   ay:'holidays',hb:'fullday',notes:'Ad hoc holiday only, 3/4 yr',                    startDate:'2025-09-01',endDate:null,archived:false},
+  {id:'alicja',   name:'Alicja',      surname:'Urbanaviciute', emoji:'🌸',type:'school',ao:15,color:AC[8],pin:'2015',days:[],        cs:'08:00',ce:'17:00',billing:'holidayfee',   ay:'holidays',hb:'fullday',notes:'Ad hoc holiday only, under 8',                   startDate:'2025-09-01',endDate:null,archived:false,schoolRun:false,afterSchoolDays:[]},
 ];
 
 let STAFF = [
@@ -1022,7 +1024,7 @@ let timesheet = {};
 // ════════════════════════════════════════════════
 // Data version — bump this whenever CHILDREN or STAFF structure changes in the code
 // so that OneDrive syncs pick up the code changes rather than being overwritten
-const DATA_VERSION = 9;
+const DATA_VERSION = 10;
 
 let viewDate = new Date(); viewDate.setHours(0,0,0,0);
 let managerMode = false;
@@ -1232,8 +1234,8 @@ function setTab(t){
 // RENDER CHILDREN
 // ════════════════════════════════════════════════
 function renderChildren(){
-  const eyToday  = CHILDREN.filter(c=>c.type==='ey'     &&childScheduledToday(c,viewDate)).sort((a,b)=>a.ao-b.ao);
-  const schToday = CHILDREN.filter(c=>c.type==='school' &&childScheduledToday(c,viewDate)).sort((a,b)=>a.ao-b.ao);
+  const eyToday  = CHILDREN.filter(c=>c.type==='ey'     &&childScheduledToday(c,viewDate)).sort((a,b)=>a.name.localeCompare(b.name));
+  const schToday = CHILDREN.filter(c=>c.type==='school' &&childScheduledToday(c,viewDate)).sort((a,b)=>a.name.localeCompare(b.name));
   function grp(list,label){
     if(!list.length)return`<div class="empty" style="padding:12px 0">No ${label.toLowerCase()} attending today</div>`;
     const inN=list.filter(c=>getAtt(c.id,viewDate).signedIn).length;
