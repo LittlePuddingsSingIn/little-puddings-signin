@@ -524,6 +524,7 @@
         <select class="af-select" id="afBilling">
           <option value="funded">Funded only</option>
           <option value="wraparound">Funded + wrap</option>
+          <option value="wraponly">Wrap around only</option>
           <option value="fullday">Full day fee</option>
           <option value="halfday">Half day fee</option>
           <option value="varies">Varies</option>
@@ -831,6 +832,8 @@ async function syncWithOneDrive() {
     dataDirty = false;
     updateSyncIndicator();
     renderAll();
+    // Check school run after sync loads latest attendance
+    try { schoolRunTick(); } catch(e) {}
   } catch(e) {
     console.error('Sync error:', e);
   }
@@ -1018,7 +1021,7 @@ let timesheet = {};
 // ════════════════════════════════════════════════
 // Data version — bump this whenever CHILDREN or STAFF structure changes in the code
 // so that OneDrive syncs pick up the code changes rather than being overwritten
-const DATA_VERSION = 6;
+const DATA_VERSION = 8;
 
 let viewDate = new Date(); viewDate.setHours(0,0,0,0);
 let managerMode = false;
@@ -2045,25 +2048,45 @@ function closeLeave() {
 
 function renderSettings(){
   const scheduled=CHILDREN.filter(c=>childScheduledToday(c,viewDate));
+  const scheduledStaff=STAFF.filter(s=>staffScheduledToday(s,viewDate));
   const collected=getCollected(viewDate);
 
-  // Override sign in/out grid
-  document.getElementById('overrideChildGrid').innerHTML=scheduled.length?scheduled.map(c=>{
-    const att=getAtt(c.id,viewDate),sel=overrideSelectedChild===c.id;
-    return`<div class="mgr-ov-card ${sel?'selected':''}" onclick="selectOverrideChild('${c.id}')">
+  // Override sign in/out grid — children and staff
+  const childCards = scheduled.map(c=>{
+    const att=getAtt(c.id,viewDate),sel=overrideSelectedChild==='child_'+c.id;
+    return`<div class="mgr-ov-card ${sel?'selected':''}" onclick="selectOverrideChild('child_${c.id}')">
       <div class="mgr-ov-av" style="background:${c.color}">${c.emoji}</div>
       <div class="mgr-ov-name">${c.name}</div>
       <div class="mgr-ov-status" style="color:${att.signInTime?'var(--ok)':'var(--bark)'}">
         ${att.signInTime?'In '+att.signInTime:'Not in'}${att.signOutTime?' · Out '+att.signOutTime:''}
       </div>
-    </div>`;}).join(''):'<div class="empty">No children scheduled today</div>';
+    </div>`;}).join('');
+  const staffCards = scheduledStaff.map(s=>{
+    const log=getSLog(s.id,viewDate),sel=overrideSelectedChild==='staff_'+s.id;
+    return`<div class="mgr-ov-card ${sel?'selected':''}" onclick="selectOverrideChild('staff_${s.id}')" style="border-color:${s.color}">
+      <div class="mgr-ov-av" style="background:${s.color};color:white;font-family:'Playfair Display',serif;font-weight:700">${s.name[0]}</div>
+      <div class="mgr-ov-name">${s.name} <span style="color:var(--moss);font-size:9px">(staff)</span></div>
+      <div class="mgr-ov-status" style="color:${log.clockInTime?'var(--ok)':'var(--bark)'}">
+        ${log.clockInTime?'In '+log.clockInTime:'Not in'}${log.clockOutTime?' · Out '+log.clockOutTime:''}
+      </div>
+    </div>`;}).join('');
+  document.getElementById('overrideChildGrid').innerHTML=(childCards+staffCards)||'<div class="empty">No-one scheduled today</div>';
 
   if(overrideSelectedChild){
     document.getElementById('overrideTimeRow').style.display='block';
-    const c=CHILDREN.find(x=>x.id===overrideSelectedChild),att=getAtt(overrideSelectedChild,viewDate);
-    document.getElementById('overrideChildName').textContent=c.name;
-    document.getElementById('overrideTimeIn').value=att.signInTime||'';
-    document.getElementById('overrideTimeOut').value=att.signOutTime||'';
+    if(overrideSelectedChild.startsWith('child_')){
+      const cid=overrideSelectedChild.slice(6);
+      const c=CHILDREN.find(x=>x.id===cid),att=getAtt(cid,viewDate);
+      document.getElementById('overrideChildName').textContent=c.name;
+      document.getElementById('overrideTimeIn').value=att.signInTime||'';
+      document.getElementById('overrideTimeOut').value=att.signOutTime||'';
+    } else if(overrideSelectedChild.startsWith('staff_')){
+      const sid=overrideSelectedChild.slice(6);
+      const s=STAFF.find(x=>x.id===sid),log=getSLog(sid,viewDate);
+      document.getElementById('overrideChildName').textContent=s.name+' (staff)';
+      document.getElementById('overrideTimeIn').value=log.clockInTime||'';
+      document.getElementById('overrideTimeOut').value=log.clockOutTime||'';
+    }
   } else {
     document.getElementById('overrideTimeRow').style.display='none';
   }
@@ -2137,15 +2160,29 @@ function renderSettings(){
 function selectOverrideChild(cid){ overrideSelectedChild=overrideSelectedChild===cid?null:cid;renderSettings(); }
 function applyOverrideTime(){
   if(!overrideSelectedChild)return;
-  const c=CHILDREN.find(x=>x.id===overrideSelectedChild),att=getAtt(overrideSelectedChild,viewDate);
   const inVal=document.getElementById('overrideTimeIn').value;
   const outVal=document.getElementById('overrideTimeOut').value;
-  if(inVal){att.signInTime=inVal;att.signedIn=true;const grace=graceMins(c.cs),thresh=pm(c.cs)-grace,inMins=pm(inVal);att.earlyMins=inMins<thresh?thresh-inMins:0;}
-  if(outVal){att.signOutTime=outVal;att.signedIn=false;const outMins=pm(outVal);att.lateMins=outMins>pm(c.ce)?outMins-pm(c.ce):0;}
-  getLog(viewDate).unshift({name:c.name,type:'child',action:'override',time:inVal||outVal,extra:0,verified:true,note:'Manager override'});
-  showFlash(`⚙ ${c.name}'s times updated`);
+  
+  if(overrideSelectedChild.startsWith('child_')){
+    const cid=overrideSelectedChild.slice(6);
+    const c=CHILDREN.find(x=>x.id===cid),att=getAtt(cid,viewDate);
+    if(inVal){att.signInTime=inVal;att.signedIn=true;const grace=graceMins(c.cs),thresh=pm(c.cs)-grace,inMins=pm(inVal);att.earlyMins=inMins<thresh?thresh-inMins:0;}
+    if(outVal){att.signOutTime=outVal;att.signedIn=false;const outMins=pm(outVal);att.lateMins=outMins>pm(c.ce)?outMins-pm(c.ce):0;}
+    getLog(viewDate).unshift({name:c.name,type:'child',action:'override',time:inVal||outVal,extra:0,verified:true,note:'Manager override'});
+    showFlash(`⚙ ${c.name}'s times updated`);
+    if(odConnected)writeToExcel(c,viewDate,att);
+  } else if(overrideSelectedChild.startsWith('staff_')){
+    const sid=overrideSelectedChild.slice(6);
+    const s=STAFF.find(x=>x.id===sid),log=getSLog(sid,viewDate);
+    const dow=viewDate.getDay(),sched=s.sch[dow];
+    if(inVal){log.clockInTime=inVal;log.clockedIn=true;if(sched){const inMins=pm(inVal);log.lateInMins=inMins>pm(sched.s)?inMins-pm(sched.s):0;}}
+    if(outVal){log.clockOutTime=outVal;log.clockedIn=false;if(sched){const outMins=pm(outVal);log.earlyOutMins=outMins<pm(sched.e)?pm(sched.e)-outMins:0;}}
+    getLog(viewDate).unshift({name:s.name,type:'staff',action:'override',time:inVal||outVal,extra:0,verified:true,note:'Manager override'});
+    showFlash(`⚙ ${s.name}'s times updated`);
+  }
   overrideSelectedChild=null;renderSettings();renderChildren();updateStatusBar();
-  if(odConnected)writeToExcel(c,viewDate,att);
+  dataDirty = true;
+  if(odConnected) syncWithOneDrive();
 }
 function resetPin(type,id){
   const e=type==='child'?CHILDREN.find(x=>x.id===id):STAFF.find(x=>x.id===id);
@@ -2368,41 +2405,55 @@ function schoolRunTick() {
 
   const h=now.getHours(), m=now.getMinutes();
   const t=ts(now);
+  const nowMins = h*60 + m;
 
-  // 08:55 — auto sign-out school run children (unless parent is doing the school drop today)
-  if(h===8 && m===55) {
+  // Auto sign-out school run children at 08:55 (or catch up if app opens later)
+  if(nowMins >= 8*60+55) {
     const dropped = getDropped(now);
+    let anySignedOut = false;
     CHILDREN.filter(c=>c.schoolRun && childScheduledToday(c,now) && !dropped[c.id]).forEach(c=>{
       const att=getAtt(c.id,now);
-      if(att.signedIn && att.signInTime) {
+      if(att.signedIn && att.signInTime && !att.signOutTime) {
         att.signedIn=false; att.signOutTime='08:55';
         getLog(now).unshift({name:c.name,type:'child',action:'out',time:'08:55',extra:0,verified:true,note:'Auto — school drop off'});
         if(odConnected) writeToExcel(c,now,att);
+        anySignedOut = true;
       }
     });
-    renderAll();
-    showFlash('🚌 School run — children signed out at 08:55');
+    if(anySignedOut) {
+      renderAll();
+      // Only show flash if we're within a few minutes of 08:55, not hours later
+      if(nowMins < 9*60+30) showFlash('🚌 School run — children signed out at 08:55');
+    }
   }
 
-  // 15:25 — auto sign-in school children scheduled for afternoon (unless collected from school)
-  if(h===15 && m===25) {
+  // Auto sign-in school children at 15:25 (or catch up if app opens later)
+  if(nowMins >= 15*60+25) {
     const collected=getCollected(now);
+    let anySignedIn = false;
     CHILDREN.filter(c=>c.schoolRun && c.afterSchoolDays && c.afterSchoolDays.includes(now.getDay()) && childScheduledToday(c,now)).forEach(c=>{
-      if(collected[c.id]) return; // parent collected from school — skip
+      if(collected[c.id]) return;
       const att=getAtt(c.id,now);
-      if(!att.signedIn) {
+      // Only auto sign-in if they haven't been signed in yet this afternoon
+      if(!att.signedIn && att.signOutTime==='08:55') {
         att.signedIn=true; att.signInTime='15:25';
+        // clear the sign-out so afternoon session starts fresh
+        att.signOutTime=null;
         getLog(now).unshift({name:c.name,type:'child',action:'in',time:'15:25',extra:0,verified:true,note:'Auto — afternoon collection'});
         if(odConnected) writeToExcel(c,now,att);
+        anySignedIn = true;
       }
     });
-    renderAll();
-    showFlash('🏫 Afternoon — children signed in at 15:25');
+    if(anySignedIn) {
+      renderAll();
+      if(nowMins < 16*60) showFlash('🏫 Afternoon — children signed in at 15:25');
+    }
   }
 }
 
-// Run every 30 seconds to catch exact times
+// Run every 30 seconds and once shortly after load to catch up
 setInterval(schoolRunTick, 30000);
+setTimeout(schoolRunTick, 3000);
 
 function toggleCollectedFromSchool(cid) {
   const collected=getCollected(viewDate);
