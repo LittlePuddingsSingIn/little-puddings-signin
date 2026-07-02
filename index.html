@@ -413,6 +413,7 @@
     <div class="set-section">
       <div class="set-title">🔑 Reset PIN to 0000</div>
       <div class="sec-sub" style="margin-bottom:8px">Tap a name to reset — they'll be prompted to set a new PIN on next sign in</div>
+      <button onclick="resetAllPins()" style="width:100%;padding:10px;background:var(--warn);color:white;border:none;border-radius:9px;font-weight:700;font-size:12px;cursor:pointer;margin-bottom:10px">⚠ Reset ALL PINs (for first-day rollout)</button>
       <div class="pin-reset-grid" id="pinResetGrid"></div>
     </div>
   </div>
@@ -983,7 +984,7 @@ let CHILDREN = [
   {id:'diora',    name:'Diora',       surname:'Maslovskaja', emoji:'🦚',type:'ey',  ao:15, color:AC[3], pin:'1015',days:[1,2,3,4],  cs:'07:30',ce:'17:00',billing:'fullday',   ay:true, hb:'fullday', notes:'4yr funding, all year round',                startDate:'2025-09-01',endDate:null,archived:false},
   {id:'rory',     name:'Rory',        surname:'Dickins',     emoji:'🦊',type:'ey',  ao:16, color:AC[4], pin:'1016',days:[2,3,4,5],  cs:'07:45',ce:'17:15',billing:'wraparound',ay:false,hb:null,      notes:'4yr funding 7.5hrs/day',                     startDate:'2025-09-01',endDate:null,archived:false},
   // School
-  {id:'alara',    name:'Alara',       surname:'Claypole-Demir',emoji:'⭐',type:'school',ao:1, color:AC[5], pin:'2001',days:[1,2,3,4,5],cs:'07:30',ce:'16:30',billing:'wraparound',ay:false,hb:null,      notes:'Before school daily, after school Mon only',   startDate:'2025-09-01',endDate:null,archived:false,schoolRun:true, afterSchoolDays:[1]},
+  {id:'alara',    name:'Alara',       surname:'Claypole-Demir',emoji:'⭐',type:'school',ao:1, color:AC[5], pin:'2001',days:[1,2,3,5],  cs:'07:30',ce:'16:30',billing:'wraparound',ay:false,hb:null,      notes:'Before school Mon/Tue/Wed/Fri, after school Mon only',   startDate:'2025-09-01',endDate:null,archived:false,schoolRun:true, afterSchoolDays:[1]},
   {id:'bernard',  name:'Bernard',     surname:'Burr',          emoji:'🚀',type:'school',ao:2, color:AC[6], pin:'2002',days:[1,2,3,4,5],cs:'07:30',ce:'17:30',billing:'wraparound',ay:false,hb:null,      notes:'Before school daily, after school Wed & Thurs',startDate:'2025-09-01',endDate:null,archived:false,schoolRun:true, afterSchoolDays:[3,4]},
   {id:'bonnie',   name:'Bonnie',      surname:'Stukins',       emoji:'🌈',type:'school',ao:3, color:AC[7], pin:'2003',days:[2,3,4,5], cs:'07:30',ce:'08:55',billing:'wraparound',ay:false,hb:null,       notes:'Before school Tue-Fri only',                   startDate:'2025-09-01',endDate:null,archived:false,schoolRun:true, afterSchoolDays:[]},
   {id:'douglas',  name:'Douglas',     surname:'Burr',          emoji:'⚡',type:'school',ao:4, color:AC[8], pin:'2004',days:[1,2,3,4,5],cs:'07:30',ce:'17:30',billing:'wraparound',ay:false,hb:null,      notes:'Before school daily, after school Wed & Thurs',startDate:'2025-09-01',endDate:null,archived:false,schoolRun:true, afterSchoolDays:[3,4]},
@@ -1021,7 +1022,7 @@ let timesheet = {};
 // ════════════════════════════════════════════════
 // Data version — bump this whenever CHILDREN or STAFF structure changes in the code
 // so that OneDrive syncs pick up the code changes rather than being overwritten
-const DATA_VERSION = 8;
+const DATA_VERSION = 9;
 
 let viewDate = new Date(); viewDate.setHours(0,0,0,0);
 let managerMode = false;
@@ -2188,6 +2189,18 @@ function resetPin(type,id){
   const e=type==='child'?CHILDREN.find(x=>x.id===id):STAFF.find(x=>x.id===id);
   e.pin='0000';delete pinCustomised[type+'_'+id];
   showFlash(`🔑 ${e.name}'s PIN reset to 0000`);renderSettings();
+  dataDirty = true;
+  if(odConnected) syncWithOneDrive();
+}
+
+function resetAllPins(){
+  if(!confirm('Reset ALL parent and staff PINs to 0000? Everyone will be prompted to set a new PIN on next sign-in. Manager PIN is NOT affected.')) return;
+  CHILDREN.forEach(c=>{ c.pin='0000'; delete pinCustomised['child_'+c.id]; });
+  STAFF.forEach(s=>{ s.pin='0000'; delete pinCustomised['staff_'+s.id]; });
+  showFlash(`🔑 All PINs reset to 0000`);
+  renderSettings();
+  dataDirty = true;
+  if(odConnected) syncWithOneDrive();
 }
 
 // ════════════════════════════════════════════════
