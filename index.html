@@ -321,6 +321,7 @@
   <div class="tabs" id="tabBar">
     <button class="tab active" onclick="setTab('children')">Children</button>
     <button class="tab" onclick="setTab('staff')">Staff</button>
+    <button class="tab" onclick="setTab('visitor')">Visitor</button>
     <button class="tab mgr-only" onclick="setTab('log')"      style="display:none">Log</button>
     <button class="tab mgr-only" onclick="setTab('invoice')"  style="display:none">Invoices</button>
     <button class="tab mgr-only" onclick="setTab('override')" style="display:none">Day Changes</button>
@@ -337,6 +338,14 @@
     <div class="sec-head"><div class="sec-label">Staff</div><div class="sec-line"></div></div>
     <div class="sec-sub">Tap your name · PIN required</div>
     <div class="staff-list" id="staffList"></div>
+  </div>
+
+  <!-- VISITOR -->
+  <div id="panel-visitor" style="display:none">
+    <div class="sec-head"><div class="sec-label">Visitors</div><div class="sec-line"></div></div>
+    <div class="sec-sub" style="margin-bottom:12px">Sign in or out — visitors, deliveries, professionals</div>
+    <button onclick="openVisitorForm()" style="width:100%;padding:15px;background:var(--forest);color:var(--gold-light);border:none;border-radius:12px;font-weight:700;font-size:14px;cursor:pointer;margin-bottom:14px">＋ New Visitor Sign In</button>
+    <div id="visitorsToday"></div>
   </div>
 
   <!-- LOG -->
@@ -597,6 +606,42 @@
   </div>
 </div>
 
+<!-- VISITOR FORM MODAL -->
+<div class="overlay" id="visitorOv">
+  <div class="admin-modal" style="max-width:380px">
+    <div class="af-title">🚪 Visitor Sign In</div>
+    <div class="sec-sub" style="margin-bottom:12px;color:var(--moss)">All fields help with safeguarding records</div>
+    <div class="af-group">
+      <label class="af-label">Full Name *</label>
+      <input class="af-input" id="visName" type="text" placeholder="e.g. Sarah Johnson">
+    </div>
+    <div class="af-group">
+      <label class="af-label">Purpose of Visit *</label>
+      <select class="af-select" id="visPurpose">
+        <option value="">Choose...</option>
+        <option value="Parent visiting">Parent visiting</option>
+        <option value="Prospective parent tour">Prospective parent tour</option>
+        <option value="Family member">Family member</option>
+        <option value="Professional (health visitor, SENCO etc)">Professional (health visitor, SENCO etc)</option>
+        <option value="Delivery">Delivery</option>
+        <option value="Contractor/tradesperson">Contractor/tradesperson</option>
+        <option value="Ofsted inspector">Ofsted inspector</option>
+        <option value="Other">Other</option>
+      </select>
+    </div>
+    <div class="af-group">
+      <label class="af-label">Visiting (who or which child)</label>
+      <input class="af-input" id="visVisiting" type="text" placeholder="e.g. Sussie, or Mia's mum">
+    </div>
+    <div class="af-group">
+      <label class="af-label">Car Registration (optional)</label>
+      <input class="af-input" id="visReg" type="text" placeholder="e.g. AB12 CDE" style="text-transform:uppercase">
+    </div>
+    <button class="af-save" onclick="saveVisitor()">Sign In</button>
+    <button class="af-cancel" onclick="closeVisitorForm()">Cancel</button>
+  </div>
+</div>
+
 <!-- LEAVE ENTRY MODAL -->
 <div class="overlay" id="leaveOv">
   <div class="admin-modal" style="max-width:380px">
@@ -786,7 +831,18 @@ async function syncWithOneDrive() {
           });
         });
       }
-      if (remoteData.staffLog) staffLog = { ...remoteData.staffLog, ...staffLog };
+      if (remoteData.staffLog) {
+        Object.keys(remoteData.staffLog).forEach(sid => {
+          if (!staffLog[sid]) staffLog[sid] = {};
+          Object.keys(remoteData.staffLog[sid]).forEach(dkk => {
+            const remote = remoteData.staffLog[sid][dkk];
+            const local = staffLog[sid][dkk];
+            if (!local || (remote.clockInTime && !local.clockInTime) || (remote.clockOutTime && !local.clockOutTime)) {
+              staffLog[sid][dkk] = remote;
+            }
+          });
+        });
+      }
       if (remoteData.eventLog) {
         Object.keys(remoteData.eventLog).forEach(dkk => {
           if (!eventLog[dkk]) eventLog[dkk] = remoteData.eventLog[dkk];
@@ -796,6 +852,11 @@ async function syncWithOneDrive() {
       if (remoteData.absences) absences = { ...remoteData.absences, ...absences };
       if (remoteData.collectedFromSchool) collectedFromSchool = { ...remoteData.collectedFromSchool, ...collectedFromSchool };
       if (remoteData.droppedOffAtSchool) droppedOffAtSchool = { ...remoteData.droppedOffAtSchool, ...droppedOffAtSchool };
+      if (remoteData.visitors) {
+        Object.keys(remoteData.visitors).forEach(dkk => {
+          if (!visitors[dkk]) visitors[dkk] = remoteData.visitors[dkk];
+        });
+      }
       if (remoteData.timesheet) {
         Object.keys(remoteData.timesheet).forEach(sid => {
           if (!timesheet[sid]) timesheet[sid] = {};
@@ -821,7 +882,7 @@ async function syncWithOneDrive() {
     const payload = JSON.stringify({
       dataVersion: DATA_VERSION,
       CHILDREN, STAFF, attendance, staffLog, eventLog, overrides, absences,
-      collectedFromSchool, droppedOffAtSchool, pinCustomised, timesheet, lastUpdated: new Date().toISOString()
+      collectedFromSchool, droppedOffAtSchool, visitors, pinCustomised, timesheet, lastUpdated: new Date().toISOString()
     });
     
     const uploadUrl = `https://graph.microsoft.com/v1.0/me/drive/root:/${SYNC_FOLDER}/${encodeURIComponent(SYNC_FILE)}:/content`;
@@ -1024,7 +1085,7 @@ let timesheet = {};
 // ════════════════════════════════════════════════
 // Data version — bump this whenever CHILDREN or STAFF structure changes in the code
 // so that OneDrive syncs pick up the code changes rather than being overwritten
-const DATA_VERSION = 10;
+const DATA_VERSION = 11;
 
 let viewDate = new Date(); viewDate.setHours(0,0,0,0);
 let managerMode = false;
@@ -1036,6 +1097,7 @@ let overrides = {};
 let absences = {}; // [dateKey][childId] = {reason, note}
 let collectedFromSchool = {}; // [dateKey][childId] = true — skip afternoon auto sign-in
 let droppedOffAtSchool = {}; // [dateKey][childId] = true — skip morning auto sign-out (parent doing school drop)
+let visitors = {}; // [dateKey] = [{id, name, reason, reg, purpose, signInTime, signOutTime, visiting}]
 let pinTarget = null, pinEntry = '', pinShaking = false;
 let mgrPinEntry = '', mgrPinShaking = false;
 let actionTarget = null;
@@ -1110,7 +1172,12 @@ let adminEditTarget = null; // {type, id} or null for new
 let adminFormDays = [];
 let adminFormEmoji = '🌱';
 
-function isPinDefault(type,id){ return !pinCustomised[type+'_'+id]; }
+function isPinDefault(type,id){
+  // If the current PIN is 0000, always treat as default (must change)
+  const e = type==='child' ? CHILDREN.find(x=>x.id===id) : STAFF.find(x=>x.id===id);
+  if (e && e.pin === '0000') return true;
+  return !pinCustomised[type+'_'+id];
+}
 function markPinCustomised(type,id){ pinCustomised[type+'_'+id]=true; }
 
 // ════════════════════════════════════════════════
@@ -1218,16 +1285,115 @@ function goToday(){ viewDate=new Date();viewDate.setHours(0,0,0,0);updateDateNav
 // ════════════════════════════════════════════════
 function setTab(t){
   currentTab=t;
-  ['children','staff','log','invoice','override','admin','payroll','settings'].forEach((p,i)=>{
+  ['children','staff','visitor','log','invoice','override','admin','payroll','settings'].forEach((p,i)=>{
     document.getElementById('panel-'+p).style.display=p===t?'':'none';
     document.querySelectorAll('.tab')[i].classList.toggle('active',p===t);
   });
+  if(t==='visitor')renderVisitors();
   if(t==='log')renderLog();
   if(t==='invoice')renderInvoice();
   if(t==='override')renderOverride();
   if(t==='admin')renderAdmin();
   if(t==='payroll')renderPayroll();
   if(t==='settings')renderSettings();
+}
+
+// ════════════════════════════════════════════════
+// VISITOR MANAGEMENT
+// ════════════════════════════════════════════════
+function getVisitors(d) {
+  const k = dk(d);
+  if (!visitors[k]) visitors[k] = [];
+  return visitors[k];
+}
+
+function openVisitorForm() {
+  document.getElementById('visName').value = '';
+  document.getElementById('visPurpose').value = '';
+  document.getElementById('visVisiting').value = '';
+  document.getElementById('visReg').value = '';
+  document.getElementById('visitorOv').classList.add('vis');
+}
+
+function closeVisitorForm() {
+  document.getElementById('visitorOv').classList.remove('vis');
+}
+
+function saveVisitor() {
+  const name = document.getElementById('visName').value.trim();
+  const purpose = document.getElementById('visPurpose').value;
+  const visiting = document.getElementById('visVisiting').value.trim();
+  const reg = document.getElementById('visReg').value.trim().toUpperCase();
+  
+  if (!name) { showFlash('Please enter a name'); return; }
+  if (!purpose) { showFlash('Please select purpose'); return; }
+  
+  const now = new Date();
+  const t = ts(now);
+  const vlist = getVisitors(viewDate);
+  vlist.push({
+    id: 'v' + Date.now(),
+    name, purpose, visiting, reg,
+    signInTime: t,
+    signOutTime: null
+  });
+  
+  // Also add to event log
+  getLog(viewDate).unshift({name:name,type:'visitor',action:'in',time:t,extra:0,verified:true,note:`Visitor — ${purpose}${visiting?' — '+visiting:''}${reg?' — Reg '+reg:''}`});
+  
+  showFlash(`🚪 ${name} signed in at ${t}`);
+  closeVisitorForm();
+  renderVisitors();
+  updateStatusBar();
+  dataDirty = true;
+  if (odConnected) syncWithOneDrive();
+}
+
+function signOutVisitor(vid) {
+  const vlist = getVisitors(viewDate);
+  const v = vlist.find(x => x.id === vid);
+  if (!v) return;
+  const now = new Date();
+  const t = ts(now);
+  v.signOutTime = t;
+  getLog(viewDate).unshift({name:v.name,type:'visitor',action:'out',time:t,extra:0,verified:true,note:`Visitor signed out`});
+  showFlash(`👋 ${v.name} signed out at ${t}`);
+  renderVisitors();
+  updateStatusBar();
+  dataDirty = true;
+  if (odConnected) syncWithOneDrive();
+}
+
+function renderVisitors() {
+  const vlist = getVisitors(viewDate);
+  const el = document.getElementById('visitorsToday');
+  if (!vlist.length) { el.innerHTML = '<div class="empty" style="padding:12px 0">No visitors today</div>'; return; }
+  const activeVisitors = vlist.filter(v => !v.signOutTime);
+  const completedVisitors = vlist.filter(v => v.signOutTime);
+  
+  el.innerHTML = `
+    ${activeVisitors.length ? `<div style="margin-bottom:14px">
+      <div style="font-family:'Playfair Display',serif;color:var(--gold-light);font-size:13px;margin-bottom:8px">CURRENTLY ON SITE (${activeVisitors.length})</div>
+      ${activeVisitors.map(v => `<div style="background:var(--cream);border-radius:11px;padding:11px 13px;margin-bottom:8px;border-left:4px solid var(--gold)">
+        <div style="display:flex;justify-content:space-between;align-items:start">
+          <div style="flex:1">
+            <div style="font-weight:700;color:var(--forest);font-size:14px">${v.name}</div>
+            <div style="font-size:11px;color:var(--moss);margin-top:2px">${v.purpose}${v.visiting?' · '+v.visiting:''}${v.reg?' · '+v.reg:''}</div>
+            ${managerMode ? `<div style="font-size:10px;color:var(--bark);margin-top:3px">In at ${v.signInTime}</div>` : ''}
+          </div>
+          <button onclick="signOutVisitor('${v.id}')" style="background:var(--forest);color:var(--gold-light);border:none;border-radius:8px;padding:8px 14px;font-weight:700;font-size:12px;cursor:pointer">Sign Out</button>
+        </div>
+      </div>`).join('')}
+    </div>` : ''}
+    ${completedVisitors.length && managerMode ? `<div>
+      <div style="font-family:'Playfair Display',serif;color:var(--gold-light);font-size:13px;margin-bottom:8px">EARLIER TODAY (${completedVisitors.length})</div>
+      ${completedVisitors.map(v => `<div style="background:rgba(255,255,255,0.04);border-radius:11px;padding:10px 13px;margin-bottom:6px;opacity:0.7">
+        <div style="font-weight:700;color:var(--gold-light);font-size:13px">${v.name}</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-top:2px">${v.purpose}${v.visiting?' · '+v.visiting:''}${v.reg?' · '+v.reg:''}</div>
+        <div style="font-size:10px;color:rgba(255,255,255,0.4);margin-top:3px">In ${v.signInTime} · Out ${v.signOutTime}</div>
+      </div>`).join('')}
+    </div>` : ''}
+  `;
 }
 
 // ════════════════════════════════════════════════
@@ -1253,11 +1419,11 @@ function renderChildren(){
         </div>`;
       }
       return`<div class="child-card ${att.signedIn?'in':''} ${ov==='add'?'override':''}" onclick="openPin('child','${c.id}')">
-        ${hasExtra?'<div class="early-flag"></div>':''}
+        ${hasExtra&&managerMode?'<div class="early-flag"></div>':''}
         <div class="child-avatar" style="background:${c.color}">${c.emoji}</div>
         <div class="child-name">${c.name}</div>
         <span class="child-badge ${att.signedIn?'badge-in':'badge-out'}">${att.signedIn?'In':'Out'}</span>
-        ${att.signInTime?`<div class="child-time">in ${att.signInTime}${att.signOutTime?' · out '+att.signOutTime:''}</div>`:''}
+        ${managerMode&&att.signInTime?`<div class="child-time">in ${att.signInTime}${att.signOutTime?' · out '+att.signOutTime:''}</div>`:''}
       </div>`;
     }).join('')}</div>`;
   }
@@ -1277,15 +1443,15 @@ function renderStaff(){
     const log=getSLog(s.id,viewDate),dow=viewDate.getDay(),sched=s.sch[dow];
     const nowMins=new Date().getHours()*60+new Date().getMinutes();
     const isLate=isToday&&!log.clockedIn&&sched&&nowMins>pm(sched.s);
-    return`<div class="staff-card ${log.clockedIn?'in':isLate?'late':''}" onclick="openPin('staff','${s.id}')">
+    return`<div class="staff-card ${log.clockedIn?'in':(managerMode&&isLate)?'late':''}" onclick="openPin('staff','${s.id}')">
       <div class="staff-avatar" style="background:${s.color}">${s.name.charAt(0)}</div>
       <div class="staff-info">
         <div class="staff-name">${s.name}</div>
         <div class="staff-role">${s.role}</div>
-        ${log.clockInTime?`<div class="staff-clock">In ${log.clockInTime}${log.clockOutTime?' · Out '+log.clockOutTime:''}</div>`:''}
-        ${log.lateInMins>0?`<div class="staff-late-note">⚠ ${log.lateInMins}min late</div>`:''}
+        ${managerMode&&log.clockInTime?`<div class="staff-clock">In ${log.clockInTime}${log.clockOutTime?' · Out '+log.clockOutTime:''}</div>`:''}
+        ${managerMode&&log.lateInMins>0?`<div class="staff-late-note">⚠ ${log.lateInMins}min late</div>`:''}
       </div>
-      <div class="staff-sbadge ${log.clockedIn?'sb-in':isLate?'sb-late':'sb-out'}">${log.clockedIn?'● In':isLate?'⚠ Late':'○ Out'}</div>
+      <div class="staff-sbadge ${log.clockedIn?'sb-in':(managerMode&&isLate)?'sb-late':'sb-out'}">${log.clockedIn?'● In':(managerMode&&isLate)?'⚠ Late':'○ Out'}</div>
     </div>`;
   }).join('');
 }
