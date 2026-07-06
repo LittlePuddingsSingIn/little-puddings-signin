@@ -1630,14 +1630,13 @@ function renderStaff(){
   el.innerHTML=todayStaff.map(s=>{
     const log=getSLog(s.id,viewDate),dow=viewDate.getDay(),sched=s.sch[dow];
     const nowMins=new Date().getHours()*60+new Date().getMinutes();
-    const isLate=isToday&&!log.clockedIn&&sched&&nowMins>pm(sched.s);
+    const isLate=false; // staff late auto-flag removed: hours vary daily, a fixed schedule can't judge lateness fairly
     return`<div class="staff-card ${log.clockedIn?'in':(managerMode&&isLate)?'late':''}" onclick="openPin('staff','${s.id}')">
       <div class="staff-avatar" style="background:${s.color}">${s.name.charAt(0)}</div>
       <div class="staff-info">
         <div class="staff-name">${s.name}</div>
         <div class="staff-role">${s.role}</div>
         ${managerMode&&log.clockInTime?`<div class="staff-clock">In ${log.clockInTime}${log.clockOutTime?' · Out '+log.clockOutTime:''}</div>`:''}
-        ${managerMode&&log.lateInMins>0?`<div class="staff-late-note">⚠ ${log.lateInMins}min late</div>`:''}
       </div>
       <div class="staff-sbadge ${log.clockedIn?'sb-in':(managerMode&&isLate)?'sb-late':'sb-out'}">${log.clockedIn?'● In':(managerMode&&isLate)?'⚠ Late':'○ Out'}</div>
     </div>`;
@@ -2074,7 +2073,8 @@ const LEAVE_TYPES = {
   sick:      { label: 'Sick (SSP)',     emoji: '🤒', color: '#e67e22' },
   unpaid:    { label: 'Unpaid Leave',   emoji: '⏸',  color: '#6B4F3A' },
   bank:      { label: 'Bank Holiday',   emoji: '🎉', color: '#C9A84C' },
-  offthejob: { label: 'Off-the-Job',    emoji: '📚', color: '#4A7C6A' }
+  offthejob: { label: 'Off-the-Job',    emoji: '📚', color: '#4A7C6A' },
+  lieu:      { label: 'Lieu Taken',     emoji: '⏳', color: '#8E7CC3' }
 };
 
 function getTs(staffId, d) {
@@ -2103,6 +2103,53 @@ function calcWorkedHours(staffId, d) {
     return (pm(log.clockOutTime) - pm(log.clockInTime)) / 60;
   }
   return 0;
+}
+
+// ════════════════════════════════════════════════
+// TIME OFF IN LIEU (TOIL)
+// No lunch is taken off site, so staff are paid arrival-to-leaving (already the case),
+// and each FULL DAY worked earns 30 minutes off in lieu. This keeps a running tally
+// from the start of the leave year, minus any lieu taken (logged as the 'lieu' type).
+// To change the rule later, edit the two constants below.
+// ════════════════════════════════════════════════
+const LIEU_FULL_DAY_HOURS = 6;      // a full day = worked this many hours or more
+const LIEU_MIN_PER_FULL_DAY = 30;   // minutes accrued in lieu for each full day worked
+
+function fmtMin(mins){
+  const sign = mins < 0 ? '-' : '';
+  const m = Math.round(Math.abs(mins));
+  const h = Math.floor(m / 60), r = m % 60;
+  if (h && r) return `${sign}${h}h ${r}m`;
+  if (h) return `${sign}${h}h`;
+  return `${sign}${r}m`;
+}
+
+// Reads stores directly (no mutation). Counts full days worked since the leave-year start.
+function computeLieu(staffId, refDate){
+  const fyStart = getFinancialYearStart(refDate);
+  const fyEnd = getFinancialYearEnd(refDate);
+  const today = new Date(); today.setHours(0,0,0,0);
+  const end = today < fyEnd ? today : fyEnd;
+  let fullDays = 0, takenMin = 0;
+  const cur = new Date(fyStart);
+  let guard = 0;
+  while (cur <= end && guard < 400) {
+    const k = dk(cur);
+    const man = (timesheet[staffId] && timesheet[staffId][k]) ? timesheet[staffId][k] : null;
+    let workedHrs = 0, isLeaveDay = false;
+    if (man) {
+      if (man.type === 'worked') workedHrs = man.hours || 0;
+      else { isLeaveDay = true; if (man.type === 'lieu') takenMin += (man.hours || 0) * 60; }
+    } else {
+      const log = (staffLog[staffId] && staffLog[staffId][k]) ? staffLog[staffId][k] : null;
+      if (log && log.clockInTime && log.clockOutTime) workedHrs = (pm(log.clockOutTime) - pm(log.clockInTime)) / 60;
+    }
+    if (!isLeaveDay && workedHrs >= LIEU_FULL_DAY_HOURS) fullDays++;
+    cur.setDate(cur.getDate() + 1);
+    guard++;
+  }
+  const accruedMin = fullDays * LIEU_MIN_PER_FULL_DAY;
+  return { fullDays, accruedMin, takenMin, balanceMin: accruedMin - takenMin };
 }
 
 // Get leave year (April to March) totals for a staff member
@@ -2191,6 +2238,7 @@ function renderPayroll() {
   ${STAFF.filter(s=>!s.archived).map(s=>{
     const month = getMonthTotals(s.id, refDate);
     const year = getYearTotals(s.id, refDate);
+    const lieu = computeLieu(s.id, refDate);
     const leaveRemaining = (s.annualLeaveHours || 0) - year.annual - year.bank;
     const leavePct = ((year.annual + year.bank) / (s.annualLeaveHours || 1)) * 100;
     const monthExpected = (s.paidHoursPerWeek || 0) * 4.33;
@@ -2224,6 +2272,10 @@ function renderPayroll() {
           <div style="font-size:9px;color:var(--bark);text-transform:uppercase">${s.isApprentice?'Off-job':'Other'}</div>
         </div>
       </div>
+      <div style="margin-top:8px;background:rgba(142,124,195,0.16);border-radius:7px;padding:8px 10px;display:flex;justify-content:space-between;align-items:center">
+        <div style="font-size:10px;color:var(--bark);text-transform:uppercase;letter-spacing:0.5px">⏳ Lieu owed · ${lieu.fullDays} full days</div>
+        <div style="font-weight:700;color:#6B5CA6;font-size:15px">${fmtMin(lieu.balanceMin)}</div>
+      </div>
     </div>`;
   }).join('')}
   <div style="background:rgba(255,255,255,0.04);border-radius:11px;padding:12px;text-align:center;font-size:11px;color:rgba(255,255,255,0.5);margin-top:10px">
@@ -2242,6 +2294,7 @@ function openStaffDetail(staffId) {
   const refDate = viewDate;
   const month = getMonthTotals(staffId, refDate);
   const year = getYearTotals(staffId, refDate);
+  const lieu = computeLieu(staffId, refDate);
   const leaveRemaining = (s.annualLeaveHours || 0) - year.annual - year.bank;
   const monthName = MONTH_SHORT[refDate.getMonth()];
   const fyStart = getFinancialYearStart(refDate);
@@ -2294,6 +2347,21 @@ function openStaffDetail(staffId) {
     </div>
   </div>
   
+  <!-- Lieu (time off in lieu) -->
+  <div style="background:var(--cream);border-radius:13px;padding:14px;margin-bottom:10px;border-left:5px solid #8E7CC3">
+    <div style="font-family:'Playfair Display',serif;font-size:13px;color:var(--forest);margin-bottom:10px">⏳ Time off in lieu ${fyLabel}</div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <div style="font-size:12px;color:var(--bark)">Balance owed</div>
+      <div style="font-family:'Playfair Display',serif;font-size:22px;color:#6B5CA6;font-weight:700">${fmtMin(lieu.balanceMin)}</div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;font-size:11px;text-align:center">
+      <div style="background:rgba(142,124,195,0.1);border-radius:7px;padding:7px"><div style="font-weight:700;color:var(--forest)">${lieu.fullDays}</div><div style="font-size:9px;color:var(--bark);text-transform:uppercase">Full days</div></div>
+      <div style="background:rgba(142,124,195,0.1);border-radius:7px;padding:7px"><div style="font-weight:700;color:var(--forest)">${fmtMin(lieu.accruedMin)}</div><div style="font-size:9px;color:var(--bark);text-transform:uppercase">Accrued</div></div>
+      <div style="background:rgba(142,124,195,0.1);border-radius:7px;padding:7px"><div style="font-weight:700;color:var(--forest)">${fmtMin(lieu.takenMin)}</div><div style="font-size:9px;color:var(--bark);text-transform:uppercase">Taken</div></div>
+    </div>
+    <div style="font-size:10px;color:var(--bark);margin-top:8px">30 min per full day (6+ hrs worked). To book lieu taken, use the button below and choose Lieu Taken.</div>
+  </div>
+  
   <!-- Add entry button -->
   <button onclick="openLeaveEntry('${staffId}')" style="width:100%;padding:13px;background:var(--forest);color:var(--gold-light);border:none;border-radius:11px;font-weight:700;cursor:pointer;margin-bottom:14px">＋ Record Leave / Sick / Override Day</button>
   
@@ -2306,7 +2374,7 @@ function openStaffDetail(staffId) {
         <div style="width:28px;height:28px;border-radius:50%;background:${lt.color};display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0">${lt.emoji}</div>
         <div style="flex:1">
           <div style="font-weight:700;color:var(--forest)">${DAYS[e.date.getDay()].slice(0,3)} ${e.date.getDate()} ${MONTH_SHORT[e.date.getMonth()]} · ${lt.label}</div>
-          <div style="font-size:10px;color:var(--moss)">${e.clockIn ? 'In ' + e.clockIn + ' · Out ' + (e.clockOut || 'still in') : ''}${e.late > 0 ? ' · ⚠ ' + e.late + 'min late' : ''}${e.note ? ' · ' + e.note : ''}</div>
+          <div style="font-size:10px;color:var(--moss)">${e.clockIn ? 'In ' + e.clockIn + ' · Out ' + (e.clockOut || 'still in') : ''}${e.note ? ' · ' + e.note : ''}</div>
         </div>
         <div style="font-weight:700;color:var(--forest)">${e.hours.toFixed(1)}h</div>
       </div>`;
@@ -2405,7 +2473,7 @@ function closeLeave() {
 
 function renderSettings(){
   const scheduled=CHILDREN.filter(c=>childScheduledToday(c,viewDate));
-  const scheduledStaff=STAFF.filter(s=>staffScheduledToday(s,viewDate));
+  const scheduledStaff=STAFF.filter(s=>!s.archived); // amend any staff on any day: hours vary daily
   const collected=getCollected(viewDate);
 
   // Override sign in/out grid — children and staff
@@ -2532,8 +2600,8 @@ function applyOverrideTime(){
     const sid=overrideSelectedChild.slice(6);
     const s=STAFF.find(x=>x.id===sid),log=getSLog(sid,viewDate);
     const dow=viewDate.getDay(),sched=s.sch[dow];
-    if(inVal){log.clockInTime=inVal;log.clockedIn=true;if(sched){const inMins=pm(inVal);log.lateInMins=inMins>pm(sched.s)?inMins-pm(sched.s):0;}}
-    if(outVal){log.clockOutTime=outVal;log.clockedIn=false;if(sched){const outMins=pm(outVal);log.earlyOutMins=outMins<pm(sched.e)?pm(sched.e)-outMins:0;}}
+    if(inVal){log.clockInTime=inVal;log.clockedIn=true;log.lateInMins=0;}
+    if(outVal){log.clockOutTime=outVal;log.clockedIn=false;log.earlyOutMins=0;}
     getLog(viewDate).unshift({name:s.name,type:'staff',action:'override',time:inVal||outVal,extra:0,verified:true,note:'Manager override'});
     showFlash(`⚙ ${s.name}'s times updated`);
   }
@@ -2686,8 +2754,7 @@ function openAction(type,id){
     document.getElementById('actBtnIn').textContent='✓ Clock In';
     document.getElementById('actBtnOut').textContent='✗ Clock Out';
     if(!isIn){
-      const dow=viewDate.getDay(),sched=e.sch[dow];
-      if(sched&&nowMins>pm(sched.s)){const late=nowMins-pm(sched.s);warn.style.display='block';document.getElementById('actWarnTitle').textContent=`⚠ Late clock-in — ${fmins(late)} late`;document.getElementById('actWarnDetail').textContent=`Contracted start: ${sched.s} · Actual: ${ts(now)}`;}
+      // staff late warning removed: hours vary daily, fixed schedule can't judge lateness fairly
     }
   }
   document.getElementById('actOv').classList.add('vis');
@@ -2713,10 +2780,10 @@ function confirmAction(isIn){
   } else {
     const s=STAFF.find(x=>x.id===id),log=getSLog(id,viewDate);
     const dow=viewDate.getDay(),sched=s.sch[dow];
-    if(isIn){log.clockedIn=true;log.clockInTime=t;if(sched&&nowMins>pm(sched.s))log.lateInMins=nowMins-pm(sched.s);}
-    else{log.clockedIn=false;log.clockOutTime=t;if(sched&&nowMins<pm(sched.e))log.earlyOutMins=pm(sched.e)-nowMins;}
+    if(isIn){log.clockedIn=true;log.clockInTime=t;log.lateInMins=0;}
+    else{log.clockedIn=false;log.clockOutTime=t;log.earlyOutMins=0;}
     getLog(viewDate).unshift({name:s.name,type:'staff',action:isIn?'in':'out',time:t,extra:0,verified:true});
-    showFlash(`${s.name} clocked ${isIn?'IN':'OUT'} at ${t}${log.lateInMins>0?' · ⚠ '+log.lateInMins+'min late':''}`);
+    showFlash(`${s.name} clocked ${isIn?'IN':'OUT'} at ${t}`);
     markDirty();
     if(odConnected) syncWithOneDrive();
   }
@@ -2742,7 +2809,7 @@ function openPhone(){
   document.getElementById('pSchIn').innerHTML=schIn.length?schIn.map(c=>cRow(c,true)).join(''):'<div class="phone-detail" style="padding:8px">None in</div>';
   document.getElementById('pStaffOn').innerHTML=stOn.length?stOn.map(s=>{const log=getSLog(s.id,d);return`<div class="phone-row pin">
     <div class="phone-av" style="background:${s.color};font-family:'Playfair Display',serif;font-size:15px;font-weight:700;color:white">${s.name.charAt(0)}</div>
-    <div><div class="phone-name">${s.name}</div><div class="phone-detail">${s.role} · in ${log.clockInTime}${log.lateInMins>0?' · ⚠ '+log.lateInMins+'min late':''}</div></div>
+    <div><div class="phone-name">${s.name}</div><div class="phone-detail">${s.role} · in ${log.clockInTime}</div></div>
   </div>`;}).join(''):'<div class="phone-detail" style="padding:8px">No staff clocked in</div>';
   document.getElementById('pOut').innerHTML=notIn.length?notIn.map(c=>cRow(c,false)).join(''):'<div class="phone-detail" style="padding:8px">All children are in ✓</div>';
   document.getElementById('phoneOv').classList.add('vis');
