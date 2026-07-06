@@ -7,6 +7,10 @@
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Lato:wght@300;400;700;900&display=swap" rel="stylesheet">
 <!-- Microsoft Authentication Library -->
 <script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
+<!-- Export libraries: SheetJS (Excel) + jsPDF + AutoTable (PDF registers) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
 <style>
   :root {
     --forest:#2C4A3E; --forest-dark:#1e3329; --moss:#4A7C6A;
@@ -299,6 +303,7 @@
       <strong id="flagCount">0</strong> early/late flags
     </div>
     <div class="od-badge od-off" id="odBadge" onclick="openOD()">☁ Connect OneDrive</div>
+    <span id="connStatus" style="display:none;font-size:10px;font-weight:700;margin-left:8px;padding:3px 8px;border-radius:10px;background:#E8F1EC;color:#1A7A4A"></span>
     <span id="syncIndicator" style="display:none;font-size:10px;color:var(--ok);font-weight:700;margin-left:8px"></span>
   </div>
 
@@ -327,6 +332,7 @@
     <button class="tab mgr-only" onclick="setTab('override')" style="display:none">Day Changes</button>
     <button class="tab mgr-only" onclick="setTab('admin')"    style="display:none">Admin</button>
     <button class="tab mgr-only" onclick="setTab('payroll')"  style="display:none">Payroll</button>
+    <button class="tab mgr-only" onclick="setTab('reports')"  style="display:none">Reports</button>
     <button class="tab mgr-only" onclick="setTab('settings')" style="display:none">Settings</button>
   </div>
 
@@ -396,8 +402,65 @@
   <div id="panel-payroll" style="display:none">
     <div class="sec-head"><div class="sec-label">Payroll & Time Sheets</div><div class="sec-line"></div></div>
     <div class="sec-sub">Staff hours, leave balances, sick days, overtime</div>
+
+    <!-- TIME SHEET EXPORTS -->
+    <div class="set-section" style="border-left:4px solid var(--gold);background:rgba(212,160,23,0.08)">
+      <div class="set-title">📊 Time Sheet Exports (for accountant Jamie)</div>
+      <div class="sec-sub" style="margin-bottom:10px">Choose the month, then export. The PAY workbook write shows a full preview before anything is saved.</div>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+        <label style="font-size:11px;color:rgba(255,255,255,0.6)">Month</label>
+        <input type="month" id="exportMonth" class="time-inp" style="max-width:170px">
+      </div>
+      <button onclick="previewPayWorkbook()" style="width:100%;padding:11px;background:var(--forest);color:#fff;border:none;border-radius:9px;font-weight:700;font-size:12px;cursor:pointer;margin-bottom:8px">1 · Export month to PAY workbook (preview first)</button>
+      <button onclick="downloadAllStaffTimesheets()" style="width:100%;padding:11px;background:var(--moss);color:#fff;border:none;border-radius:9px;font-weight:700;font-size:12px;cursor:pointer;margin-bottom:10px">2 · Download individual staff time sheets (Excel)</button>
+      <div id="staffTimesheetLinks" class="pin-reset-grid"></div>
+    </div>
+
     <div id="payrollOverview"></div>
     <div id="payrollDetail" style="display:none"></div>
+  </div>
+
+  <!-- REPORTS -->
+  <div id="panel-reports" style="display:none">
+    <div class="sec-head"><div class="sec-label">Reports & Registers</div><div class="sec-line"></div></div>
+    <div class="sec-sub">PDF registers for safeguarding, Ofsted and funding audits</div>
+
+    <!-- WEEKLY REGISTER -->
+    <div class="set-section">
+      <div class="set-title">🗓 Weekly Register (all children)</div>
+      <div class="sec-sub" style="margin-bottom:8px">Full Monday–Friday attendance grid with sign in/out times and absences.</div>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
+        <label style="font-size:11px;color:rgba(255,255,255,0.6)">Week beginning (any day in the week)</label>
+        <input type="date" id="weekRegDate" class="time-inp" style="max-width:170px">
+      </div>
+      <button onclick="exportWeeklyRegisterPDF()" style="width:100%;padding:11px;background:var(--forest);color:#fff;border:none;border-radius:9px;font-weight:700;font-size:12px;cursor:pointer">Generate weekly register PDF</button>
+    </div>
+
+    <!-- INDIVIDUAL CHILD REGISTER -->
+    <div class="set-section">
+      <div class="set-title">👤 Individual Child Register (funding audit)</div>
+      <div class="sec-sub" style="margin-bottom:8px">One child, any date range. Full attendance detail and total hours for funding audits.</div>
+      <div style="margin-bottom:8px">
+        <label style="font-size:11px;color:rgba(255,255,255,0.6);display:block;margin-bottom:4px">Child</label>
+        <select id="childRegSelect" class="af-select" style="width:100%"></select>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+        <div style="flex:1;min-width:130px"><label style="font-size:11px;color:rgba(255,255,255,0.6);display:block;margin-bottom:4px">From</label><input type="date" id="childRegFrom" class="time-inp" style="width:100%"></div>
+        <div style="flex:1;min-width:130px"><label style="font-size:11px;color:rgba(255,255,255,0.6);display:block;margin-bottom:4px">To</label><input type="date" id="childRegTo" class="time-inp" style="width:100%"></div>
+      </div>
+      <button onclick="exportChildRegisterPDF()" style="width:100%;padding:11px;background:var(--forest);color:#fff;border:none;border-radius:9px;font-weight:700;font-size:12px;cursor:pointer">Generate child register PDF</button>
+    </div>
+
+    <!-- VISITOR LOG -->
+    <div class="set-section">
+      <div class="set-title">🚪 Visitor Log (audit trail)</div>
+      <div class="sec-sub" style="margin-bottom:8px">All signed-in visitors over a date range, with purpose, car registration and who they visited.</div>
+      <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+        <div style="flex:1;min-width:130px"><label style="font-size:11px;color:rgba(255,255,255,0.6);display:block;margin-bottom:4px">From</label><input type="date" id="visLogFrom" class="time-inp" style="width:100%"></div>
+        <div style="flex:1;min-width:130px"><label style="font-size:11px;color:rgba(255,255,255,0.6);display:block;margin-bottom:4px">To</label><input type="date" id="visLogTo" class="time-inp" style="width:100%"></div>
+      </div>
+      <button onclick="exportVisitorLogPDF()" style="width:100%;padding:11px;background:var(--forest);color:#fff;border:none;border-radius:9px;font-weight:700;font-size:12px;cursor:pointer">Generate visitor log PDF</button>
+    </div>
   </div>
 
   <!-- SETTINGS -->
@@ -429,6 +492,29 @@
   </div>
 </div>
 <div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027</div>
+
+<!-- PAY WORKBOOK EXPORT PREVIEW OVERLAY -->
+<div class="overlay" id="payPreviewOv">
+  <div class="admin-modal" id="payPreviewModal" style="max-width:560px;max-height:88vh;overflow-y:auto;text-align:left">
+    <div class="af-title" id="payPreviewTitle">Preview — Write to PAY workbook</div>
+    <div class="sec-sub" style="margin-bottom:10px;color:var(--bark)">Nothing is written until you tap Confirm. Check the target file, tab name and every cell below against the real workbook the first time.</div>
+    <div class="af-group">
+      <label class="af-label">Target file (in OneDrive folder "2026-2027 INVOICES")</label>
+      <input class="af-input" id="payFileName" type="text" value="PAY_2026-2027.xlsx">
+    </div>
+    <div class="af-group">
+      <label class="af-label">Target tab (month sheet name in the PAY workbook)</label>
+      <input class="af-input" id="payTabName" type="text" placeholder="e.g. JUL26 or July">
+      <div class="sec-sub" style="margin-top:4px;color:var(--bark)">Type the exact sheet name as it appears in the PAY workbook. This is saved for next time.</div>
+    </div>
+    <div id="payPreviewBody" style="font-size:12px"></div>
+    <div id="payPreviewStatus" style="font-size:12px;margin-top:10px;color:var(--forest);font-weight:700"></div>
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button class="act-btn btn-cx" style="flex:1" onclick="closePayPreview()">Cancel</button>
+      <button class="act-btn btn-in" style="flex:1" id="payConfirmBtn" onclick="confirmPayWorkbookWrite()">✓ Confirm & write</button>
+    </div>
+  </div>
+</div>
 
 <!-- PHONE VIEW -->
 <div class="phone-ov" id="phoneOv">
@@ -813,10 +899,14 @@ async function syncWithOneDrive() {
   try {
     // Pull latest from OneDrive
     const url = `https://graph.microsoft.com/v1.0/me/drive/root:/${SYNC_FOLDER}/${encodeURIComponent(SYNC_FILE)}:/content`;
-    const resp = await fetch(url, { headers: { 'Authorization': `Bearer ${odAccessToken}` } });
+    let resp = await fetch(url, { headers: { 'Authorization': `Bearer ${odAccessToken}` } });
+    // Token may have expired during a long outage — refresh once and retry.
+    if (resp.status === 401 && await refreshToken()) {
+      resp = await fetch(url, { headers: { 'Authorization': `Bearer ${odAccessToken}` } });
+    }
     
-    if (resp.ok) {
-      const remoteData = await resp.json();
+    if (resp.ok || resp.status === 404) {
+      const remoteData = resp.ok ? await resp.json() : {};
       // Merge: parent input (attendance) wins; manager input (children/staff/absences) wins from most recent device
       if (remoteData.attendance) {
         // Merge attendance — most recent sign-in/out wins per child per date
@@ -886,22 +976,119 @@ async function syncWithOneDrive() {
     });
     
     const uploadUrl = `https://graph.microsoft.com/v1.0/me/drive/root:/${SYNC_FOLDER}/${encodeURIComponent(SYNC_FILE)}:/content`;
-    await fetch(uploadUrl, {
+    let put = await fetch(uploadUrl, {
       method: 'PUT',
       headers: { 'Authorization': `Bearer ${odAccessToken}`, 'Content-Type': 'application/json' },
       body: payload
     });
-    
-    lastSyncTime = new Date();
-    dataDirty = false;
-    updateSyncIndicator();
+    if (put.status === 401 && await refreshToken()) {
+      put = await fetch(uploadUrl, { method: 'PUT', headers: { 'Authorization': `Bearer ${odAccessToken}`, 'Content-Type': 'application/json' }, body: payload });
+    }
+
+    if (put.ok) {
+      lastSyncTime = new Date();
+      lastSyncOk = lastSyncTime;
+      dataDirty = false;
+      syncFailing = false;
+      saveLocal();            // mirror last-synced state on device (pendingSync now false)
+      updateSyncIndicator();
+    } else {
+      syncFailing = true;     // keep dataDirty so changes retry next tick
+      console.error('Sync upload failed:', put.status);
+    }
+    updateConnStatus();
     renderAll();
     // Check school run after sync loads latest attendance
     try { schoolRunTick(); } catch(e) {}
   } catch(e) {
+    syncFailing = true;       // offline or network error — changes stay buffered on device
+    updateConnStatus();
     console.error('Sync error:', e);
   }
   syncInProgress = false;
+}
+
+// ════════════════════════════════════════════════
+// ON-DEVICE PERSISTENCE + CONNECTION RESILIENCE (v6.1)
+// The wall tablet can drop Wi-Fi. These keep sign-ins safe on the device
+// so nothing is lost on a refresh/reboot, and pending changes flush on reconnect.
+// ════════════════════════════════════════════════
+const LOCAL_KEY = 'lp_appdata_v1';
+let lastSyncOk = null;     // time of last successful OneDrive push
+let syncFailing = false;   // last sync attempt failed (offline / token expired)
+
+function markDirty(){ dataDirty = true; saveLocal(); updateConnStatus(); }
+
+function saveLocal(){
+  try {
+    localStorage.setItem(LOCAL_KEY, JSON.stringify({
+      dataVersion: DATA_VERSION,
+      CHILDREN, STAFF, attendance, staffLog, eventLog, overrides, absences,
+      collectedFromSchool, droppedOffAtSchool, visitors, pinCustomised, timesheet,
+      pendingSync: dataDirty, savedAt: new Date().toISOString()
+    }));
+  } catch(e){ console.warn('On-device save failed (storage full/unavailable):', e); }
+}
+
+function loadLocal(){
+  try {
+    const raw = localStorage.getItem(LOCAL_KEY);
+    if(!raw) return;
+    const d = JSON.parse(raw);
+    if(d.attendance) attendance = d.attendance;
+    if(d.staffLog) staffLog = d.staffLog;
+    if(d.eventLog) eventLog = d.eventLog;
+    if(d.overrides) overrides = d.overrides;
+    if(d.absences) absences = d.absences;
+    if(d.collectedFromSchool) collectedFromSchool = d.collectedFromSchool;
+    if(d.droppedOffAtSchool) droppedOffAtSchool = d.droppedOffAtSchool;
+    if(d.visitors) visitors = d.visitors;
+    if(d.pinCustomised) pinCustomised = d.pinCustomised;
+    if(d.timesheet) timesheet = d.timesheet;
+    if(d.dataVersion === DATA_VERSION){
+      if(d.CHILDREN && d.CHILDREN.length) CHILDREN = d.CHILDREN;
+      if(d.STAFF && d.STAFF.length && d.STAFF[0].hourlyRate !== undefined) STAFF = d.STAFF;
+    }
+    // If the device had unsynced changes when last closed, push them on next sync.
+    dataDirty = !!d.pendingSync;
+    console.log('Restored on-device data from', d.savedAt, '· pendingSync:', dataDirty);
+  } catch(e){ console.warn('On-device load failed:', e); }
+}
+
+function updateConnStatus(){
+  const el = document.getElementById('connStatus');
+  if(!el) return;
+  if(!odConnected){ el.style.display='none'; return; }
+  el.style.display='inline-block';
+  if(syncFailing){
+    el.textContent = dataDirty ? '⚠ Offline · saved on device' : '⚠ Offline';
+    el.style.background='#F4DEDA'; el.style.color='#A13A2A';
+  } else if(dataDirty){
+    el.textContent = '↻ Saving…';
+    el.style.background='#FBF3DC'; el.style.color='#6B4F3A';
+  } else {
+    el.textContent = lastSyncOk ? '✓ Synced '+ts(lastSyncOk) : '✓ Synced';
+    el.style.background='#E8F1EC'; el.style.color='#1A7A4A';
+  }
+}
+
+async function refreshToken(){
+  try {
+    if(!msalInstance) return false;
+    const accounts = msalInstance.getAllAccounts();
+    if(!accounts.length) return false;
+    const silent = await msalInstance.acquireTokenSilent({ scopes: GRAPH_SCOPES, account: accounts[0] });
+    odAccessToken = silent.accessToken; odConnected = true;
+    return true;
+  } catch(e){ return false; }
+}
+
+function wireConnectionRecovery(){
+  // Flush immediately when the connection returns; refresh the token first.
+  window.addEventListener('online', async () => { await refreshToken(); syncFailing=false; updateConnStatus(); syncWithOneDrive(); });
+  window.addEventListener('offline', () => { syncFailing=true; updateConnStatus(); });
+  // Safety net: persist any pending changes to the device and refresh the status pill.
+  setInterval(() => { if(dataDirty) saveLocal(); updateConnStatus(); }, 8000);
 }
 
 function updateSyncIndicator() {
@@ -1156,14 +1343,14 @@ function setAbsence(cid, d, reason, note) {
   const k = dk(d);
   if(!absences[k]) absences[k] = {};
   absences[k][cid] = { reason, note: note || '' };
-  dataDirty = true;
+  markDirty();
 }
 
 function clearAbsence(cid, d) {
   const k = dk(d);
   if(absences[k] && absences[k][cid]) {
     delete absences[k][cid];
-    dataDirty = true;
+    markDirty();
   }
 }
 let overrideSelectedChild = null;
@@ -1285,7 +1472,7 @@ function goToday(){ viewDate=new Date();viewDate.setHours(0,0,0,0);updateDateNav
 // ════════════════════════════════════════════════
 function setTab(t){
   currentTab=t;
-  ['children','staff','visitor','log','invoice','override','admin','payroll','settings'].forEach((p,i)=>{
+  ['children','staff','visitor','log','invoice','override','admin','payroll','reports','settings'].forEach((p,i)=>{
     document.getElementById('panel-'+p).style.display=p===t?'':'none';
     document.querySelectorAll('.tab')[i].classList.toggle('active',p===t);
   });
@@ -1295,6 +1482,7 @@ function setTab(t){
   if(t==='override')renderOverride();
   if(t==='admin')renderAdmin();
   if(t==='payroll')renderPayroll();
+  if(t==='reports')renderReports();
   if(t==='settings')renderSettings();
 }
 
@@ -1345,7 +1533,7 @@ function saveVisitor() {
   closeVisitorForm();
   renderVisitors();
   updateStatusBar();
-  dataDirty = true;
+  markDirty();
   if (odConnected) syncWithOneDrive();
 }
 
@@ -1360,7 +1548,7 @@ function signOutVisitor(vid) {
   showFlash(`👋 ${v.name} signed out at ${t}`);
   renderVisitors();
   updateStatusBar();
-  dataDirty = true;
+  markDirty();
   if (odConnected) syncWithOneDrive();
 }
 
@@ -1651,7 +1839,7 @@ function toggleOverride(cid, action) {
     const c = CHILDREN.find(x => x.id === cid);
     showFlash(`${c.emoji} ${c.name} removed from today`);
     renderOverride(); renderChildren(); updateStatusBar();
-    dataDirty = true;
+    markDirty();
     if (odConnected) syncWithOneDrive();
   } else if (action === 'add') {
     // Check if already added
@@ -1660,7 +1848,7 @@ function toggleOverride(cid, action) {
       const c = CHILDREN.find(x => x.id === cid);
       showFlash(`${c.emoji} ${c.name} removed from today`);
       renderOverride(); renderChildren(); updateStatusBar();
-      dataDirty = true;
+      markDirty();
       if (odConnected) syncWithOneDrive();
     } else {
       // Open time entry modal for ad hoc booking
@@ -1695,7 +1883,7 @@ function saveAdhocBooking() {
   showFlash(`${c.emoji} ${c.name} added for today, ${startTime}–${endTime}`);
   closeAdhoc();
   renderOverride(); renderChildren(); updateStatusBar();
-  dataDirty = true;
+  markDirty();
   if (odConnected) syncWithOneDrive();
 }
 
@@ -1861,7 +2049,7 @@ function saveAdminForm(){
     }
   }
   closeAdminForm();
-  dataDirty = true;
+  markDirty();
   if(odConnected) syncWithOneDrive();
   renderAll();
 }
@@ -1898,13 +2086,13 @@ function setTs(staffId, d, entry) {
   const k = dk(d);
   if (!timesheet[staffId]) timesheet[staffId] = {};
   timesheet[staffId][k] = entry;
-  dataDirty = true;
+  markDirty();
 }
 function clearTs(staffId, d) {
   const k = dk(d);
   if (timesheet[staffId] && timesheet[staffId][k]) {
     delete timesheet[staffId][k];
-    dataDirty = true;
+    markDirty();
   }
 }
 
@@ -2350,14 +2538,14 @@ function applyOverrideTime(){
     showFlash(`⚙ ${s.name}'s times updated`);
   }
   overrideSelectedChild=null;renderSettings();renderChildren();updateStatusBar();
-  dataDirty = true;
+  markDirty();
   if(odConnected) syncWithOneDrive();
 }
 function resetPin(type,id){
   const e=type==='child'?CHILDREN.find(x=>x.id===id):STAFF.find(x=>x.id===id);
   e.pin='0000';delete pinCustomised[type+'_'+id];
   showFlash(`🔑 ${e.name}'s PIN reset to 0000`);renderSettings();
-  dataDirty = true;
+  markDirty();
   if(odConnected) syncWithOneDrive();
 }
 
@@ -2367,7 +2555,7 @@ function resetAllPins(){
   STAFF.forEach(s=>{ s.pin='0000'; delete pinCustomised['staff_'+s.id]; });
   showFlash(`🔑 All PINs reset to 0000`);
   renderSettings();
-  dataDirty = true;
+  markDirty();
   if(odConnected) syncWithOneDrive();
 }
 
@@ -2520,7 +2708,7 @@ function confirmAction(isIn){
     const extra=isIn?att.earlyMins:att.lateMins;
     getLog(viewDate).unshift({name:c.name,type:'child',action:isIn?'in':'out',time:t,extra,verified:true});
     showFlash(`${c.emoji} ${c.name} signed ${isIn?'IN':'OUT'} at ${t}${extra>0?' · ⚠ £'+cost(extra).toFixed(2):''}`);
-    dataDirty = true;
+    markDirty();
     if(odConnected){writeToExcel(c,viewDate,att); syncWithOneDrive();}
   } else {
     const s=STAFF.find(x=>x.id===id),log=getSLog(id,viewDate);
@@ -2529,7 +2717,7 @@ function confirmAction(isIn){
     else{log.clockedIn=false;log.clockOutTime=t;if(sched&&nowMins<pm(sched.e))log.earlyOutMins=pm(sched.e)-nowMins;}
     getLog(viewDate).unshift({name:s.name,type:'staff',action:isIn?'in':'out',time:t,extra:0,verified:true});
     showFlash(`${s.name} clocked ${isIn?'IN':'OUT'} at ${t}${log.lateInMins>0?' · ⚠ '+log.lateInMins+'min late':''}`);
-    dataDirty = true;
+    markDirty();
     if(odConnected) syncWithOneDrive();
   }
   closeAction();updateStatusBar();renderAll();
@@ -2641,7 +2829,7 @@ function toggleCollectedFromSchool(cid) {
   collected[cid]=!collected[cid];
   const c=CHILDREN.find(x=>x.id===cid);
   showFlash(collected[cid]?`${c.emoji} ${c.name} — collected from school today`:`${c.emoji} ${c.name} — will return at 15:25`);
-  dataDirty = true;
+  markDirty();
   if(odConnected) syncWithOneDrive();
   renderSettings();
 }
@@ -2653,7 +2841,7 @@ function toggleDroppedOffAtSchool(cid) {
   dropped[cid]=!dropped[cid];
   const c=CHILDREN.find(x=>x.id===cid);
   showFlash(dropped[cid]?`${c.emoji} ${c.name} — parent dropping off at school today`:`${c.emoji} ${c.name} — will be signed out at 08:55`);
-  dataDirty = true;
+  markDirty();
   if(odConnected) syncWithOneDrive();
   renderSettings();
 }
@@ -2672,6 +2860,359 @@ function clearSignIn(cid) {
 // ════════════════════════════════════════════════
 // RENDER ALL
 // ════════════════════════════════════════════════
+// ════════════════════════════════════════════════
+// REPORTS & EXPORTS  (v6)
+// ════════════════════════════════════════════════
+
+// --- shared helpers ---
+function cName(c){ return c.surname ? `${c.name} ${c.surname}` : c.name; }
+function fmtUK(d){ return `${p2(d.getDate())}/${p2(d.getMonth()+1)}/${d.getFullYear()}`; }
+function parseDInput(v){ if(!v) return null; const [y,m,dd]=v.split('-').map(Number); const x=new Date(y,m-1,dd); x.setHours(0,0,0,0); return x; }
+function mondayOf(d){ const x=new Date(d); x.setHours(0,0,0,0); const day=x.getDay(); x.setDate(x.getDate()+(day===0?-6:1-day)); return x; }
+function eachDay(from,to){ const out=[]; const x=new Date(from); x.setHours(0,0,0,0); const end=new Date(to); end.setHours(0,0,0,0); let guard=0; while(x<=end && guard<800){ out.push(new Date(x)); x.setDate(x.getDate()+1); guard++; } return out; }
+function readAtt(cid,d){ const k=dk(d); return (attendance[cid]&&attendance[cid][k])?attendance[cid][k]:null; }
+function isScheduled(c,d){ const dow=d.getDay(); const ov=getOv(d); if(ov[c.id]&&ov[c.id].action==='add') return true; if(ov[c.id]&&ov[c.id].action==='remove') return false; return (c.days||[]).includes(dow); }
+
+// --- render Reports tab (fill child dropdown + sensible default dates) ---
+function renderReports(){
+  const today=new Date();
+  const sel=document.getElementById('childRegSelect');
+  if(sel){
+    const cur=sel.value;
+    sel.innerHTML=CHILDREN.filter(c=>!c.archived).sort((a,b)=>cName(a).localeCompare(cName(b))).map(c=>`<option value="${c.id}">${cName(c)}</option>`).join('');
+    if(cur) sel.value=cur;
+  }
+  const m1=dk(new Date(today.getFullYear(),today.getMonth(),1));
+  const setIf=(id,val)=>{ const el=document.getElementById(id); if(el&&!el.value) el.value=val; };
+  setIf('weekRegDate',dk(mondayOf(today)));
+  setIf('childRegFrom',m1); setIf('childRegTo',dk(today));
+  setIf('visLogFrom',m1); setIf('visLogTo',dk(today));
+  const em=document.getElementById('exportMonth'); if(em&&!em.value) em.value=`${today.getFullYear()}-${p2(today.getMonth()+1)}`;
+}
+
+// --- selected export period (from the month picker on the Payroll tab) ---
+function exportPeriod(){
+  const el=document.getElementById('exportMonth');
+  let y,m; const mv=el?el.value:'';
+  if(mv){ [y,m]=mv.split('-').map(Number); } else { const t=new Date(); y=t.getFullYear(); m=t.getMonth()+1; }
+  const from=new Date(y,m-1,1); from.setHours(0,0,0,0);
+  const to=new Date(y,m,0); to.setHours(0,0,0,0);
+  return {from,to,y,m};
+}
+
+// ════════════════════════════════════════════════
+// 2 · INDIVIDUAL STAFF TIME SHEETS (downloadable Excel)
+// ════════════════════════════════════════════════
+function staffPeriodRows(staffId, from, to){
+  const s=STAFF.find(x=>x.id===staffId);
+  const rows=[]; let totWorked=0, totLate=0, totEarly=0;
+  eachDay(from,to).forEach(d=>{
+    const dow=d.getDay();
+    const sched=s.sch[dow];
+    const log=(staffLog[staffId]&&staffLog[staffId][dk(d)])?staffLog[staffId][dk(d)]:null;
+    const man=getTs(staffId,d);
+    const hasLog=log&&(log.clockInTime||log.clockOutTime);
+    if(!sched && !hasLog && !man) return;
+    let worked=0, note='';
+    if(man){
+      note=(LEAVE_TYPES[man.type]?LEAVE_TYPES[man.type].label:man.type)+(man.note?' — '+man.note:'');
+      if(man.type==='worked') worked=man.hours||0;
+    }
+    if(hasLog && (!man || man.type==='worked')){
+      const w=calcWorkedHours(staffId,d);
+      worked=(man&&man.type==='worked')?man.hours:w;
+    }
+    totWorked+=worked;
+    totLate+=(log&&log.lateInMins)?log.lateInMins:0;
+    totEarly+=(log&&log.earlyOutMins)?log.earlyOutMins:0;
+    rows.push([
+      fmtUK(d), DAYS[dow].slice(0,3),
+      sched?sched.s:'—',
+      log&&log.clockInTime?log.clockInTime:'—',
+      log&&log.clockOutTime?log.clockOutTime:'—',
+      sched?sched.e:'—',
+      worked?Number(worked.toFixed(2)):'',
+      (log&&log.lateInMins)?log.lateInMins:'',
+      (log&&log.earlyOutMins)?log.earlyOutMins:'',
+      note
+    ]);
+  });
+  return {rows,totWorked,totLate,totEarly};
+}
+
+function buildStaffTimesheetWB(staffId,from,to){
+  const s=STAFF.find(x=>x.id===staffId);
+  const {rows,totWorked,totLate,totEarly}=staffPeriodRows(staffId,from,to);
+  const aoa=[
+    ['Little Puddings — Staff Time Sheet'],
+    [s.name+'  ·  '+s.role],
+    ['Period: '+fmtUK(from)+' to '+fmtUK(to)],
+    ['Rate: £'+s.hourlyRate.toFixed(2)+'/hr    Contracted: '+s.paidHoursPerWeek+' hrs/week'],
+    [],
+    ['Date','Day','Sched In','Clock In','Clock Out','Sched Out','Worked hrs','Late (min)','Early out (min)','Leave / Note']
+  ].concat(rows).concat([
+    [],
+    ['','','','','','TOTAL',Number(totWorked.toFixed(2)),totLate,totEarly,'']
+  ]);
+  const ws=XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols']=[{wch:12},{wch:6},{wch:9},{wch:9},{wch:9},{wch:9},{wch:11},{wch:11},{wch:13},{wch:28}];
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Time Sheet');
+  return wb;
+}
+
+function downloadStaffTimesheet(staffId){
+  if(typeof XLSX==='undefined'){ alert('Excel library not loaded. Check the internet connection and refresh (Ctrl+F5).'); return; }
+  const {from,to}=exportPeriod();
+  const s=STAFF.find(x=>x.id===staffId);
+  XLSX.writeFile(buildStaffTimesheetWB(staffId,from,to), `${s.name} Time Sheet ${dk(from)}_to_${dk(to)}.xlsx`);
+}
+
+function downloadAllStaffTimesheets(){
+  if(typeof XLSX==='undefined'){ alert('Excel library not loaded. Check the internet connection and refresh (Ctrl+F5).'); return; }
+  const {from}=exportPeriod();
+  const box=document.getElementById('staffTimesheetLinks');
+  box.innerHTML=STAFF.filter(s=>!s.archived).map(s=>
+    `<button onclick="downloadStaffTimesheet('${s.id}')" style="padding:9px;background:var(--sage);color:var(--forest-dark);border:none;border-radius:8px;font-weight:700;font-size:11px;cursor:pointer">⬇ ${s.name}</button>`
+  ).join('');
+  showFlash('Tap each name to download their '+MONTH_SHORT[from.getMonth()]+' time sheet');
+}
+
+// ════════════════════════════════════════════════
+// 1 · STAFF TIME SHEET EXPORT → PAY WORKBOOK (preview, then Graph write)
+// ════════════════════════════════════════════════
+const PAY_COL={ sussie:'E', claire:'H', courtney:'K', leah:'N', chloe:'Q', alexandra:'T' };
+const PAY_ROWS={ ssp:[22,27], deduction:[34,37], overtime:[40,45], leave:[53,64] };
+let payPreviewUpdates=[];
+let payPreviewMonth=null;
+
+function previewPayWorkbook(){
+  if(!odConnected||!odAccessToken){ alert('Connect OneDrive first (tap ☁ at the top) so the app can write to the PAY workbook.'); return; }
+  const {y,m,from,to}=exportPeriod();
+  payPreviewMonth={y,m,from,to};
+  const tabField=document.getElementById('payTabName');
+  let saved=''; try{ saved=localStorage.getItem('payTab_'+y+'_'+m)||''; }catch(e){}
+  tabField.value=saved || MONTH_TABS[m] || '';
+  document.getElementById('payPreviewTitle').textContent='Preview — PAY workbook · '+MONTH_SHORT[m-1]+' '+y;
+  buildPayPreview();
+  document.getElementById('payPreviewStatus').textContent='';
+  document.getElementById('payConfirmBtn').disabled=false;
+  document.getElementById('payPreviewOv').classList.add('vis');
+}
+
+function buildPayPreview(){
+  const {y,m}=payPreviewMonth;
+  payPreviewUpdates=[]; let html=''; const warnings=[];
+  STAFF.filter(s=>!s.archived).forEach(s=>{
+    const col=PAY_COL[s.id];
+    if(!col){ warnings.push(s.name+': no PAY column mapped, skipped. Add them to PAY_COL if needed.'); return; }
+    const sick=[], unpaid=[], annual=[]; let unpaidHrs=0;
+    if(timesheet[s.id]){
+      Object.keys(timesheet[s.id]).forEach(k=>{
+        const d=parseDInput(k); if(!d||d.getFullYear()!==y||d.getMonth()!==m-1) return;
+        const e=timesheet[s.id][k];
+        if(e.type==='sick') sick.push(d);
+        else if(e.type==='unpaid'){ unpaid.push(d); unpaidHrs+=e.hours||0; }
+        else if(e.type==='annual') annual.push(d);
+      });
+    }
+    sick.sort((a,b)=>a-b); unpaid.sort((a,b)=>a-b); annual.sort((a,b)=>a-b);
+    const ups=[];
+    ups.push({address:col+'6', value:s.hourlyRate, label:'Hourly rate'});
+    ups.push({address:col+'8', value:s.paidHoursPerWeek, label:'Contracted hrs/wk'});
+    ups.push({address:col+'51', value:s.annualLeaveHours, label:'Annual leave entitlement'});
+    ups.push({address:col+'19', value:Number(unpaidHrs.toFixed(2)), label:'Deduction hours'});
+    const fill=(arr,range,lbl)=>{ arr.forEach((d,i)=>{ const r=range[0]+i; if(r<=range[1]) ups.push({address:col+r,value:fmtUK(d),label:lbl}); }); if(arr.length>(range[1]-range[0]+1)) warnings.push(`${s.name}: ${arr.length} ${lbl.toLowerCase()} entries but only ${range[1]-range[0]+1} rows (${range[0]}–${range[1]}). Extra ones are not written.`); };
+    fill(sick,PAY_ROWS.ssp,'SSP/sick date');
+    fill(unpaid,PAY_ROWS.deduction,'Deduction date');
+    fill(annual,PAY_ROWS.leave,'Leave taken date');
+    payPreviewUpdates.push(...ups);
+    html+=`<div style="margin:8px 0;padding:8px 10px;background:var(--parchment);border-radius:8px">
+      <div style="font-weight:700;color:var(--forest);margin-bottom:3px">${s.name} <span style="font-weight:400;color:var(--bark)">→ column ${col}</span></div>
+      <div style="font-size:11px;color:var(--bark)">Sick/SSP: ${sick.length} · Unpaid: ${unpaid.length} (${unpaidHrs.toFixed(1)}h) · Annual leave: ${annual.length}</div>
+      <div style="font-size:11px;margin-top:4px;line-height:1.7">${ups.map(u=>`<span style="display:inline-block;margin:0 6px 0 0"><code style="background:#fff;padding:0 3px;border-radius:3px">${u.address}</code>=<b>${u.value}</b></span>`).join('')}</div>
+    </div>`;
+  });
+  html+=`<div style="margin-top:8px;padding:8px 10px;background:#FBF3DC;border-left:3px solid var(--gold);border-radius:6px;font-size:11px;color:var(--bark)">Overtime rows (16, 40–45) are left untouched: the app does not track overtime automatically, so add those by hand in the workbook if needed.</div>`;
+  if(warnings.length) html+=`<div style="margin-top:8px;padding:8px 10px;background:#F4DEDA;border-left:3px solid #A13A2A;border-radius:6px;font-size:11px;color:#7a2418"><b>Please check:</b><br>${warnings.join('<br>')}</div>`;
+  document.getElementById('payPreviewBody').innerHTML=html;
+}
+
+async function confirmPayWorkbookWrite(){
+  if(!odConnected||!odAccessToken){ alert('OneDrive is not connected.'); return; }
+  const {y,m}=payPreviewMonth;
+  const fileName=document.getElementById('payFileName').value.trim();
+  const tab=document.getElementById('payTabName').value.trim();
+  if(!tab){ alert('Enter the PAY workbook tab name first (the exact month sheet name).'); return; }
+  if(!fileName){ alert('Enter the PAY workbook file name.'); return; }
+  try{ localStorage.setItem('payTab_'+y+'_'+m, tab); }catch(e){}
+  const btn=document.getElementById('payConfirmBtn'); btn.disabled=true;
+  const statusEl=document.getElementById('payPreviewStatus');
+  const folderPath='2026-2027 INVOICES';
+  let ok=0, fail=0, firstErr='';
+  for(const u of payPreviewUpdates){
+    statusEl.textContent=`Writing ${u.address}…  (${ok+fail+1} of ${payPreviewUpdates.length})`;
+    const url=`https://graph.microsoft.com/v1.0/me/drive/root:/${folderPath}/${encodeURIComponent(fileName)}:/workbook/worksheets('${tab}')/range(address='${u.address}')`;
+    try{
+      const resp=await fetch(url,{method:'PATCH',headers:{'Authorization':`Bearer ${odAccessToken}`,'Content-Type':'application/json'},body:JSON.stringify({values:[[u.value]]})});
+      if(resp.ok) ok++; else { fail++; const t=await resp.text(); console.error('PAY write fail',u.address,resp.status,t); if(!firstErr) firstErr=`${resp.status} on ${u.address}`; }
+    }catch(e){ fail++; console.error(e); if(!firstErr) firstErr=String(e); }
+  }
+  if(fail===0){ statusEl.innerHTML=`<span style="color:var(--forest)">✓ Done — ${ok} cells written to sheet "${tab}".</span>`; showFlash('✓ PAY workbook updated ('+ok+' cells)'); }
+  else { statusEl.innerHTML=`<span style="color:var(--error)">${ok} written, ${fail} failed (first: ${firstErr}). If everything failed, the tab name "${tab}" probably does not match the workbook exactly — fix it above and try again.</span>`; btn.disabled=false; }
+}
+function closePayPreview(){ document.getElementById('payPreviewOv').classList.remove('vis'); }
+
+// ════════════════════════════════════════════════
+// PDF helpers (Little Puddings house style)
+// ════════════════════════════════════════════════
+function pdfHeader(doc,title,subtitle){
+  const w=doc.internal.pageSize.getWidth();
+  doc.setFillColor(26,122,74); doc.rect(0,0,w,20,'F');
+  doc.setTextColor(255,255,255);
+  doc.setFont('times','bold'); doc.setFontSize(15); doc.text('Little Puddings',12,9);
+  doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.text('Grounded & Curious Ltd · Registered Childminding Setting · Lincoln',12,15);
+  doc.setFont('times','bold'); doc.setFontSize(13); doc.setTextColor(26,122,74); doc.text(title,12,30);
+  if(subtitle){ doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(107,100,96); doc.text(subtitle,12,36); }
+  doc.setDrawColor(212,160,23); doc.setLineWidth(0.6); doc.line(12,39,w-12,39);
+}
+function pdfFooter(doc){
+  const w=doc.internal.pageSize.getWidth(), h=doc.internal.pageSize.getHeight();
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(107,100,96);
+  doc.text('Generated '+fmtUK(new Date())+' '+ts(new Date()), 12, h-8);
+  doc.text('Signed (childminder): ______________________     Page '+doc.internal.getNumberOfPages(), w-12, h-8, {align:'right'});
+}
+
+// ════════════════════════════════════════════════
+// 3 · WEEKLY REGISTER PDF
+// ════════════════════════════════════════════════
+function exportWeeklyRegisterPDF(){
+  if(!window.jspdf){ alert('PDF library not loaded. Check the internet connection and refresh (Ctrl+F5).'); return; }
+  const base=parseDInput(document.getElementById('weekRegDate').value)||new Date();
+  const mon=mondayOf(base);
+  const week=[0,1,2,3,4].map(i=>{ const d=new Date(mon); d.setDate(d.getDate()+i); return d; });
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+  const ABS={holiday:'HOL',illness:'ILL',family:'FAM',unauthorised:'N/S',other:'ABS'};
+  const kids=CHILDREN.filter(c=>!c.archived).filter(c=>week.some(d=>{
+    if(isScheduled(c,d)) return true;
+    const a=readAtt(c.id,d); if(a&&a.signInTime) return true;
+    return !!getAbsence(c.id,d);
+  })).sort((a,b)=> a.type===b.type ? cName(a).localeCompare(cName(b)) : (a.type==='ey'?-1:1));
+  const body=kids.map(c=>{
+    const cells=week.map(d=>{
+      const a=readAtt(c.id,d), ab=getAbsence(c.id,d);
+      if(ab) return ABS[ab.reason]||'ABS';
+      if(a&&(a.signInTime||a.signOutTime)) return (a.signInTime||'—')+'\n'+(a.signOutTime||'—');
+      if(isScheduled(c,d)) return '·';
+      return '';
+    });
+    return [cName(c), c.type==='ey'?'EY':'Sch', ...cells];
+  });
+  pdfHeader(doc,'Weekly Attendance Register','Week beginning '+fmtUK(mon)+'   ('+fmtUK(mon)+' to '+fmtUK(week[4])+')');
+  doc.autoTable({
+    startY:44,
+    head:[['Child','Type',...week.map(d=>DAYS[d.getDay()]+'\n'+p2(d.getDate())+'/'+p2(d.getMonth()+1))]],
+    body: body.length?body:[['No children booked or attending this week','','','','','','']],
+    styles:{fontSize:8,cellPadding:1.6,valign:'middle',halign:'center',lineColor:[204,204,204],lineWidth:0.1,textColor:[40,40,40]},
+    headStyles:{fillColor:[232,241,236],textColor:[26,122,74],fontStyle:'bold',halign:'center'},
+    columnStyles:{0:{cellWidth:46,halign:'left',fontStyle:'bold'},1:{cellWidth:14}},
+    alternateRowStyles:{fillColor:[247,243,236]},
+    margin:{left:12,right:12},
+    didDrawPage:()=>pdfFooter(doc)
+  });
+  const ly=doc.lastAutoTable.finalY+6;
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(107,100,96);
+  doc.text('Key:  top time = signed in, lower time = signed out  ·  HOL holiday  ·  ILL illness  ·  FAM family event  ·  N/S no show  ·  "·" booked, no times  ·  blank = not booked', 12, ly, {maxWidth:doc.internal.pageSize.getWidth()-24});
+  doc.save('LP Weekly Register '+dk(mon)+'.pdf');
+  showFlash('📄 Weekly register PDF generated');
+}
+
+// ════════════════════════════════════════════════
+// 4 · INDIVIDUAL CHILD REGISTER PDF (funding audit)
+// ════════════════════════════════════════════════
+function exportChildRegisterPDF(){
+  if(!window.jspdf){ alert('PDF library not loaded. Check the internet connection and refresh (Ctrl+F5).'); return; }
+  const cid=document.getElementById('childRegSelect').value;
+  const c=CHILDREN.find(x=>x.id===cid); if(!c){ alert('Select a child first.'); return; }
+  const from=parseDInput(document.getElementById('childRegFrom').value);
+  const to=parseDInput(document.getElementById('childRegTo').value);
+  if(!from||!to||from>to){ alert('Check the date range: "From" must be on or before "To".'); return; }
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+  const body=[]; let totalMins=0, sessions=0, absHol=0, absIll=0, absOther=0;
+  eachDay(from,to).forEach(d=>{
+    const a=readAtt(c.id,d), ab=getAbsence(c.id,d), sched=isScheduled(c,d);
+    if((!a||!a.signInTime) && !ab && !sched) return;
+    let inT=a&&a.signInTime?a.signInTime:'', outT=a&&a.signOutTime?a.signOutTime:'', hrs='', note='';
+    if(ab){
+      note=(ABSENCE_REASONS[ab.reason]?ABSENCE_REASONS[ab.reason].label:ab.reason)+(ab.note?' — '+ab.note:'');
+      if(ab.reason==='holiday') absHol++; else if(ab.reason==='illness') absIll++; else absOther++;
+    } else if(a&&a.signInTime&&a.signOutTime){
+      const mins=pm(a.signOutTime)-pm(a.signInTime);
+      if(mins>0){ hrs=(mins/60).toFixed(2); totalMins+=mins; sessions++; }
+    } else if(a&&a.signInTime){ note='No sign-out recorded'; }
+    else if(sched){ note='Booked'; }
+    const flags=[]; if(a&&a.earlyMins>0) flags.push('Early '+a.earlyMins+'m'); if(a&&a.lateMins>0) flags.push('Late '+a.lateMins+'m');
+    body.push([fmtUK(d),DAYS[d.getDay()].slice(0,3),inT||'—',outT||'—',hrs||'—',flags.join(', '),note]);
+  });
+  pdfHeader(doc,'Individual Child Register',cName(c)+'   ·   '+(c.type==='ey'?'Early Years':'School')+'   ·   '+fmtUK(from)+' to '+fmtUK(to));
+  doc.autoTable({
+    startY:44,
+    head:[['Date','Day','In','Out','Hours','Flags','Absence / Notes']],
+    body: body.length?body:[['—','','','','','','No records in this period']],
+    styles:{fontSize:8.5,cellPadding:2,lineColor:[204,204,204],lineWidth:0.1,textColor:[40,40,40]},
+    headStyles:{fillColor:[232,241,236],textColor:[26,122,74],fontStyle:'bold'},
+    alternateRowStyles:{fillColor:[247,243,236]},
+    columnStyles:{0:{cellWidth:24},1:{cellWidth:12},2:{cellWidth:16},3:{cellWidth:16},4:{cellWidth:16},5:{cellWidth:26}},
+    margin:{left:12,right:12},
+    didDrawPage:()=>pdfFooter(doc)
+  });
+  let y=doc.lastAutoTable.finalY+8; const w=doc.internal.pageSize.getWidth();
+  if(y>270){ doc.addPage(); y=20; }
+  doc.setFillColor(251,243,220); doc.rect(12,y-5,w-24,20,'F');
+  doc.setDrawColor(212,160,23); doc.setLineWidth(0.8); doc.line(12,y-5,12,y+15);
+  doc.setFont('times','bold'); doc.setFontSize(11); doc.setTextColor(26,122,74);
+  doc.text('Sessions attended: '+sessions+'      Total hours attended: '+(totalMins/60).toFixed(2)+' hrs',16,y+2);
+  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(107,100,96);
+  doc.text('Absences — holiday: '+absHol+'   illness: '+absIll+'   other: '+absOther,16,y+9);
+  doc.save('LP Register '+cName(c).replace(/[^a-z0-9]+/gi,'_')+' '+dk(from)+'_'+dk(to)+'.pdf');
+  showFlash('📄 Child register PDF generated');
+}
+
+// ════════════════════════════════════════════════
+// VISITOR LOG PDF (audit trail)
+// ════════════════════════════════════════════════
+function exportVisitorLogPDF(){
+  if(!window.jspdf){ alert('PDF library not loaded. Check the internet connection and refresh (Ctrl+F5).'); return; }
+  const from=parseDInput(document.getElementById('visLogFrom').value);
+  const to=parseDInput(document.getElementById('visLogTo').value);
+  if(!from||!to||from>to){ alert('Check the date range: "From" must be on or before "To".'); return; }
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+  const body=[];
+  eachDay(from,to).forEach(d=>{
+    (visitors[dk(d)]||[]).forEach(v=>{
+      body.push([fmtUK(d), v.name||'', v.purpose||'', v.visiting||'', v.reg||'', v.signInTime||'', v.signOutTime||'']);
+    });
+  });
+  pdfHeader(doc,'Visitor Log',fmtUK(from)+' to '+fmtUK(to)+'   ·   '+body.length+' visitor'+(body.length!==1?'s':''));
+  doc.autoTable({
+    startY:44,
+    head:[['Date','Name','Purpose','Visiting','Car reg','In','Out']],
+    body: body.length?body:[['—','No visitors recorded in this period','','','','','']],
+    styles:{fontSize:8.5,cellPadding:2,lineColor:[204,204,204],lineWidth:0.1,textColor:[40,40,40]},
+    headStyles:{fillColor:[232,241,236],textColor:[26,122,74],fontStyle:'bold'},
+    alternateRowStyles:{fillColor:[247,243,236]},
+    columnStyles:{0:{cellWidth:26},5:{cellWidth:18},6:{cellWidth:18}},
+    margin:{left:12,right:12},
+    didDrawPage:()=>pdfFooter(doc)
+  });
+  doc.save('LP Visitor Log '+dk(from)+'_'+dk(to)+'.pdf');
+  showFlash('📄 Visitor log PDF generated');
+}
+
+
 function renderAll(){
   renderChildren();renderStaff();updateStatusBar();
   if(currentTab==='log')renderLog();
@@ -2679,6 +3220,7 @@ function renderAll(){
   if(currentTab==='override')renderOverride();
   if(currentTab==='admin')renderAdmin();
   if(currentTab==='payroll')renderPayroll();
+  if(currentTab==='reports')renderReports();
   if(currentTab==='settings')renderSettings();
 }
 
@@ -2689,7 +3231,11 @@ function renderAll(){
 document.querySelectorAll('.overlay').forEach(el => el.classList.remove('vis'));
 
 // Init MSAL and render
-initMSAL().then(()=>renderAll());
+// Restore any on-device data first (survives refresh/reboot while offline),
+// then wire connection recovery, then connect and render.
+loadLocal();
+wireConnectionRecovery();
+initMSAL().then(()=>{ updateConnStatus(); renderAll(); });
 </script>
 </body>
 </html>
