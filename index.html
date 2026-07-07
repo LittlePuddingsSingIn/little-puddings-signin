@@ -3350,9 +3350,26 @@ function scToggleStaff(id){ if(scSelStaff.has(id))scSelStaff.delete(id); else sc
 function scAllPresentChildren(){ scSelChildren = new Set(scPresentChildIds()); scRenderChildGrid(); }
 function scNoneChildren(){ scSelChildren = new Set(); scRenderChildGrid(); }
 
+let scShowAllChildren = false;
+function scDayChildren(){
+  const all = CHILDREN.filter(c=>!c.archived);
+  const list = scShowAllChildren ? all : all.filter(c=>{
+    const a = readAtt(c.id, viewDate);
+    const presentNow = a && a.signInTime && !a.signOutTime;
+    const departed   = a && a.signInTime && a.signOutTime;
+    if(presentNow) return true;                 // here right now
+    if(departed)   return false;                // already gone home today
+    return isScheduled(c, viewDate);            // still due today (e.g. school collection)
+  });
+  return list.sort((a,b)=>cName(a).localeCompare(cName(b)));
+}
+function scToggleShowAll(){ scShowAllChildren=!scShowAllChildren; scRenderChildGrid(); const b=document.getElementById('scShowAllBtn'); if(b) b.textContent=scShowAllChildren?'Today only':'Show all'; }
+
 function scRenderChildGrid(){
   const box=document.getElementById('scChildGrid'); if(!box) return;
-  const kids=CHILDREN.filter(c=>!c.archived).sort((a,b)=>cName(a).localeCompare(cName(b)));
+  const kids=scDayChildren();
+  const cntEl=document.getElementById('scChildCount'); if(cntEl)cntEl.textContent=scSelChildren.size;
+  if(!kids.length){ box.innerHTML='<div style="font-size:12px;color:var(--bark);padding:8px">No children scheduled or signed in today. Tap Show all to pick from everyone.</div>'; return; }
   box.innerHTML = kids.map(c=>{ const sel=scSelChildren.has(c.id);
     return `<div onclick="scToggleChild('${c.id}')" style="cursor:pointer;border-radius:11px;padding:9px 6px;text-align:center;border:2px solid ${sel?'var(--forest)':'rgba(0,0,0,0.08)'};background:${sel?'var(--sage)':'var(--cream)'};transition:all 0.12s">
       <div style="width:30px;height:30px;border-radius:50%;background:${c.color||'var(--moss)'};color:#fff;display:flex;align-items:center;justify-content:center;margin:0 auto 5px;font-weight:700;font-size:13px">${c.name.charAt(0)}</div>
@@ -3382,6 +3399,7 @@ function buildSoleChargeForm(){
   const dLabel = `${DAYS[viewDate.getDay()]} ${viewDate.getDate()} ${MONTH_SHORT[viewDate.getMonth()]}`;
   scSelChildren = new Set(scPresentChildIds());
   scSelStaff = new Set(scPresentStaffIds());
+  scShowAllChildren = false;
   const form = `<div style="background:var(--cream);border-radius:13px;padding:14px;margin-bottom:14px">
     <div style="font-family:'Playfair Display',serif;font-size:14px;color:var(--forest);margin-bottom:10px">Start a sole-charge period &middot; ${dLabel}</div>
     <div style="margin-bottom:12px">
@@ -3396,6 +3414,7 @@ function buildSoleChargeForm(){
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
         <label style="font-size:11px;color:var(--moss);text-transform:uppercase">Children staying &middot; <span id="scChildCount">0</span> selected</label>
         <div style="display:flex;gap:4px">
+          <button type="button" id="scShowAllBtn" onclick="scToggleShowAll()" style="padding:4px 9px;background:rgba(26,122,74,0.12);color:var(--forest);border:none;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer">Show all</button>
           <button type="button" onclick="scAllPresentChildren()" style="padding:4px 9px;background:var(--moss);color:#fff;border:none;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer">All present</button>
           <button type="button" onclick="scNoneChildren()" style="padding:4px 9px;background:rgba(107,79,58,0.2);color:var(--bark);border:none;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer">None</button>
         </div>
