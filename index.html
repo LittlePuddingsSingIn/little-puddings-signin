@@ -2,6 +2,9 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>Little Puddings — Sign In & Out</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Lato:wght@300;400;700;900&display=swap" rel="stylesheet">
@@ -1526,7 +1529,7 @@ function setTab(t){
   if(t==='log')renderLog();
   if(t==='invoice')renderInvoice();
   if(t==='override')renderOverride();
-  if(t==='solecharge')renderSoleCharge();
+  if(t==='solecharge')renderSoleCharge(true);
   if(t==='admin')renderAdmin();
   if(t==='payroll')renderPayroll();
   if(t==='reports')renderReports();
@@ -3334,10 +3337,25 @@ function scPresentChildIds(){
   return CHILDREN.filter(c=>!c.archived).filter(c=>{ const a=readAtt(c.id,viewDate); return a && a.signInTime && !a.signOutTime; }).map(c=>c.id);
 }
 
-function renderSoleCharge(){
+function scPresentStaffNames(){
+  return STAFF.filter(s=>!s.archived).filter(s=>{ const l=staffLog[s.id]&&staffLog[s.id][dk(viewDate)]; return l && l.clockedIn; }).map(s=>s.name);
+}
+function scNow(){ const el=document.getElementById('scFrom'); if(el) el.value=ts(new Date()); }
+function scTickPresent(){ const present=scPresentChildIds().map(id=>cName(CHILDREN.find(c=>c.id===id))); document.querySelectorAll('.scChild').forEach(cb=>{ cb.checked=present.includes(cb.value); }); }
+function scClearChildren(){ document.querySelectorAll('.scChild').forEach(cb=>cb.checked=false); }
+
+// The form is only (re)built when the tab is opened, so the 30-second background
+// sync no longer wipes what you are ticking. Sync just refreshes the list below.
+function renderSoleCharge(rebuildForm){
+  if(rebuildForm || !document.getElementById('scInCharge')) buildSoleChargeForm();
+  renderSoleChargeList();
+}
+
+function buildSoleChargeForm(){
   const staff = STAFF.filter(s=>!s.archived);
   const kids = CHILDREN.filter(c=>!c.archived).sort((a,b)=>cName(a).localeCompare(cName(b)));
   const present = scPresentChildIds();
+  const presentStaff = scPresentStaffNames();
   const now = ts(new Date());
   const dLabel = `${DAYS[viewDate.getDay()]} ${viewDate.getDate()} ${MONTH_SHORT[viewDate.getMonth()]}`;
   const form = `<div style="background:var(--cream);border-radius:13px;padding:14px;margin-bottom:14px">
@@ -3347,9 +3365,12 @@ function renderSoleCharge(){
         <label style="font-size:11px;color:var(--moss);text-transform:uppercase">Person in sole charge</label>
         <select id="scInCharge" class="af-select" style="width:100%">${staff.map(s=>`<option value="${s.name}">${s.name} · ${s.role}</option>`).join('')}</select>
       </div>
-      <div style="width:92px">
+      <div style="width:110px">
         <label style="font-size:11px;color:var(--moss);text-transform:uppercase">From</label>
-        <input type="time" id="scFrom" class="time-inp" style="width:100%" value="${now}">
+        <div style="display:flex;gap:4px">
+          <input type="time" id="scFrom" class="time-inp" style="flex:1;min-width:0" value="${now}">
+          <button type="button" onclick="scNow()" style="padding:0 8px;background:var(--gold);color:var(--forest);border:none;border-radius:7px;font-size:10px;font-weight:700;cursor:pointer">Now</button>
+        </div>
       </div>
       <div style="width:92px">
         <label style="font-size:11px;color:var(--moss);text-transform:uppercase">To</label>
@@ -3359,11 +3380,17 @@ function renderSoleCharge(){
     <div style="margin-bottom:10px">
       <label style="font-size:11px;color:var(--moss);text-transform:uppercase">Other staff present</label>
       <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:5px">
-        ${staff.map(s=>`<label style="font-size:12px;background:rgba(127,169,154,0.12);border-radius:7px;padding:5px 9px;cursor:pointer"><input type="checkbox" class="scStaff" value="${s.name}"> ${s.name}</label>`).join('')}
+        ${staff.map(s=>`<label style="font-size:12px;background:rgba(127,169,154,0.12);border-radius:7px;padding:5px 9px;cursor:pointer"><input type="checkbox" class="scStaff" value="${s.name}" ${presentStaff.includes(s.name)?'checked':''}> ${s.name}</label>`).join('')}
       </div>
     </div>
     <div style="margin-bottom:10px">
-      <label style="font-size:11px;color:var(--moss);text-transform:uppercase">Children present · ${present.length} signed in now, pre-ticked</label>
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <label style="font-size:11px;color:var(--moss);text-transform:uppercase">Children present · ${present.length} signed in now, pre-ticked</label>
+        <div style="display:flex;gap:4px">
+          <button type="button" onclick="scTickPresent()" style="padding:3px 8px;background:var(--moss);color:#fff;border:none;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer">All present</button>
+          <button type="button" onclick="scClearChildren()" style="padding:3px 8px;background:rgba(107,79,58,0.2);color:var(--bark);border:none;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer">None</button>
+        </div>
+      </div>
       <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:5px;max-height:190px;overflow-y:auto">
         ${kids.map(c=>`<label style="font-size:12px;background:rgba(127,169,154,0.12);border-radius:7px;padding:5px 9px;cursor:pointer"><input type="checkbox" class="scChild" value="${cName(c)}" ${present.includes(c.id)?'checked':''}> ${cName(c)}</label>`).join('')}
       </div>
@@ -3375,7 +3402,9 @@ function renderSoleCharge(){
     <button onclick="saveSoleCharge()" style="width:100%;padding:12px;background:var(--forest);color:var(--gold-light);border:none;border-radius:10px;font-weight:700;cursor:pointer">Save sole-charge record</button>
   </div>`;
   document.getElementById('soleChargeForm').innerHTML = form;
+}
 
+function renderSoleChargeList(){
   const list = soleCharge[dk(viewDate)] || [];
   const mStart = dk(new Date(viewDate.getFullYear(), viewDate.getMonth(), 1));
   let listHtml = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px">
@@ -3421,7 +3450,7 @@ function saveSoleCharge(){
     note, recordedBy: managerMode ? 'Manager' : (deputyMode ? 'Deputy' : 'Staff')
   });
   markDirty();
-  renderSoleCharge();
+  renderSoleCharge(true);
   showFlash('✓ Sole-charge record saved');
 }
 
