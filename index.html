@@ -285,6 +285,7 @@
   </div>
   <div class="header-right">
     <button class="mgr-btn" id="mgrBtn" onclick="mgrBtnClick()">⚙ Manager</button>
+    <button class="mgr-btn" id="depBtn" onclick="depBtnClick()" style="margin-left:6px;background:var(--moss)">Deputy</button>
     <div class="htime">
       <div class="time" id="clock">--:--</div>
       <div class="date" id="dateDisp">--</div>
@@ -309,9 +310,9 @@
 
   <!-- MANAGER BANNER -->
   <div class="mgr-banner" id="mgrBanner" style="display:none">
-    <div class="mgr-banner-text">⚙ Manager Mode · <span id="mgrDateLabel"></span><span class="save-indicator" id="saveIndicator" style="display:none">✓ Saved to OneDrive</span></div>
+    <div class="mgr-banner-text"><span id="bannerModeLabel">⚙ Manager Mode</span> · <span id="mgrDateLabel"></span><span class="save-indicator" id="saveIndicator" style="display:none">✓ Saved to OneDrive</span></div>
     <button class="mgr-small-btn" onclick="openPhone()">📱 Register</button>
-    <button class="mgr-exit-btn" onclick="exitManager()">Exit</button>
+    <button class="mgr-exit-btn" onclick="exitMode()">Exit</button>
   </div>
 
   <!-- DATE NAV -->
@@ -327,9 +328,10 @@
     <button class="tab active" onclick="setTab('children')">Children</button>
     <button class="tab" onclick="setTab('staff')">Staff</button>
     <button class="tab" onclick="setTab('visitor')">Visitor</button>
-    <button class="tab mgr-only" onclick="setTab('log')"      style="display:none">Log</button>
+    <button class="tab mgr-only dep-ok" onclick="setTab('log')"      style="display:none">Log</button>
     <button class="tab mgr-only" onclick="setTab('invoice')"  style="display:none">Invoices</button>
-    <button class="tab mgr-only" onclick="setTab('override')" style="display:none">Day Changes</button>
+    <button class="tab mgr-only dep-ok" onclick="setTab('override')" style="display:none">Day Changes</button>
+    <button class="tab mgr-only dep-ok" onclick="setTab('solecharge')" style="display:none">Sole Charge</button>
     <button class="tab mgr-only" onclick="setTab('admin')"    style="display:none">Admin</button>
     <button class="tab mgr-only" onclick="setTab('payroll')"  style="display:none">Payroll</button>
     <button class="tab mgr-only" onclick="setTab('reports')"  style="display:none">Reports</button>
@@ -421,6 +423,13 @@
   </div>
 
   <!-- REPORTS -->
+  <div id="panel-solecharge" style="display:none">
+    <div class="sec-head"><div class="sec-label">Sole Charge Register</div><div class="sec-line"></div></div>
+    <div class="sec-sub">Record when someone is left in sole charge (school runs, cover, or manager off site). Saved as an audit trail.</div>
+    <div id="soleChargeForm"></div>
+    <div id="soleChargeList"></div>
+  </div>
+
   <div id="panel-reports" style="display:none">
     <div class="sec-head"><div class="sec-label">Reports & Registers</div><div class="sec-line"></div></div>
     <div class="sec-sub">PDF registers for safeguarding, Ofsted and funding audits</div>
@@ -947,6 +956,11 @@ async function syncWithOneDrive() {
           if (!visitors[dkk]) visitors[dkk] = remoteData.visitors[dkk];
         });
       }
+      if (remoteData.soleCharge) {
+        Object.keys(remoteData.soleCharge).forEach(dkk => {
+          if (!soleCharge[dkk]) soleCharge[dkk] = remoteData.soleCharge[dkk];
+        });
+      }
       if (remoteData.timesheet) {
         Object.keys(remoteData.timesheet).forEach(sid => {
           if (!timesheet[sid]) timesheet[sid] = {};
@@ -972,7 +986,7 @@ async function syncWithOneDrive() {
     const payload = JSON.stringify({
       dataVersion: DATA_VERSION,
       CHILDREN, STAFF, attendance, staffLog, eventLog, overrides, absences,
-      collectedFromSchool, droppedOffAtSchool, visitors, pinCustomised, timesheet, lastUpdated: new Date().toISOString()
+      collectedFromSchool, droppedOffAtSchool, visitors, soleCharge, pinCustomised, timesheet, lastUpdated: new Date().toISOString()
     });
     
     const uploadUrl = `https://graph.microsoft.com/v1.0/me/drive/root:/${SYNC_FOLDER}/${encodeURIComponent(SYNC_FILE)}:/content`;
@@ -1024,7 +1038,7 @@ function saveLocal(){
     localStorage.setItem(LOCAL_KEY, JSON.stringify({
       dataVersion: DATA_VERSION,
       CHILDREN, STAFF, attendance, staffLog, eventLog, overrides, absences,
-      collectedFromSchool, droppedOffAtSchool, visitors, pinCustomised, timesheet,
+      collectedFromSchool, droppedOffAtSchool, visitors, soleCharge, pinCustomised, timesheet,
       pendingSync: dataDirty, savedAt: new Date().toISOString()
     }));
   } catch(e){ console.warn('On-device save failed (storage full/unavailable):', e); }
@@ -1043,6 +1057,7 @@ function loadLocal(){
     if(d.collectedFromSchool) collectedFromSchool = d.collectedFromSchool;
     if(d.droppedOffAtSchool) droppedOffAtSchool = d.droppedOffAtSchool;
     if(d.visitors) visitors = d.visitors;
+    if(d.soleCharge) soleCharge = d.soleCharge;
     if(d.pinCustomised) pinCustomised = d.pinCustomised;
     if(d.timesheet) timesheet = d.timesheet;
     if(d.dataVersion === DATA_VERSION){
@@ -1195,6 +1210,7 @@ async function saveRegisterEntry(child, date, att) {
 // CONSTANTS
 // ════════════════════════════════════════════════
 const MANAGER_PIN = '6927';
+const DEPUTY_PIN = '2468'; // deputy (limited) access; change here if needed
 const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 const MONTH_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const MONTH_TABS  = ['','JAN27','FEB27','MAR27','APR26','MAY26','JUN26','JUL26','AUG26','SEP26','OCT26','NOV26','DEC26'];
@@ -1276,6 +1292,8 @@ const DATA_VERSION = 11;
 
 let viewDate = new Date(); viewDate.setHours(0,0,0,0);
 let managerMode = false;
+let deputyMode = false; // limited access for when the manager is not present
+function elevated(){ return managerMode || deputyMode; }
 let currentTab = 'children';
 let attendance = {};
 let staffLog = {};
@@ -1285,6 +1303,7 @@ let absences = {}; // [dateKey][childId] = {reason, note}
 let collectedFromSchool = {}; // [dateKey][childId] = true — skip afternoon auto sign-in
 let droppedOffAtSchool = {}; // [dateKey][childId] = true — skip morning auto sign-out (parent doing school drop)
 let visitors = {}; // [dateKey] = [{id, name, reason, reg, purpose, signInTime, signOutTime, visiting}]
+let soleCharge = {}; // [dateKey] = [{id, inCharge, from, to, staffPresent:[names], children:[names], count, note, recordedBy}]
 let pinTarget = null, pinEntry = '', pinShaking = false;
 let mgrPinEntry = '', mgrPinShaking = false;
 let actionTarget = null;
@@ -1428,18 +1447,25 @@ updateClock(); setInterval(updateClock,1000);
 // ════════════════════════════════════════════════
 // MANAGER MODE
 // ════════════════════════════════════════════════
-function mgrBtnClick(){ if(managerMode){exitManager();return;} mgrPinEntry='';updateMgrDots();document.getElementById('mgrPinErr').textContent='';document.getElementById('mgrPinOv').classList.add('vis'); }
+function openMgrPinModal(){ mgrPinEntry='';updateMgrDots();document.getElementById('mgrPinErr').textContent='';document.getElementById('mgrPinOv').classList.add('vis'); }
+function mgrBtnClick(){ if(elevated()){exitMode();return;} openMgrPinModal(); }
+function depBtnClick(){ if(elevated()){exitMode();return;} openMgrPinModal(); }
+function exitMode(){ if(managerMode)exitManager(); else if(deputyMode)exitDeputy(); }
 function closeMgrPin(){ document.getElementById('mgrPinOv').classList.remove('vis');mgrPinEntry='';updateMgrDots(); }
 function mkp(d){ if(mgrPinEntry.length>=4||mgrPinShaking)return;mgrPinEntry+=d;updateMgrDots();if(mgrPinEntry.length===4)setTimeout(checkMgrPin,110); }
 function mkd(){ mgrPinEntry=mgrPinEntry.slice(0,-1);updateMgrDots();document.getElementById('mgrPinErr').textContent=''; }
 function updateMgrDots(){ for(let i=0;i<4;i++){const el=document.getElementById('mpd'+i);el.classList.toggle('filled',i<mgrPinEntry.length);el.classList.remove('err');} }
 function checkMgrPin(){
   if(mgrPinEntry===MANAGER_PIN){ closeMgrPin();enterManager(); }
+  else if(mgrPinEntry===DEPUTY_PIN){ closeMgrPin();enterDeputy(); }
   else{ mgrPinShaking=true;for(let i=0;i<4;i++)document.getElementById('mpd'+i).classList.add('err');document.getElementById('mgrPinErr').textContent='Incorrect PIN';setTimeout(()=>{mgrPinShaking=false;mgrPinEntry='';updateMgrDots();},450); }
 }
 function enterManager(){
+  deputyMode=false;
   managerMode=true;
   document.getElementById('mgrBtn').classList.add('active');
+  document.getElementById('depBtn').classList.remove('active');
+  document.getElementById('bannerModeLabel').textContent='⚙ Manager Mode';
   document.getElementById('mgrBanner').style.display='flex';
   document.getElementById('dateNav').style.display='flex';
   document.querySelectorAll('.mgr-only').forEach(el=>el.style.display='');
@@ -1452,6 +1478,26 @@ function exitManager(){
   document.getElementById('dateNav').style.display='none';
   document.querySelectorAll('.mgr-only').forEach(el=>el.style.display='none');
   if(!['children','staff'].includes(currentTab))setTab('children');
+  renderAll();
+}
+function enterDeputy(){
+  managerMode=false;
+  deputyMode=true;
+  document.getElementById('depBtn').classList.add('active');
+  document.getElementById('mgrBtn').classList.remove('active');
+  document.getElementById('bannerModeLabel').textContent='👤 Deputy Mode';
+  document.getElementById('mgrBanner').style.display='flex';
+  document.getElementById('dateNav').style.display='flex';
+  document.querySelectorAll('.dep-ok').forEach(el=>el.style.display='');
+  updateDateNav();renderAll();showFlash('👤 Deputy mode unlocked');
+}
+function exitDeputy(){
+  deputyMode=false;
+  document.getElementById('depBtn').classList.remove('active');
+  document.getElementById('mgrBanner').style.display='none';
+  document.getElementById('dateNav').style.display='none';
+  document.querySelectorAll('.dep-ok').forEach(el=>el.style.display='none');
+  if(!['children','staff','visitor'].includes(currentTab))setTab('children');
   renderAll();
 }
 
@@ -1472,7 +1518,7 @@ function goToday(){ viewDate=new Date();viewDate.setHours(0,0,0,0);updateDateNav
 // ════════════════════════════════════════════════
 function setTab(t){
   currentTab=t;
-  ['children','staff','visitor','log','invoice','override','admin','payroll','reports','settings'].forEach((p,i)=>{
+  ['children','staff','visitor','log','invoice','override','solecharge','admin','payroll','reports','settings'].forEach((p,i)=>{
     document.getElementById('panel-'+p).style.display=p===t?'':'none';
     document.querySelectorAll('.tab')[i].classList.toggle('active',p===t);
   });
@@ -1480,6 +1526,7 @@ function setTab(t){
   if(t==='log')renderLog();
   if(t==='invoice')renderInvoice();
   if(t==='override')renderOverride();
+  if(t==='solecharge')renderSoleCharge();
   if(t==='admin')renderAdmin();
   if(t==='payroll')renderPayroll();
   if(t==='reports')renderReports();
@@ -1567,13 +1614,13 @@ function renderVisitors() {
           <div style="flex:1">
             <div style="font-weight:700;color:var(--forest);font-size:14px">${v.name}</div>
             <div style="font-size:11px;color:var(--moss);margin-top:2px">${v.purpose}${v.visiting?' · '+v.visiting:''}${v.reg?' · '+v.reg:''}</div>
-            ${managerMode ? `<div style="font-size:10px;color:var(--bark);margin-top:3px">In at ${v.signInTime}</div>` : ''}
+            ${elevated() ? `<div style="font-size:10px;color:var(--bark);margin-top:3px">In at ${v.signInTime}</div>` : ''}
           </div>
           <button onclick="signOutVisitor('${v.id}')" style="background:var(--forest);color:var(--gold-light);border:none;border-radius:8px;padding:8px 14px;font-weight:700;font-size:12px;cursor:pointer">Sign Out</button>
         </div>
       </div>`).join('')}
     </div>` : ''}
-    ${completedVisitors.length && managerMode ? `<div>
+    ${completedVisitors.length && elevated() ? `<div>
       <div style="font-family:'Playfair Display',serif;color:var(--gold-light);font-size:13px;margin-bottom:8px">EARLIER TODAY (${completedVisitors.length})</div>
       ${completedVisitors.map(v => `<div style="background:rgba(255,255,255,0.04);border-radius:11px;padding:10px 13px;margin-bottom:6px;opacity:0.7">
         <div style="font-weight:700;color:var(--gold-light);font-size:13px">${v.name}</div>
@@ -1607,11 +1654,11 @@ function renderChildren(){
         </div>`;
       }
       return`<div class="child-card ${att.signedIn?'in':''} ${ov==='add'?'override':''}" onclick="openPin('child','${c.id}')">
-        ${hasExtra&&managerMode?'<div class="early-flag"></div>':''}
+        ${hasExtra&&elevated()?'<div class="early-flag"></div>':''}
         <div class="child-avatar" style="background:${c.color}">${c.emoji}</div>
         <div class="child-name">${c.name}</div>
         <span class="child-badge ${att.signedIn?'badge-in':'badge-out'}">${att.signedIn?'In':'Out'}</span>
-        ${managerMode&&att.signInTime?`<div class="child-time">in ${att.signInTime}${att.signOutTime?' · out '+att.signOutTime:''}</div>`:''}
+        ${elevated()&&att.signInTime?`<div class="child-time">in ${att.signInTime}${att.signOutTime?' · out '+att.signOutTime:''}</div>`:''}
       </div>`;
     }).join('')}</div>`;
   }
@@ -1636,7 +1683,7 @@ function renderStaff(){
       <div class="staff-info">
         <div class="staff-name">${s.name}</div>
         <div class="staff-role">${s.role}</div>
-        ${managerMode&&log.clockInTime?`<div class="staff-clock">In ${log.clockInTime}${log.clockOutTime?' · Out '+log.clockOutTime:''}</div>`:''}
+        ${elevated()&&log.clockInTime?`<div class="staff-clock">In ${log.clockInTime}${log.clockOutTime?' · Out '+log.clockOutTime:''}</div>`:''}
       </div>
       <div class="staff-sbadge ${log.clockedIn?'sb-in':(managerMode&&isLate)?'sb-late':'sb-out'}">${log.clockedIn?'● In':(managerMode&&isLate)?'⚠ Late':'○ Out'}</div>
     </div>`;
@@ -3280,6 +3327,145 @@ function exportVisitorLogPDF(){
 }
 
 
+// ════════════════════════════════════════════════
+// SOLE CHARGE REGISTER (v6)
+// ════════════════════════════════════════════════
+function scPresentChildIds(){
+  return CHILDREN.filter(c=>!c.archived).filter(c=>{ const a=readAtt(c.id,viewDate); return a && a.signInTime && !a.signOutTime; }).map(c=>c.id);
+}
+
+function renderSoleCharge(){
+  const staff = STAFF.filter(s=>!s.archived);
+  const kids = CHILDREN.filter(c=>!c.archived).sort((a,b)=>cName(a).localeCompare(cName(b)));
+  const present = scPresentChildIds();
+  const now = ts(new Date());
+  const dLabel = `${DAYS[viewDate.getDay()]} ${viewDate.getDate()} ${MONTH_SHORT[viewDate.getMonth()]}`;
+  const form = `<div style="background:var(--cream);border-radius:13px;padding:14px;margin-bottom:14px">
+    <div style="font-family:'Playfair Display',serif;font-size:14px;color:var(--forest);margin-bottom:10px">New record — ${dLabel}</div>
+    <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+      <div style="flex:1;min-width:150px">
+        <label style="font-size:11px;color:var(--moss);text-transform:uppercase">Person in sole charge</label>
+        <select id="scInCharge" class="af-select" style="width:100%">${staff.map(s=>`<option value="${s.name}">${s.name} · ${s.role}</option>`).join('')}</select>
+      </div>
+      <div style="width:92px">
+        <label style="font-size:11px;color:var(--moss);text-transform:uppercase">From</label>
+        <input type="time" id="scFrom" class="time-inp" style="width:100%" value="${now}">
+      </div>
+      <div style="width:92px">
+        <label style="font-size:11px;color:var(--moss);text-transform:uppercase">To</label>
+        <input type="time" id="scTo" class="time-inp" style="width:100%">
+      </div>
+    </div>
+    <div style="margin-bottom:10px">
+      <label style="font-size:11px;color:var(--moss);text-transform:uppercase">Other staff present</label>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:5px">
+        ${staff.map(s=>`<label style="font-size:12px;background:rgba(127,169,154,0.12);border-radius:7px;padding:5px 9px;cursor:pointer"><input type="checkbox" class="scStaff" value="${s.name}"> ${s.name}</label>`).join('')}
+      </div>
+    </div>
+    <div style="margin-bottom:10px">
+      <label style="font-size:11px;color:var(--moss);text-transform:uppercase">Children present · ${present.length} signed in now, pre-ticked</label>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:5px;max-height:190px;overflow-y:auto">
+        ${kids.map(c=>`<label style="font-size:12px;background:rgba(127,169,154,0.12);border-radius:7px;padding:5px 9px;cursor:pointer"><input type="checkbox" class="scChild" value="${cName(c)}" ${present.includes(c.id)?'checked':''}> ${cName(c)}</label>`).join('')}
+      </div>
+    </div>
+    <div style="margin-bottom:10px">
+      <label style="font-size:11px;color:var(--moss);text-transform:uppercase">Notes (optional)</label>
+      <textarea id="scNote" class="af-input" style="width:100%;min-height:48px" placeholder="e.g. Manager collecting from school, back by 16:00"></textarea>
+    </div>
+    <button onclick="saveSoleCharge()" style="width:100%;padding:12px;background:var(--forest);color:var(--gold-light);border:none;border-radius:10px;font-weight:700;cursor:pointer">Save sole-charge record</button>
+  </div>`;
+  document.getElementById('soleChargeForm').innerHTML = form;
+
+  const list = soleCharge[dk(viewDate)] || [];
+  const mStart = dk(new Date(viewDate.getFullYear(), viewDate.getMonth(), 1));
+  let listHtml = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px">
+     <div style="font-size:12px;color:rgba(255,255,255,0.6);text-transform:uppercase;letter-spacing:0.5px">Records for this day (${list.length})</div>
+     ${managerMode?`<div style="display:flex;gap:6px;align-items:center">
+        <input type="date" id="scPdfFrom" class="time-inp" style="max-width:140px" value="${mStart}">
+        <input type="date" id="scPdfTo" class="time-inp" style="max-width:140px" value="${dk(viewDate)}">
+        <button onclick="exportSoleChargePDF()" style="font-size:11px;padding:7px 10px;background:var(--moss);color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer">Export PDF</button>
+     </div>`:''}
+  </div>`;
+  if(!list.length){
+    listHtml += `<div style="background:rgba(255,255,255,0.04);border-radius:11px;padding:16px;text-align:center;color:rgba(255,255,255,0.4);font-size:12px">No sole-charge records for this day yet.</div>`;
+  } else {
+    listHtml += list.map((r,i)=>`<div style="background:var(--cream);border-radius:11px;padding:12px;margin-bottom:8px;border-left:4px solid var(--gold)">
+      <div style="display:flex;justify-content:space-between;align-items:start">
+        <div>
+          <div style="font-weight:700;color:var(--forest);font-size:14px">${r.inCharge} <span style="font-weight:400;color:var(--bark);font-size:12px">in sole charge</span></div>
+          <div style="font-size:12px;color:var(--bark);margin-top:2px">${r.from||'?'} to ${r.to||'ongoing'} · ${r.count} children${r.staffPresent&&r.staffPresent.length?' · with '+r.staffPresent.join(', '):' · alone'}</div>
+          ${r.children&&r.children.length?`<div style="font-size:11px;color:var(--moss);margin-top:4px">Children: ${r.children.join(', ')}</div>`:''}
+          ${r.note?`<div style="font-size:11px;color:var(--bark);margin-top:4px;font-style:italic">${r.note}</div>`:''}
+          <div style="font-size:10px;color:var(--moss);margin-top:4px">Recorded by ${r.recordedBy}</div>
+        </div>
+        <button onclick="deleteSoleCharge(${i})" style="background:none;border:none;color:var(--error);font-size:16px;cursor:pointer">✕</button>
+      </div>
+    </div>`).join('');
+  }
+  document.getElementById('soleChargeList').innerHTML = listHtml;
+}
+
+function saveSoleCharge(){
+  const inCharge = document.getElementById('scInCharge').value;
+  const from = document.getElementById('scFrom').value;
+  const to = document.getElementById('scTo').value;
+  const note = document.getElementById('scNote').value.trim();
+  const staffPresent = Array.from(document.querySelectorAll('.scStaff:checked')).map(x=>x.value);
+  const children = Array.from(document.querySelectorAll('.scChild:checked')).map(x=>x.value);
+  if(!inCharge){ alert('Choose who is in sole charge.'); return; }
+  const k = dk(viewDate);
+  if(!soleCharge[k]) soleCharge[k] = [];
+  soleCharge[k].push({
+    id: Date.now(), inCharge, from, to,
+    staffPresent, children, count: children.length,
+    note, recordedBy: managerMode ? 'Manager' : (deputyMode ? 'Deputy' : 'Staff')
+  });
+  markDirty();
+  renderSoleCharge();
+  showFlash('✓ Sole-charge record saved');
+}
+
+function deleteSoleCharge(i){
+  const k = dk(viewDate);
+  if(soleCharge[k] && soleCharge[k][i]){
+    if(!confirm('Delete this sole-charge record?')) return;
+    soleCharge[k].splice(i,1);
+    if(!soleCharge[k].length) delete soleCharge[k];
+    markDirty();
+    renderSoleCharge();
+  }
+}
+
+function exportSoleChargePDF(){
+  if(!window.jspdf){ alert('PDF library not loaded. Check the internet connection and refresh (Ctrl+F5).'); return; }
+  const f = parseDInput(document.getElementById('scPdfFrom').value);
+  const t = parseDInput(document.getElementById('scPdfTo').value);
+  if(!f||!t||f>t){ alert('Check the date range: "From" must be on or before "To".'); return; }
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+  const body=[];
+  eachDay(f,t).forEach(d=>{
+    (soleCharge[dk(d)]||[]).forEach(r=>{
+      body.push([fmtUK(d), r.inCharge, (r.from||'?')+'–'+(r.to||'ongoing'), String(r.count), (r.staffPresent||[]).join(', ')||'alone', (r.children||[]).join(', '), r.note||'']);
+    });
+  });
+  pdfHeader(doc,'Sole Charge Register',fmtUK(f)+' to '+fmtUK(t)+'   ·   '+body.length+' record'+(body.length!==1?'s':''));
+  doc.autoTable({
+    startY:44,
+    head:[['Date','In sole charge','Time','Children','Other staff','Children present','Notes']],
+    body: body.length?body:[['—','No records in this period','','','','','']],
+    styles:{fontSize:8,cellPadding:2,lineColor:[204,204,204],lineWidth:0.1,textColor:[40,40,40]},
+    headStyles:{fillColor:[232,241,236],textColor:[26,122,74],fontStyle:'bold'},
+    alternateRowStyles:{fillColor:[247,243,236]},
+    columnStyles:{0:{cellWidth:22},1:{cellWidth:32},2:{cellWidth:24},3:{cellWidth:15}},
+    margin:{left:12,right:12},
+    didDrawPage:()=>pdfFooter(doc)
+  });
+  doc.save('LP Sole Charge '+dk(f)+'_'+dk(t)+'.pdf');
+  showFlash('📄 Sole charge PDF generated');
+}
+
+
 function renderAll(){
   renderChildren();renderStaff();updateStatusBar();
   if(currentTab==='log')renderLog();
@@ -3287,6 +3473,7 @@ function renderAll(){
   if(currentTab==='override')renderOverride();
   if(currentTab==='admin')renderAdmin();
   if(currentTab==='payroll')renderPayroll();
+  if(currentTab==='solecharge')renderSoleCharge();
   if(currentTab==='reports')renderReports();
   if(currentTab==='settings')renderSettings();
 }
