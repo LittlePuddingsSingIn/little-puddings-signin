@@ -381,10 +381,12 @@
   <!-- DAY CHANGES -->
   <div id="panel-override" style="display:none">
     <div class="sec-head"><div class="sec-label">Day Changes</div><div class="sec-line"></div></div>
-    <div class="sec-sub">Mark absences, add or remove children for this date only</div>
+    <div class="sec-sub">Mark absences, add or remove children and staff for this date only</div>
     <div class="ov-section"><div class="ov-title">🏖️ Mark as absent today</div><div id="absenceGrid"></div></div>
     <div class="ov-section"><div class="ov-title">➕ Add a child for today</div><div class="ov-grid" id="addGrid"></div></div>
     <div class="ov-section"><div class="ov-title">✏ Scheduled today — tap to remove</div><div class="ov-grid" id="removeGrid"></div></div>
+    <div class="ov-section"><div class="ov-title">👥 Staff working today — tap to remove</div><div class="ov-grid" id="staffRemoveGrid"></div></div>
+    <div class="ov-section"><div class="ov-title">➕ Add staff for today (cover or extra day)</div><div class="ov-grid" id="staffAddGrid"></div></div>
   </div>
 
   <!-- ADMIN -->
@@ -421,6 +423,7 @@
       <div id="staffTimesheetLinks" class="pin-reset-grid"></div>
     </div>
 
+    <div id="overtimePanel"></div>
     <div id="payrollOverview"></div>
     <div id="payrollDetail" style="display:none"></div>
   </div>
@@ -964,6 +967,19 @@ async function syncWithOneDrive() {
           if (!soleCharge[dkk]) soleCharge[dkk] = remoteData.soleCharge[dkk];
         });
       }
+      if (remoteData.staffOverrides) {
+        Object.keys(remoteData.staffOverrides).forEach(dkk => {
+          if (!staffOverrides[dkk]) staffOverrides[dkk] = remoteData.staffOverrides[dkk];
+        });
+      }
+      if (remoteData.overtime) {
+        Object.keys(remoteData.overtime).forEach(sid => {
+          if (!overtime[sid]) overtime[sid] = {};
+          Object.keys(remoteData.overtime[sid]).forEach(dkk => {
+            if (!overtime[sid][dkk]) overtime[sid][dkk] = remoteData.overtime[sid][dkk];
+          });
+        });
+      }
       if (remoteData.timesheet) {
         Object.keys(remoteData.timesheet).forEach(sid => {
           if (!timesheet[sid]) timesheet[sid] = {};
@@ -989,7 +1005,7 @@ async function syncWithOneDrive() {
     const payload = JSON.stringify({
       dataVersion: DATA_VERSION,
       CHILDREN, STAFF, attendance, staffLog, eventLog, overrides, absences,
-      collectedFromSchool, droppedOffAtSchool, visitors, soleCharge, pinCustomised, timesheet, lastUpdated: new Date().toISOString()
+      collectedFromSchool, droppedOffAtSchool, visitors, soleCharge, staffOverrides, overtime, pinCustomised, timesheet, lastUpdated: new Date().toISOString()
     });
     
     const uploadUrl = `https://graph.microsoft.com/v1.0/me/drive/root:/${SYNC_FOLDER}/${encodeURIComponent(SYNC_FILE)}:/content`;
@@ -1041,7 +1057,7 @@ function saveLocal(){
     localStorage.setItem(LOCAL_KEY, JSON.stringify({
       dataVersion: DATA_VERSION,
       CHILDREN, STAFF, attendance, staffLog, eventLog, overrides, absences,
-      collectedFromSchool, droppedOffAtSchool, visitors, soleCharge, pinCustomised, timesheet,
+      collectedFromSchool, droppedOffAtSchool, visitors, soleCharge, staffOverrides, overtime, pinCustomised, timesheet,
       pendingSync: dataDirty, savedAt: new Date().toISOString()
     }));
   } catch(e){ console.warn('On-device save failed (storage full/unavailable):', e); }
@@ -1061,6 +1077,8 @@ function loadLocal(){
     if(d.droppedOffAtSchool) droppedOffAtSchool = d.droppedOffAtSchool;
     if(d.visitors) visitors = d.visitors;
     if(d.soleCharge) soleCharge = d.soleCharge;
+    if(d.staffOverrides) staffOverrides = d.staffOverrides;
+    if(d.overtime) overtime = d.overtime;
     if(d.pinCustomised) pinCustomised = d.pinCustomised;
     if(d.timesheet) timesheet = d.timesheet;
     if(d.dataVersion === DATA_VERSION){
@@ -1278,9 +1296,9 @@ let STAFF = [
   {id:'sussie',    name:'Sussie',    role:'Registered Childminder', color:AC[0],pin:'5840',sch:{1:{s:'07:30',e:'17:30'},2:{s:'07:30',e:'17:30'},3:{s:'07:30',e:'17:30'},4:{s:'07:30',e:'17:30'},5:{s:'07:30',e:'17:30'}},archived:false,hourlyRate:15.50,paidHoursPerWeek:16,actualHoursPerWeek:50,annualLeaveHours:280,startDate:'2025-04-01',isApprentice:false},
   {id:'claire',    name:'Claire',    role:'Level 4 Educator',       color:AC[1],pin:'1111',sch:{1:{s:'08:00',e:'17:00'},3:{s:'08:00',e:'16:15'},4:{s:'08:00',e:'16:15'}},archived:false,hourlyRate:14.50,paidHoursPerWeek:26,actualHoursPerWeek:26,annualLeaveHours:96.2,startDate:'2025-04-01',isApprentice:false},
   {id:'courtney',  name:'Courtney',  role:'Level 3 Educator',       color:AC[2],pin:'2222',sch:{2:{s:'07:30',e:'17:00'},3:{s:'07:30',e:'17:00'},4:{s:'07:30',e:'17:00'},5:{s:'08:00',e:'16:30'}},archived:false,hourlyRate:13.00,paidHoursPerWeek:37,actualHoursPerWeek:37,annualLeaveHours:192.4,startDate:'2025-04-01',isApprentice:false},
-  {id:'alexandra', name:'Alexandra', role:'Early Years Apprentice', color:AC[3],pin:'3333',sch:{1:{s:'07:30',e:'16:30'},2:{s:'08:00',e:'16:30'},5:{s:'08:30',e:'15:00'}},archived:false,hourlyRate:8.00,paidHoursPerWeek:24,actualHoursPerWeek:24,annualLeaveHours:152,startDate:'2026-05-11',isApprentice:true,collegeStartDate:'2026-07-06'},
+  {id:'alexandra', name:'Alexandra', role:'Early Years Apprentice', color:AC[3],pin:'3333',sch:{1:{s:'07:30',e:'16:30'},4:{s:'07:30',e:'12:30'},5:{s:'07:30',e:'17:30'}},archived:false,hourlyRate:8.00,paidHoursPerWeek:24,actualHoursPerWeek:24,annualLeaveHours:152,startDate:'2026-05-11',isApprentice:true,collegeStartDate:'2026-07-06'},
   {id:'chloe',     name:'Chloe',     role:'Early Years Apprentice', color:AC[4],pin:'4444',sch:{1:{s:'07:45',e:'17:15'},2:{s:'07:45',e:'17:15'},3:{s:'07:30',e:'12:30'}},archived:false,hourlyRate:8.00,paidHoursPerWeek:24,actualHoursPerWeek:24,annualLeaveHours:168,startDate:'2025-09-01',isApprentice:true,collegeStartDate:'2026-07-06'},
-  {id:'leah',      name:'Leah',      role:'Early Years Apprentice', color:AC[5],pin:'5555',sch:{3:{s:'12:30',e:'17:00'},4:{s:'07:30',e:'17:00'},5:{s:'07:30',e:'17:30'}},archived:false,hourlyRate:8.00,paidHoursPerWeek:24,actualHoursPerWeek:24,annualLeaveHours:168,startDate:'2025-09-01',isApprentice:true,collegeStartDate:'2026-07-06'},
+  {id:'leah',      name:'Leah',      role:'Early Years Apprentice', color:AC[5],pin:'5555',sch:{2:{s:'08:30',e:'16:00'},3:{s:'12:30',e:'17:30'},4:{s:'12:30',e:'17:30'},5:{s:'08:00',e:'15:00'}},archived:false,hourlyRate:8.00,paidHoursPerWeek:24,actualHoursPerWeek:24,annualLeaveHours:168,startDate:'2025-09-01',isApprentice:true,collegeStartDate:'2026-07-06'},
 ];
 
 // Staff timesheet entries — [staffId][dateKey] = { type: 'worked'|'annual'|'sick'|'unpaid'|'bank'|'offthejob', hours: number, note: '' }
@@ -1291,7 +1309,7 @@ let timesheet = {};
 // ════════════════════════════════════════════════
 // Data version — bump this whenever CHILDREN or STAFF structure changes in the code
 // so that OneDrive syncs pick up the code changes rather than being overwritten
-const DATA_VERSION = 11;
+const DATA_VERSION = 12;
 
 let viewDate = new Date(); viewDate.setHours(0,0,0,0);
 let managerMode = false;
@@ -1307,6 +1325,8 @@ let collectedFromSchool = {}; // [dateKey][childId] = true — skip afternoon au
 let droppedOffAtSchool = {}; // [dateKey][childId] = true — skip morning auto sign-out (parent doing school drop)
 let visitors = {}; // [dateKey] = [{id, name, reason, reg, purpose, signInTime, signOutTime, visiting}]
 let soleCharge = {}; // [dateKey] = [{id, inCharge, from, to, staffPresent:[names], children:[names], count, note, recordedBy}]
+let staffOverrides = {}; // [dateKey][staffId] = {action:'add'|'remove'} — staff day changes (cover, day off)
+let overtime = {}; // [staffId][dateKey] = {hours, status:'approved'|'dismissed', note} — confirmed before payroll
 let pinTarget = null, pinEntry = '', pinShaking = false;
 let mgrPinEntry = '', mgrPinShaking = false;
 let actionTarget = null;
@@ -1435,7 +1455,14 @@ function childScheduledToday(c,d){
   if(c.ay==='holidays')return isHoliday(d);
   return true;
 }
-function staffScheduledToday(s,d){ return !s.archived && !!s.sch[d.getDay()]; }
+function getSOv(d){ const k=dk(d);if(!staffOverrides[k])staffOverrides[k]={};return staffOverrides[k]; }
+function staffScheduledToday(s,d){
+  if(s.archived) return false;
+  const ov=getSOv(d)[s.id];
+  if(ov && ov.action==='add') return true;      // added for this day only (e.g. cover)
+  if(ov && ov.action==='remove') return false;  // taken off this day only
+  return !!s.sch[d.getDay()];
+}
 
 // ════════════════════════════════════════════════
 // CLOCK — exact to the minute, no rounding
@@ -1774,6 +1801,38 @@ function renderOverride(){
       <div class="ov-action ${ovAction==='remove'?'ov-rem-c':'ov-norm'}">${ovAction==='remove'?'✗ Removed':'Scheduled'}</div>
     </div>`;
   }).join(''):'<div style="color:rgba(255,255,255,0.3);font-size:12px;padding:8px">No children scheduled today</div>';
+
+  // ── Staff day changes (cover, extra day, day off) ──
+  const sov = getSOv(viewDate);
+  const staffOn  = STAFF.filter(s=>staffScheduledToday(s,viewDate));
+  const staffOff = STAFF.filter(s=>!s.archived && !staffScheduledToday(s,viewDate));
+  const sCard=(s,action,label,cls)=>`<div class="ov-card ${cls}" onclick="toggleStaffOverride('${s.id}','${action}')">
+      <div class="ov-av" style="width:32px;height:32px;border-radius:50%;background:${s.color||'var(--moss)'};color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;margin:0 auto 4px">${s.name.charAt(0)}</div>
+      <div class="ov-name">${s.name}</div>
+      <div class="ov-action ${cls==='added'?'ov-add-c':(cls==='removed'?'ov-rem-c':'ov-norm')}">${label}</div>
+    </div>`;
+  document.getElementById('staffRemoveGrid').innerHTML = staffOn.length ? staffOn.map(s=>{
+    const added = sov[s.id] && sov[s.id].action==='add';
+    return sCard(s,'remove', added?'✓ Added today':'Working', added?'added':'');
+  }).join('') : '<div style="color:rgba(255,255,255,0.3);font-size:12px;padding:8px">No staff working today</div>';
+  document.getElementById('staffAddGrid').innerHTML = staffOff.length ? staffOff.map(s=>{
+    const removed = sov[s.id] && sov[s.id].action==='remove';
+    return sCard(s,'add', removed?'✗ Off today':'+ Add', removed?'removed':'');
+  }).join('') : '<div style="color:rgba(255,255,255,0.3);font-size:12px;padding:8px">All staff working today</div>';
+}
+
+function toggleStaffOverride(sid, action){
+  const sov = getSOv(viewDate);
+  const s = STAFF.find(x=>x.id===sid);
+  if(!s) return;
+  const cur = sov[sid] ? sov[sid].action : null;
+  if(cur === action) delete sov[sid];             // tap again to undo
+  else sov[sid] = { action };
+  const nowOn = staffScheduledToday(s, viewDate);
+  showFlash(`${s.name} ${nowOn ? 'added to' : 'removed from'} today`);
+  markDirty();
+  renderOverride(); renderStaff(); updateStatusBar();
+  if(odConnected) syncWithOneDrive();
 }
 
 // ════════════════════════════════════════════════
@@ -2278,6 +2337,7 @@ function getMonthTotals(staffId, refDate) {
 
 function renderPayroll() {
   const refDate = viewDate;
+  try { renderOvertimeSection(); } catch(e) { console.warn('overtime section:', e); }
   const monthName = MONTH_SHORT[refDate.getMonth()];
   const fyStart = getFinancialYearStart(refDate);
   const fyLabel = `${fyStart.getFullYear()}–${fyStart.getFullYear()+1}`;
@@ -3096,8 +3156,120 @@ function downloadAllStaffTimesheets(){
 }
 
 // ════════════════════════════════════════════════
-// 1 · STAFF TIME SHEET EXPORT → PAY WORKBOOK (preview, then Graph write)
+// OVERTIME (detected, then confirmed by the manager before payroll)
+// A day counts as possible overtime if the person clocked more than their
+// scheduled hours for that day, or worked a day they were not scheduled.
+// Nothing reaches payroll until it is approved here.
 // ════════════════════════════════════════════════
+const OT_MIN_MINUTES = 15; // ignore anything under this, to avoid noise from a few minutes
+// Sussie is the registered childminder/director (paid 16 hrs, works far more),
+// so automatic detection would flag every day. Add 'sussie' back in if ever wanted.
+const OT_EXCLUDE = ['sussie'];
+
+function getOT(staffId, d){ const k=dk(d); return (overtime[staffId]&&overtime[staffId][k])?overtime[staffId][k]:null; }
+function setOT(staffId, d, val){ const k=dk(d); if(!overtime[staffId])overtime[staffId]={}; if(val===null) delete overtime[staffId][k]; else overtime[staffId][k]=val; markDirty(); }
+
+// Returns {candidates:[], approved:[], approvedHours} for a staff member in a period
+function overtimeFor(staffId, from, to){
+  const s = STAFF.find(x=>x.id===staffId);
+  const candidates=[], approved=[]; let approvedHours=0;
+  if(!s || OT_EXCLUDE.includes(staffId)) return {candidates, approved, approvedHours};
+  eachDay(from,to).forEach(d=>{
+    const k=dk(d);
+    const man = timesheet[staffId] && timesheet[staffId][k];
+    if(man && man.type!=='worked') return;                 // leave/sick day, not overtime
+    const log = staffLog[staffId] && staffLog[staffId][k];
+    if(!log || !log.clockInTime || !log.clockOutTime) return;
+    const workedMins = pm(log.clockOutTime) - pm(log.clockInTime);
+    if(workedMins <= 0) return;
+    const sched = s.sch[d.getDay()];
+    const schedMins = sched ? (pm(sched.e) - pm(sched.s)) : 0;
+    const extraMins = workedMins - schedMins;              // no schedule = whole day is extra
+    const rec = getOT(staffId, d);
+    if(rec && rec.status==='approved'){
+      approved.push({date:d, hours:rec.hours, note:rec.note||'', extraMins, sched:!!sched});
+      approvedHours += rec.hours;
+      return;
+    }
+    if(rec && rec.status==='dismissed') return;            // manager said no
+    if(extraMins >= OT_MIN_MINUTES){
+      candidates.push({date:d, hours:Number((extraMins/60).toFixed(2)), extraMins, sched:!!sched,
+                       workedMins, schedMins, in:log.clockInTime, out:log.clockOutTime});
+    }
+  });
+  return {candidates, approved, approvedHours};
+}
+
+function approveOT(staffId, dateKey, hours){
+  const d = parseDInput(dateKey);
+  setOT(staffId, d, {hours: Number(hours), status:'approved', note:''});
+  renderPayroll();
+  showFlash('✓ Overtime approved · '+fmtMin(hours*60));
+}
+function dismissOT(staffId, dateKey){
+  const d = parseDInput(dateKey);
+  setOT(staffId, d, {hours:0, status:'dismissed', note:''});
+  renderPayroll();
+  showFlash('Overtime dismissed');
+}
+function unapproveOT(staffId, dateKey){
+  const d = parseDInput(dateKey);
+  setOT(staffId, d, null);
+  renderPayroll();
+  showFlash('Overtime removed');
+}
+function addManualOT(staffId){
+  const dateVal = prompt('Overtime date (dd/mm/yyyy):', fmtUK(viewDate));
+  if(!dateVal) return;
+  const parts = dateVal.split('/');
+  if(parts.length!==3){ alert('Please enter the date as dd/mm/yyyy'); return; }
+  const d = new Date(Number(parts[2]), Number(parts[1])-1, Number(parts[0]));
+  if(isNaN(d)){ alert('That date did not look right.'); return; }
+  const hrs = parseFloat(prompt('Overtime hours (e.g. 1.5):',''));
+  if(!hrs || hrs<=0){ alert('Enter the hours as a number, e.g. 1.5'); return; }
+  setOT(staffId, d, {hours:hrs, status:'approved', note:'Added manually'});
+  renderPayroll();
+  showFlash('✓ Overtime added · '+fmtMin(hrs*60));
+}
+
+function renderOvertimeSection(){
+  const box = document.getElementById('overtimePanel');
+  if(!box) return;
+  const {from, to} = exportPeriod();
+  const mLabel = MONTH_SHORT[from.getMonth()]+' '+from.getFullYear();
+  let anyCand = 0, html = '';
+  STAFF.filter(s=>!s.archived).forEach(s=>{
+    const ot = overtimeFor(s.id, from, to);
+    if(!ot.candidates.length && !ot.approved.length) return;
+    anyCand += ot.candidates.length;
+    html += `<div style="background:var(--parchment);border-radius:9px;padding:10px;margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <div style="font-weight:700;color:var(--forest);font-size:13px">${s.name}</div>
+        <div style="font-size:11px;color:var(--bark)">Approved: <b>${fmtMin(ot.approvedHours*60)}</b></div>
+      </div>
+      ${ot.candidates.map(c=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-top:1px solid rgba(0,0,0,0.06)">
+        <div style="font-size:11px;color:var(--bark)">
+          <b style="color:var(--forest)">${fmtUK(c.date)}</b> · ${c.in}–${c.out}
+          <div style="font-size:10px">${c.sched?('scheduled '+fmtMin(c.schedMins)+', worked '+fmtMin(c.workedMins)):'extra day (not scheduled)'} → <b style="color:#A13A2A">+${fmtMin(c.extraMins)}</b></div>
+        </div>
+        <div style="display:flex;gap:5px;white-space:nowrap">
+          <button onclick="approveOT('${s.id}','${dk(c.date)}',${c.hours})" style="padding:6px 10px;background:var(--forest);color:#fff;border:none;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer">✓ Approve</button>
+          <button onclick="dismissOT('${s.id}','${dk(c.date)}')" style="padding:6px 10px;background:rgba(107,79,58,0.15);color:var(--bark);border:none;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer">✕ No</button>
+        </div>
+      </div>`).join('')}
+      ${ot.approved.map(a=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-top:1px solid rgba(0,0,0,0.06)">
+        <div style="font-size:11px;color:var(--forest)">✓ ${fmtUK(a.date)} · <b>${fmtMin(a.hours*60)}</b> approved${a.note?' · '+a.note:''}</div>
+        <button onclick="unapproveOT('${s.id}','${dk(a.date)}')" style="background:none;border:none;color:var(--error);font-size:12px;cursor:pointer">undo</button>
+      </div>`).join('')}
+      <div style="margin-top:6px"><button onclick="addManualOT('${s.id}')" style="font-size:10px;padding:4px 8px;background:rgba(26,122,74,0.1);color:var(--forest);border:none;border-radius:6px;font-weight:700;cursor:pointer">+ Add overtime manually</button></div>
+    </div>`;
+  });
+  box.innerHTML = `<div style="background:var(--cream);border-radius:13px;padding:14px;margin-bottom:14px;border-left:5px solid #A13A2A">
+    <div style="font-family:'Playfair Display',serif;font-size:14px;color:var(--forest);margin-bottom:4px">⏱ Overtime to confirm · ${mLabel}</div>
+    <div style="font-size:11px;color:var(--bark);margin-bottom:10px">${anyCand?anyCand+' possible overtime day'+(anyCand!==1?'s':'')+' found. Approve or dismiss each one. Only approved overtime goes to payroll.':'Nothing to confirm. Approved overtime is listed below if any.'}</div>
+    ${html || '<div style="font-size:12px;color:var(--bark)">No overtime detected this month.</div>'}
+  </div>`;
+}
 const PAY_COL={ sussie:'E', claire:'H', courtney:'K', leah:'N', chloe:'Q', alexandra:'T' };
 const PAY_ROWS={ ssp:[22,27], deduction:[34,37], overtime:[40,45], leave:[53,64] };
 let payPreviewUpdates=[];
@@ -3134,23 +3306,27 @@ function buildPayPreview(){
       });
     }
     sick.sort((a,b)=>a-b); unpaid.sort((a,b)=>a-b); annual.sort((a,b)=>a-b);
+    const otData = overtimeFor(s.id, new Date(y,m-1,1), new Date(y,m,0));
+    const otDates = otData.approved.map(a=>a.date).sort((a,b)=>a-b);
     const ups=[];
     ups.push({address:col+'6', value:s.hourlyRate, label:'Hourly rate'});
     ups.push({address:col+'8', value:s.paidHoursPerWeek, label:'Contracted hrs/wk'});
     ups.push({address:col+'51', value:s.annualLeaveHours, label:'Annual leave entitlement'});
     ups.push({address:col+'19', value:Number(unpaidHrs.toFixed(2)), label:'Deduction hours'});
+    ups.push({address:col+'16', value:Number(otData.approvedHours.toFixed(2)), label:'Overtime hours (approved)'});
     const fill=(arr,range,lbl)=>{ arr.forEach((d,i)=>{ const r=range[0]+i; if(r<=range[1]) ups.push({address:col+r,value:fmtUK(d),label:lbl}); }); if(arr.length>(range[1]-range[0]+1)) warnings.push(`${s.name}: ${arr.length} ${lbl.toLowerCase()} entries but only ${range[1]-range[0]+1} rows (${range[0]}–${range[1]}). Extra ones are not written.`); };
     fill(sick,PAY_ROWS.ssp,'SSP/sick date');
     fill(unpaid,PAY_ROWS.deduction,'Deduction date');
+    fill(otDates,PAY_ROWS.overtime,'Overtime date');
     fill(annual,PAY_ROWS.leave,'Leave taken date');
     payPreviewUpdates.push(...ups);
     html+=`<div style="margin:8px 0;padding:8px 10px;background:var(--parchment);border-radius:8px">
       <div style="font-weight:700;color:var(--forest);margin-bottom:3px">${s.name} <span style="font-weight:400;color:var(--bark)">→ column ${col}</span></div>
-      <div style="font-size:11px;color:var(--bark)">Sick/SSP: ${sick.length} · Unpaid: ${unpaid.length} (${unpaidHrs.toFixed(1)}h) · Annual leave: ${annual.length}</div>
+      <div style="font-size:11px;color:var(--bark)">Sick/SSP: ${sick.length} · Unpaid: ${unpaid.length} (${unpaidHrs.toFixed(1)}h) · Annual leave: ${annual.length} · Overtime: ${otDates.length} (${otData.approvedHours.toFixed(1)}h approved)</div>
       <div style="font-size:11px;margin-top:4px;line-height:1.7">${ups.map(u=>`<span style="display:inline-block;margin:0 6px 0 0"><code style="background:#fff;padding:0 3px;border-radius:3px">${u.address}</code>=<b>${u.value}</b></span>`).join('')}</div>
     </div>`;
   });
-  html+=`<div style="margin-top:8px;padding:8px 10px;background:#FBF3DC;border-left:3px solid var(--gold);border-radius:6px;font-size:11px;color:var(--bark)">Overtime rows (16, 40–45) are left untouched: the app does not track overtime automatically, so add those by hand in the workbook if needed.</div>`;
+  html+=`<div style="margin-top:8px;padding:8px 10px;background:#FBF3DC;border-left:3px solid var(--gold);border-radius:6px;font-size:11px;color:var(--bark)">Overtime (row 16 and rows 40–45) only includes days you have approved on the Payroll tab. Anything still awaiting confirmation is not written.</div>`;
   if(warnings.length) html+=`<div style="margin-top:8px;padding:8px 10px;background:#F4DEDA;border-left:3px solid #A13A2A;border-radius:6px;font-size:11px;color:#7a2418"><b>Please check:</b><br>${warnings.join('<br>')}</div>`;
   document.getElementById('payPreviewBody').innerHTML=html;
 }
