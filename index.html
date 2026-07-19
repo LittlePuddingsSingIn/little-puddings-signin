@@ -387,6 +387,21 @@
     <div class="ov-section"><div class="ov-title">✏ Scheduled today — tap to remove</div><div class="ov-grid" id="removeGrid"></div></div>
     <div class="ov-section"><div class="ov-title">👥 Staff working today — tap to remove</div><div class="ov-grid" id="staffRemoveGrid"></div></div>
     <div class="ov-section"><div class="ov-title">➕ Add staff for today (cover or extra day)</div><div class="ov-grid" id="staffAddGrid"></div></div>
+    <div class="ov-section">
+      <div class="ov-title">⏱ Amend / clear a sign in or out time</div>
+      <div class="sec-sub" style="margin-bottom:8px">Select a child or staff member, then enter the correct time. Empty a box and Apply to clear it.</div>
+      <div class="mgr-ov-grid" id="overrideChildGrid"></div>
+      <div id="overrideTimeRow" style="display:none">
+        <div style="margin-top:12px;margin-bottom:6px;font-size:11px;color:rgba(255,255,255,0.5)">Selected: <strong id="overrideChildName" style="color:var(--gold-light)">--</strong></div>
+        <div class="time-row">
+          <input class="time-inp" id="overrideTimeIn" type="time" placeholder="Sign in">
+          <input class="time-inp" id="overrideTimeOut" type="time" placeholder="Sign out">
+          <button class="apply-btn" onclick="applyOverrideTime()">Apply</button>
+        </div>
+        <div style="margin-top:6px;font-size:10px;color:rgba(255,255,255,0.4)">Empty a box and tap Apply to clear that time. Or tap Clear all to remove both and sign them out of the day.</div>
+        <button onclick="clearOverrideTimes()" style="margin-top:6px;width:100%;padding:8px;background:rgba(161,58,42,0.25);color:#F4DEDA;border:none;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer">Clear all times for this day</button>
+      </div>
+    </div>
   </div>
 
   <!-- ADMIN -->
@@ -481,20 +496,7 @@
   <!-- SETTINGS -->
   <div id="panel-settings" style="display:none">
     <div class="sec-head"><div class="sec-label">Settings</div><div class="sec-line"></div></div>
-    <div class="sec-sub">Override times · Reset PINs</div>
-    <div class="set-section">
-      <div class="set-title">⏱ Override Sign In / Out Time</div>
-      <div class="sec-sub" style="margin-bottom:8px">Select a child then enter the correct time</div>
-      <div class="mgr-ov-grid" id="overrideChildGrid"></div>
-      <div id="overrideTimeRow" style="display:none">
-        <div style="margin-top:12px;margin-bottom:6px;font-size:11px;color:rgba(255,255,255,0.5)">Selected: <strong id="overrideChildName" style="color:var(--gold-light)">--</strong></div>
-        <div class="time-row">
-          <input class="time-inp" id="overrideTimeIn" type="time" placeholder="Sign in">
-          <input class="time-inp" id="overrideTimeOut" type="time" placeholder="Sign out">
-          <button class="apply-btn" onclick="applyOverrideTime()">Apply</button>
-        </div>
-      </div>
-    </div>
+    <div class="sec-sub">Reset PINs · School run · Term dates</div>
     <div class="set-section" id="clearSignInSection"></div>
     <div class="set-section" id="droppedAtSchoolSection"></div>
     <div class="set-section" id="collectedFromSchoolSection"></div>
@@ -959,7 +961,13 @@ async function syncWithOneDrive() {
       if (remoteData.droppedOffAtSchool) droppedOffAtSchool = { ...remoteData.droppedOffAtSchool, ...droppedOffAtSchool };
       if (remoteData.visitors) {
         Object.keys(remoteData.visitors).forEach(dkk => {
-          if (!visitors[dkk]) visitors[dkk] = remoteData.visitors[dkk];
+          if (!visitors[dkk]) { visitors[dkk] = remoteData.visitors[dkk]; return; }
+          const local = visitors[dkk];
+          remoteData.visitors[dkk].forEach(rv => {
+            const lv = local.find(x => x.id === rv.id);
+            if (!lv) { local.push(rv); }                                   // visitor added on another device
+            else if (!lv.signOutTime && rv.signOutTime) { lv.signOutTime = rv.signOutTime; } // sign-out from another device
+          });
         });
       }
       if (remoteData.soleCharge) {
@@ -1164,26 +1172,53 @@ async function writeToExcel(child, date, att) {
     const tab = MONTH_TABS[date.getMonth()+1];
     const dayRow = date.getDate() + 8; // Row offset — date 1 = row 9
 
-    const earlyBlocks = att.earlyMins > 0 ? blk(att.earlyMins) : 0;
-    const lateBlocks  = att.lateMins  > 0 ? blk(att.lateMins)  : 0;
+    const tot = attTotals(att); // across all sessions that day (before + after school)
+    const earlyBlocks = tot.early > 0 ? blk(tot.early) : 0;
+    const lateBlocks  = tot.late  > 0 ? blk(tot.late)  : 0;
     const totalBlocks = earlyBlocks + lateBlocks;
 
     const updates = [];
-    // Col D = Attendance Y/N
-    if (att.signInTime) {
-      updates.push({ address: `${tab}!D${dayRow}`, values: [['Y']] });
+    // Col D = attendance TIME string (black). "07:41 - Sch - 16:54" for a school child
+    // who attended around school that day; "07:41 - 16:54" otherwise.
+    const ss = attSessions(att);
+    if (ss.length) {
+      const firstIn = ss[0].in || '—';
+      const lastOut = ss[ss.length-1].out || '';
+      let timeStr;
+      const isSchoolDay = child.schoolRun && ss.length >= 2; // before + after school
+      if (isSchoolDay) {
+        timeStr = `${firstIn} - Sch - ${lastOut || 'in'}`;
+      } else {
+        timeStr = lastOut ? `${firstIn} - ${lastOut}` : `${firstIn} - in`;
+      }
+      updates.push({ address: `${tab}!D${dayRow}`, values: [[timeStr]], font: '000000' });
+    } else {
+      updates.push({ address: `${tab}!D${dayRow}`, values: [['']] });  // day cleared
     }
-    // Col M = Early drop off / late collection blocks
+    // Col M = early drop off / late collection blocks (numeric, feeds the £ total)
     if (totalBlocks > 0) {
       updates.push({ address: `${tab}!M${dayRow}`, values: [[totalBlocks]] });
+    } else {
+      updates.push({ address: `${tab}!M${dayRow}`, values: [['']] });  // no charge / cleared
+    }
+    // Col O = plain-English charge note in RED, only when there's an early/late
+    if (totalBlocks > 0) {
+      const bits = [];
+      if (tot.early > 0) bits.push(`${tot.early} min early`);
+      if (tot.late  > 0) bits.push(`${tot.late} min late`);
+      const chargeStr = `${bits.join(', ')} · £${totalBlocks * 5}`;
+      updates.push({ address: `${tab}!O${dayRow}`, values: [[chargeStr]], font: 'CC0000' });
+    } else {
+      // clear any stale charge note if the day no longer has a charge
+      updates.push({ address: `${tab}!O${dayRow}`, values: [['']] });
     }
 
     for (const upd of updates) {
       const parts = upd.address.split('!');
       const sheetName = parts[0];
       const cellRef = parts[1];
-      const url = `https://graph.microsoft.com/v1.0/me/drive/root:/${folderPath}/${fileName}:/workbook/worksheets('${sheetName}')/range(address='${cellRef}')`;
-      const response = await fetch(url, {
+      const baseUrl = `https://graph.microsoft.com/v1.0/me/drive/root:/${folderPath}/${fileName}:/workbook/worksheets('${sheetName}')/range(address='${cellRef}')`;
+      const response = await fetch(baseUrl, {
         method: 'PATCH',
         headers: { 'Authorization': `Bearer ${odAccessToken}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ values: upd.values })
@@ -1193,6 +1228,16 @@ async function writeToExcel(child, date, att) {
         console.error('Graph write error:', response.status, err);
       } else {
         console.log('✓ Written to Excel:', upd.address);
+        // set the font colour on cells that need it (black time, red charge)
+        if (upd.font) {
+          try {
+            await fetch(`${baseUrl}/format/font`, {
+              method: 'PATCH',
+              headers: { 'Authorization': `Bearer ${odAccessToken}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ color: '#' + upd.font })
+            });
+          } catch(e) { console.warn('font colour set failed', e); }
+        }
       }
     }
 
@@ -1294,11 +1339,11 @@ let CHILDREN = [
 
 let STAFF = [
   {id:'sussie',    name:'Sussie',    role:'Registered Childminder', color:AC[0],pin:'5840',sch:{1:{s:'07:30',e:'17:30'},2:{s:'07:30',e:'17:30'},3:{s:'07:30',e:'17:30'},4:{s:'07:30',e:'17:30'},5:{s:'07:30',e:'17:30'}},archived:false,hourlyRate:15.50,paidHoursPerWeek:16,actualHoursPerWeek:50,annualLeaveHours:280,startDate:'2025-04-01',isApprentice:false},
-  {id:'claire',    name:'Claire',    role:'Level 4 Educator',       color:AC[1],pin:'1111',sch:{1:{s:'08:00',e:'17:00'},3:{s:'08:00',e:'16:15'},4:{s:'08:00',e:'16:15'}},archived:false,hourlyRate:14.50,paidHoursPerWeek:26,actualHoursPerWeek:26,annualLeaveHours:96.2,startDate:'2025-04-01',isApprentice:false},
+  {id:'claire',    name:'Claire',    role:'Level 4 Educator',       color:AC[1],pin:'1111',sch:{1:{s:'07:45',e:'17:00'},3:{s:'08:00',e:'16:15'},4:{s:'08:00',e:'16:15'}},archived:false,hourlyRate:14.50,paidHoursPerWeek:26,actualHoursPerWeek:26,annualLeaveHours:96.2,startDate:'2025-04-01',isApprentice:false},
   {id:'courtney',  name:'Courtney',  role:'Level 3 Educator',       color:AC[2],pin:'2222',sch:{2:{s:'07:30',e:'17:00'},3:{s:'07:30',e:'17:00'},4:{s:'07:30',e:'17:00'},5:{s:'08:00',e:'16:30'}},archived:false,hourlyRate:13.00,paidHoursPerWeek:37,actualHoursPerWeek:37,annualLeaveHours:192.4,startDate:'2025-04-01',isApprentice:false},
   {id:'alexandra', name:'Alexandra', role:'Early Years Apprentice', color:AC[3],pin:'3333',sch:{1:{s:'07:30',e:'16:30'},4:{s:'07:30',e:'12:30'},5:{s:'07:30',e:'17:30'}},archived:false,hourlyRate:8.00,paidHoursPerWeek:24,actualHoursPerWeek:24,annualLeaveHours:152,startDate:'2026-05-11',isApprentice:true,collegeStartDate:'2026-07-06'},
   {id:'chloe',     name:'Chloe',     role:'Early Years Apprentice', color:AC[4],pin:'4444',sch:{1:{s:'07:45',e:'17:15'},2:{s:'07:45',e:'17:15'},3:{s:'07:30',e:'12:30'}},archived:false,hourlyRate:8.00,paidHoursPerWeek:24,actualHoursPerWeek:24,annualLeaveHours:168,startDate:'2025-09-01',isApprentice:true,collegeStartDate:'2026-07-06'},
-  {id:'leah',      name:'Leah',      role:'Early Years Apprentice', color:AC[5],pin:'5555',sch:{2:{s:'08:30',e:'16:00'},3:{s:'12:30',e:'17:30'},4:{s:'12:30',e:'17:30'},5:{s:'08:00',e:'15:00'}},archived:false,hourlyRate:8.00,paidHoursPerWeek:24,actualHoursPerWeek:24,annualLeaveHours:168,startDate:'2025-09-01',isApprentice:true,collegeStartDate:'2026-07-06'},
+  {id:'leah',      name:'Leah',      role:'Early Years Apprentice', color:AC[5],pin:'5555',sch:{2:{s:'08:30',e:'16:00'},3:{s:'12:30',e:'17:30'},4:{s:'12:30',e:'17:30'},5:{s:'08:30',e:'15:00'}},archived:false,hourlyRate:8.00,paidHoursPerWeek:24,actualHoursPerWeek:24,annualLeaveHours:168,startDate:'2025-09-01',isApprentice:true,collegeStartDate:'2026-07-06'},
 ];
 
 // Staff timesheet entries — [staffId][dateKey] = { type: 'worked'|'annual'|'sick'|'unpaid'|'bank'|'offthejob', hours: number, note: '' }
@@ -1309,7 +1354,7 @@ let timesheet = {};
 // ════════════════════════════════════════════════
 // Data version — bump this whenever CHILDREN or STAFF structure changes in the code
 // so that OneDrive syncs pick up the code changes rather than being overwritten
-const DATA_VERSION = 12;
+const DATA_VERSION = 13;
 
 let viewDate = new Date(); viewDate.setHours(0,0,0,0);
 let managerMode = false;
@@ -1425,7 +1470,8 @@ function graceMins(cs){ return GRACE[cs]||0; }
 function getAtt(cid,d){
   const k=dk(d);
   if(!attendance[cid])attendance[cid]={};
-  if(!attendance[cid][k])attendance[cid][k]={signedIn:false,signInTime:null,signOutTime:null,earlyMins:0,lateMins:0};
+  if(!attendance[cid][k])attendance[cid][k]={signedIn:false,signInTime:null,signOutTime:null,earlyMins:0,lateMins:0,sessions:[]};
+  if(!attendance[cid][k].sessions)attendance[cid][k].sessions=[]; // older records
   return attendance[cid][k];
 }
 function getSLog(sid,d){
@@ -1436,6 +1482,40 @@ function getSLog(sid,d){
 }
 function getLog(d){ const k=dk(d);if(!eventLog[k])eventLog[k]=[];return eventLog[k]; }
 function getOv(d){ const k=dk(d);if(!overrides[k])overrides[k]={};return overrides[k]; }
+
+// ════════════════════════════════════════════════
+// ATTENDANCE SESSIONS
+// A child can attend more than once a day (before school AND after school).
+// att.sessions holds completed earlier sessions; signInTime/signOutTime are the
+// current/most recent one. attSessions() returns them all, oldest first.
+// ════════════════════════════════════════════════
+function attSessions(att){
+  if(!att) return [];
+  const list = (att.sessions||[]).map(s=>({in:s.in,out:s.out,early:s.early||0,late:s.late||0}));
+  if(att.signInTime) list.push({in:att.signInTime,out:att.signOutTime,early:att.earlyMins||0,late:att.lateMins||0});
+  return list;
+}
+function attTotals(att){
+  let mins=0, early=0, late=0;
+  attSessions(att).forEach(s=>{
+    if(s.in && s.out){ const m = pm(s.out) - pm(s.in); if(m>0) mins += m; }
+    early += s.early||0; late += s.late||0;
+  });
+  return {mins, early, late};
+}
+// Archive the current session so a fresh one can start (e.g. afternoon after school)
+function attStartNewSession(att){
+  if(att.signInTime && att.signOutTime){
+    if(!att.sessions) att.sessions=[];
+    att.sessions.push({in:att.signInTime,out:att.signOutTime,early:att.earlyMins||0,late:att.lateMins||0});
+    att.signInTime=null; att.signOutTime=null; att.earlyMins=0; att.lateMins=0;
+  }
+}
+function fmtSessions(att, sep){
+  const list = attSessions(att);
+  if(!list.length) return '';
+  return list.map(s=>`${s.in||'—'}-${s.out||'in'}`).join(sep||' · ');
+}
 
 function childScheduledToday(c,d){
   if(c.archived)return false;
@@ -1614,6 +1694,24 @@ function saveVisitor() {
   if (odConnected) syncWithOneDrive();
 }
 
+function editVisitorTimes(vid){
+  const vlist = getVisitors(viewDate);
+  const v = vlist.find(x => x.id === vid);
+  if(!v){ return; }
+  const inT = prompt(`In time for ${v.name} (hh:mm, 24hr):`, v.signInTime || '');
+  if(inT===null) return;
+  if(inT.trim() && !/^\d{1,2}:\d{2}$/.test(inT.trim())){ alert('Please enter the time as hh:mm, e.g. 09:05'); return; }
+  const outT = prompt(`Out time for ${v.name} (hh:mm, 24hr). Leave blank if still on site:`, v.signOutTime || '');
+  if(outT===null) return;
+  if(outT.trim() && !/^\d{1,2}:\d{2}$/.test(outT.trim())){ alert('Please enter the time as hh:mm, e.g. 16:40'); return; }
+  if(inT.trim()) v.signInTime = inT.trim();
+  v.signOutTime = outT.trim() ? outT.trim() : null;
+  markDirty();
+  renderVisitors(); updateStatusBar();
+  if(odConnected) syncWithOneDrive();
+  showFlash(`✓ ${v.name} times updated`);
+}
+
 function signOutVisitor(vid) {
   const vlist = getVisitors(viewDate);
   const v = vlist.find(x => x.id === vid);
@@ -1644,7 +1742,7 @@ function renderVisitors() {
           <div style="flex:1">
             <div style="font-weight:700;color:var(--forest);font-size:14px">${v.name}</div>
             <div style="font-size:11px;color:var(--moss);margin-top:2px">${v.purpose}${v.visiting?' · '+v.visiting:''}${v.reg?' · '+v.reg:''}</div>
-            ${elevated() ? `<div style="font-size:10px;color:var(--bark);margin-top:3px">In at ${v.signInTime}</div>` : ''}
+            ${elevated() ? `<div style="font-size:10px;color:var(--bark);margin-top:3px">In at ${v.signInTime}${elevated()?` <span onclick="editVisitorTimes('${v.id}')" style="color:var(--forest);text-decoration:underline;cursor:pointer;margin-left:6px">edit</span>`:''}</div>` : ''}
           </div>
           <button onclick="signOutVisitor('${v.id}')" style="background:var(--forest);color:var(--gold-light);border:none;border-radius:8px;padding:8px 14px;font-weight:700;font-size:12px;cursor:pointer">Sign Out</button>
         </div>
@@ -1655,7 +1753,7 @@ function renderVisitors() {
       ${completedVisitors.map(v => `<div style="background:rgba(255,255,255,0.04);border-radius:11px;padding:10px 13px;margin-bottom:6px;opacity:0.7">
         <div style="font-weight:700;color:var(--gold-light);font-size:13px">${v.name}</div>
         <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-top:2px">${v.purpose}${v.visiting?' · '+v.visiting:''}${v.reg?' · '+v.reg:''}</div>
-        <div style="font-size:10px;color:rgba(255,255,255,0.4);margin-top:3px">In ${v.signInTime} · Out ${v.signOutTime}</div>
+        <div style="font-size:10px;color:rgba(255,255,255,0.4);margin-top:3px">In ${v.signInTime} · Out ${v.signOutTime} <span onclick="editVisitorTimes('${v.id}')" style="color:var(--gold-light);text-decoration:underline;cursor:pointer;margin-left:6px">edit</span></div>
       </div>`).join('')}
     </div>` : ''}
   `;
@@ -1677,10 +1775,13 @@ function renderChildren(){
       const abs=getAbsence(c.id,viewDate);
       if(abs){
         const r=ABSENCE_REASONS[abs.reason];
-        return`<div class="child-card" style="opacity:0.55;border-color:${r.color};border-style:dashed">
+        const badge = elevated()
+          ? `<span class="child-badge" style="background:${r.color}22;color:${r.color}">${r.emoji} ${r.label}</span>`
+          : `<span class="child-badge badge-out">Absent</span>`;
+        return`<div class="child-card" style="opacity:0.55;border-color:${elevated()?r.color:'var(--bark)'};border-style:dashed">
           <div class="child-avatar" style="background:${c.color}">${c.emoji}</div>
           <div class="child-name">${c.name}</div>
-          <span class="child-badge" style="background:${r.color}22;color:${r.color}">${r.emoji} ${r.label}</span>
+          ${badge}
         </div>`;
       }
       return`<div class="child-card ${att.signedIn?'in':''} ${ov==='add'?'override':''}" onclick="openPin('child','${c.id}')">
@@ -1688,7 +1789,7 @@ function renderChildren(){
         <div class="child-avatar" style="background:${c.color}">${c.emoji}</div>
         <div class="child-name">${c.name}</div>
         <span class="child-badge ${att.signedIn?'badge-in':'badge-out'}">${att.signedIn?'In':'Out'}</span>
-        ${elevated()&&att.signInTime?`<div class="child-time">in ${att.signInTime}${att.signOutTime?' · out '+att.signOutTime:''}</div>`:''}
+        ${elevated()&&attSessions(att).length?`<div class="child-time">${attSessions(att).map(s=>`in ${s.in}${s.out?' · out '+s.out:''}`).join('<br>')}</div>`:''}
       </div>`;
     }).join('')}</div>`;
   }
@@ -1819,6 +1920,7 @@ function renderOverride(){
     const removed = sov[s.id] && sov[s.id].action==='remove';
     return sCard(s,'add', removed?'✗ Off today':'+ Add', removed?'removed':'');
   }).join('') : '<div style="color:rgba(255,255,255,0.3);font-size:12px;padding:8px">All staff working today</div>';
+  renderOverrideGrid();
 }
 
 function toggleStaffOverride(sid, action){
@@ -2239,7 +2341,7 @@ function computeLieu(staffId, refDate){
   const fyEnd = getFinancialYearEnd(refDate);
   const today = new Date(); today.setHours(0,0,0,0);
   const end = today < fyEnd ? today : fyEnd;
-  let fullDays = 0, takenMin = 0;
+  let fullDays = 0, takenMin = 0, lateMin = 0;
   const cur = new Date(fyStart);
   let guard = 0;
   while (cur <= end && guard < 400) {
@@ -2253,12 +2355,13 @@ function computeLieu(staffId, refDate){
       const log = (staffLog[staffId] && staffLog[staffId][k]) ? staffLog[staffId][k] : null;
       if (log && log.clockInTime && log.clockOutTime) workedHrs = (pm(log.clockOutTime) - pm(log.clockInTime)) / 60;
     }
+    if (!isLeaveDay) lateMin += staffLateEarly(staffId, cur).late; // lateness reduces lieu
     if (!isLeaveDay && workedHrs >= LIEU_FULL_DAY_HOURS) fullDays++;
     cur.setDate(cur.getDate() + 1);
     guard++;
   }
   const accruedMin = fullDays * LIEU_MIN_PER_FULL_DAY;
-  return { fullDays, accruedMin, takenMin, balanceMin: accruedMin - takenMin };
+  return { fullDays, accruedMin, takenMin, lateMin, balanceMin: accruedMin - takenMin - lateMin };
 }
 
 // Get leave year (April to March) totals for a staff member
@@ -2464,12 +2567,13 @@ function openStaffDetail(staffId) {
       <div style="font-size:12px;color:var(--bark)">Balance owed</div>
       <div style="font-family:'Playfair Display',serif;font-size:22px;color:#6B5CA6;font-weight:700">${fmtMin(lieu.balanceMin)}</div>
     </div>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;font-size:11px;text-align:center">
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;font-size:11px;text-align:center">
       <div style="background:rgba(142,124,195,0.1);border-radius:7px;padding:7px"><div style="font-weight:700;color:var(--forest)">${lieu.fullDays}</div><div style="font-size:9px;color:var(--bark);text-transform:uppercase">Full days</div></div>
       <div style="background:rgba(142,124,195,0.1);border-radius:7px;padding:7px"><div style="font-weight:700;color:var(--forest)">${fmtMin(lieu.accruedMin)}</div><div style="font-size:9px;color:var(--bark);text-transform:uppercase">Accrued</div></div>
       <div style="background:rgba(142,124,195,0.1);border-radius:7px;padding:7px"><div style="font-weight:700;color:var(--forest)">${fmtMin(lieu.takenMin)}</div><div style="font-size:9px;color:var(--bark);text-transform:uppercase">Taken</div></div>
+      <div style="background:rgba(161,58,42,0.1);border-radius:7px;padding:7px"><div style="font-weight:700;color:#A13A2A">${fmtMin(lieu.lateMin||0)}</div><div style="font-size:9px;color:var(--bark);text-transform:uppercase">Late</div></div>
     </div>
-    <div style="font-size:10px;color:var(--bark);margin-top:8px">30 min per full day (6+ hrs worked). To book lieu taken, use the button below and choose Lieu Taken.</div>
+    <div style="font-size:10px;color:var(--bark);margin-top:8px">30 min per full day (6+ hrs worked), minus lieu taken and any lateness. To book lieu taken, use the button below and choose Lieu Taken.</div>
   </div>
   
   <!-- Add entry button -->
@@ -2581,12 +2685,11 @@ function closeLeave() {
 }
 
 
-function renderSettings(){
+function renderOverrideGrid(){
+  const grid=document.getElementById('overrideChildGrid');
+  if(!grid) return; // only present on the visible panel
   const scheduled=CHILDREN.filter(c=>childScheduledToday(c,viewDate));
-  const scheduledStaff=STAFF.filter(s=>!s.archived); // amend any staff on any day: hours vary daily
-  const collected=getCollected(viewDate);
-
-  // Override sign in/out grid — children and staff
+  const scheduledStaff=STAFF.filter(s=>!s.archived);
   const childCards = scheduled.map(c=>{
     const att=getAtt(c.id,viewDate),sel=overrideSelectedChild==='child_'+c.id;
     return`<div class="mgr-ov-card ${sel?'selected':''}" onclick="selectOverrideChild('child_${c.id}')">
@@ -2605,10 +2708,10 @@ function renderSettings(){
         ${log.clockInTime?'In '+log.clockInTime:'Not in'}${log.clockOutTime?' · Out '+log.clockOutTime:''}
       </div>
     </div>`;}).join('');
-  document.getElementById('overrideChildGrid').innerHTML=(childCards+staffCards)||'<div class="empty">No-one scheduled today</div>';
-
+  grid.innerHTML=(childCards+staffCards)||'<div class="empty">No-one scheduled today</div>';
+  const row=document.getElementById('overrideTimeRow');
   if(overrideSelectedChild){
-    document.getElementById('overrideTimeRow').style.display='block';
+    row.style.display='block';
     if(overrideSelectedChild.startsWith('child_')){
       const cid=overrideSelectedChild.slice(6);
       const c=CHILDREN.find(x=>x.id===cid),att=getAtt(cid,viewDate);
@@ -2623,8 +2726,12 @@ function renderSettings(){
       document.getElementById('overrideTimeOut').value=log.clockOutTime||'';
     }
   } else {
-    document.getElementById('overrideTimeRow').style.display='none';
+    row.style.display='none';
   }
+}
+
+function renderSettings(){
+  const collected=getCollected(viewDate);
 
   // Clear sign-in section
   const signedInToday=CHILDREN.filter(c=>getAtt(c.id,viewDate).signInTime);
@@ -2692,32 +2799,45 @@ function renderSettings(){
     </div>`;
   }).join('');
 }
-function selectOverrideChild(cid){ overrideSelectedChild=overrideSelectedChild===cid?null:cid;renderSettings(); }
+function selectOverrideChild(cid){ overrideSelectedChild=overrideSelectedChild===cid?null:cid; if(currentTab==='override')renderOverride(); else renderSettings(); }
 function applyOverrideTime(){
   if(!overrideSelectedChild)return;
   const inVal=document.getElementById('overrideTimeIn').value;
   const outVal=document.getElementById('overrideTimeOut').value;
-  
+
   if(overrideSelectedChild.startsWith('child_')){
     const cid=overrideSelectedChild.slice(6);
     const c=CHILDREN.find(x=>x.id===cid),att=getAtt(cid,viewDate);
-    if(inVal){att.signInTime=inVal;att.signedIn=true;const grace=graceMins(c.cs),thresh=pm(c.cs)-grace,inMins=pm(inVal);att.earlyMins=inMins<thresh?thresh-inMins:0;}
-    if(outVal){att.signOutTime=outVal;att.signedIn=false;const outMins=pm(outVal);att.lateMins=outMins>pm(c.ce)?outMins-pm(c.ce):0;}
-    getLog(viewDate).unshift({name:c.name,type:'child',action:'override',time:inVal||outVal,extra:0,verified:true,note:'Manager override'});
+    // Empty box = clear that time. This also lets you undo an accidental sign in/out.
+    att.signInTime = inVal || null;
+    att.signOutTime = outVal || null;
+    if(inVal){ const grace=graceMins(c.cs),thresh=pm(c.cs)-grace,inMins=pm(inVal); att.earlyMins=inMins<thresh?thresh-inMins:0; } else { att.earlyMins=0; }
+    if(outVal){ const outMins=pm(outVal); att.lateMins=outMins>pm(c.ce)?outMins-pm(c.ce):0; } else { att.lateMins=0; }
+    att.signedIn = !!inVal && !outVal;              // in but not out = on site; both/neither = not
+    if(!inVal && !outVal) att.sessions=[];          // fully cleared, drop any earlier sessions too
+    getLog(viewDate).unshift({name:c.name,type:'child',action:'override',time:inVal||outVal||'cleared',extra:0,verified:true,note:'Manager override'});
     showFlash(`⚙ ${c.name}'s times updated`);
     if(odConnected)writeToExcel(c,viewDate,att);
   } else if(overrideSelectedChild.startsWith('staff_')){
     const sid=overrideSelectedChild.slice(6);
     const s=STAFF.find(x=>x.id===sid),log=getSLog(sid,viewDate);
-    const dow=viewDate.getDay(),sched=s.sch[dow];
-    if(inVal){log.clockInTime=inVal;log.clockedIn=true;log.lateInMins=0;}
-    if(outVal){log.clockOutTime=outVal;log.clockedIn=false;log.earlyOutMins=0;}
-    getLog(viewDate).unshift({name:s.name,type:'staff',action:'override',time:inVal||outVal,extra:0,verified:true,note:'Manager override'});
+    log.clockInTime = inVal || null;
+    log.clockOutTime = outVal || null;
+    log.clockedIn = !!inVal && !outVal;
+    log.lateInMins=0; log.earlyOutMins=0;
+    getLog(viewDate).unshift({name:s.name,type:'staff',action:'override',time:inVal||outVal||'cleared',extra:0,verified:true,note:'Manager override'});
     showFlash(`⚙ ${s.name}'s times updated`);
   }
-  overrideSelectedChild=null;renderSettings();renderChildren();updateStatusBar();
+  overrideSelectedChild=null;if(currentTab==='override')renderOverride();else renderSettings();renderChildren();renderStaff();updateStatusBar();
   markDirty();
   if(odConnected) syncWithOneDrive();
+}
+
+function clearOverrideTimes(){
+  if(!overrideSelectedChild) return;
+  const inEl=document.getElementById('overrideTimeIn'), outEl=document.getElementById('overrideTimeOut');
+  if(inEl) inEl.value=''; if(outEl) outEl.value='';
+  applyOverrideTime();
 }
 function resetPin(type,id){
   const e=type==='child'?CHILDREN.find(x=>x.id===id):STAFF.find(x=>x.id===id);
@@ -2880,7 +3000,7 @@ function confirmAction(isIn){
     const c=CHILDREN.find(x=>x.id===id),att=getAtt(id,viewDate);
     const times = effectiveTimes(c, viewDate);
     const grace=graceMins(times.cs),thresh=pm(times.cs)-grace;
-    if(isIn){att.signedIn=true;att.signInTime=t;if(nowMins<thresh)att.earlyMins=thresh-nowMins;}
+    if(isIn){attStartNewSession(att);att.signedIn=true;att.signInTime=t;if(nowMins<thresh)att.earlyMins=thresh-nowMins;}
     else{att.signedIn=false;att.signOutTime=t;if(nowMins>pm(times.ce))att.lateMins=nowMins-pm(times.ce);}
     const extra=isIn?att.earlyMins:att.lateMins;
     getLog(viewDate).unshift({name:c.name,type:'child',action:isIn?'in':'out',time:t,extra,verified:true});
@@ -2953,13 +3073,16 @@ function schoolRunTick() {
   const t=ts(now);
   const nowMins = h*60 + m;
 
-  // Auto sign-out school run children at 08:55 (or catch up if app opens later)
+  // Auto sign-out school run children at 08:55 (or catch up if app opens later).
+  // Only applies to children signed in BEFORE school (a morning sign-in). An
+  // afternoon override sign-in must never trigger the 08:55 catch-up.
   if(nowMins >= 8*60+55) {
     const dropped = getDropped(now);
     let anySignedOut = false;
     CHILDREN.filter(c=>c.schoolRun && childScheduledToday(c,now) && !dropped[c.id]).forEach(c=>{
       const att=getAtt(c.id,now);
-      if(att.signedIn && att.signInTime && !att.signOutTime) {
+      const inBeforeSchool = att.signInTime && pm(att.signInTime) < (8*60+55);
+      if(att.signedIn && att.signInTime && !att.signOutTime && inBeforeSchool) {
         att.signedIn=false; att.signOutTime='08:55';
         getLog(now).unshift({name:c.name,type:'child',action:'out',time:'08:55',extra:0,verified:true,note:'Auto — school drop off'});
         if(odConnected) writeToExcel(c,now,att);
@@ -2982,9 +3105,8 @@ function schoolRunTick() {
       const att=getAtt(c.id,now);
       // Only auto sign-in if they haven't been signed in yet this afternoon
       if(!att.signedIn && att.signOutTime==='08:55') {
+        attStartNewSession(att);   // keep the morning session, start the afternoon one
         att.signedIn=true; att.signInTime='15:25';
-        // clear the sign-out so afternoon session starts fresh
-        att.signOutTime=null;
         getLog(now).unshift({name:c.name,type:'child',action:'in',time:'15:25',extra:0,verified:true,note:'Auto — afternoon collection'});
         if(odConnected) writeToExcel(c,now,att);
         anySignedIn = true;
@@ -3080,9 +3202,25 @@ function exportPeriod(){
 // ════════════════════════════════════════════════
 // 2 · INDIVIDUAL STAFF TIME SHEETS (downloadable Excel)
 // ════════════════════════════════════════════════
+// Lateness / early-leaving computed from the schedule, for the STAFF TIME SHEET and
+// lieu only. This is deliberately NOT shown on the public cards (staff privacy);
+// it is recalculated here from the clock times so supervisions have the record.
+function staffLateEarly(staffId, d){
+  const s = STAFF.find(x=>x.id===staffId);
+  const sched = s && s.sch[d.getDay()];
+  const log = staffLog[staffId] && staffLog[staffId][dk(d)];
+  const man = getTs(staffId, d);
+  let late = 0, early = 0;
+  if(sched && log && (!man || man.type==='worked')){
+    if(log.clockInTime){ const m = pm(log.clockInTime) - pm(sched.s); if(m > 0) late = m; }
+    if(log.clockOutTime){ const m = pm(sched.e) - pm(log.clockOutTime); if(m > 0) early = m; }
+  }
+  return {late, early};
+}
+
 function staffPeriodRows(staffId, from, to){
   const s=STAFF.find(x=>x.id===staffId);
-  const rows=[]; let totWorked=0, totLate=0, totEarly=0;
+  const rows=[]; let totWorked=0, totLate=0, totEarly=0, totExpected=0;
   eachDay(from,to).forEach(d=>{
     const dow=d.getDay();
     const sched=s.sch[dow];
@@ -3090,6 +3228,7 @@ function staffPeriodRows(staffId, from, to){
     const man=getTs(staffId,d);
     const hasLog=log&&(log.clockInTime||log.clockOutTime);
     if(!sched && !hasLog && !man) return;
+    const expected = sched ? Number(((pm(sched.e)-pm(sched.s))/60).toFixed(2)) : 0;
     let worked=0, note='';
     if(man){
       note=(LEAVE_TYPES[man.type]?LEAVE_TYPES[man.type].label:man.type)+(man.note?' — '+man.note:'');
@@ -3099,40 +3238,43 @@ function staffPeriodRows(staffId, from, to){
       const w=calcWorkedHours(staffId,d);
       worked=(man&&man.type==='worked')?man.hours:w;
     }
+    const le = staffLateEarly(staffId, d);
     totWorked+=worked;
-    totLate+=(log&&log.lateInMins)?log.lateInMins:0;
-    totEarly+=(log&&log.earlyOutMins)?log.earlyOutMins:0;
+    totLate+=le.late;
+    totEarly+=le.early;
+    totExpected+=expected;
     rows.push([
       fmtUK(d), DAYS[dow].slice(0,3),
       sched?sched.s:'—',
       log&&log.clockInTime?log.clockInTime:'—',
       log&&log.clockOutTime?log.clockOutTime:'—',
       sched?sched.e:'—',
+      expected?expected:'',
       worked?Number(worked.toFixed(2)):'',
-      (log&&log.lateInMins)?log.lateInMins:'',
-      (log&&log.earlyOutMins)?log.earlyOutMins:'',
+      le.late?le.late:'',
+      le.early?le.early:'',
       note
     ]);
   });
-  return {rows,totWorked,totLate,totEarly};
+  return {rows,totWorked,totLate,totEarly,totExpected};
 }
 
 function buildStaffTimesheetWB(staffId,from,to){
   const s=STAFF.find(x=>x.id===staffId);
-  const {rows,totWorked,totLate,totEarly}=staffPeriodRows(staffId,from,to);
+  const {rows,totWorked,totLate,totEarly,totExpected}=staffPeriodRows(staffId,from,to);
   const aoa=[
     ['Little Puddings — Staff Time Sheet'],
     [s.name+'  ·  '+s.role],
     ['Period: '+fmtUK(from)+' to '+fmtUK(to)],
     ['Rate: £'+s.hourlyRate.toFixed(2)+'/hr    Contracted: '+s.paidHoursPerWeek+' hrs/week'],
     [],
-    ['Date','Day','Sched In','Clock In','Clock Out','Sched Out','Worked hrs','Late (min)','Early out (min)','Leave / Note']
+    ['Date','Day','Sched In','Clock In','Clock Out','Sched Out','Expected hrs','Worked hrs','Late (min)','Early out (min)','Leave / Note']
   ].concat(rows).concat([
     [],
-    ['','','','','','TOTAL',Number(totWorked.toFixed(2)),totLate,totEarly,'']
+    ['','','','','','TOTAL',Number(totExpected.toFixed(2)),Number(totWorked.toFixed(2)),totLate,totEarly,'']
   ]);
   const ws=XLSX.utils.aoa_to_sheet(aoa);
-  ws['!cols']=[{wch:12},{wch:6},{wch:9},{wch:9},{wch:9},{wch:9},{wch:11},{wch:11},{wch:13},{wch:28}];
+  ws['!cols']=[{wch:12},{wch:6},{wch:9},{wch:9},{wch:9},{wch:9},{wch:12},{wch:11},{wch:11},{wch:13},{wch:28}];
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,'Time Sheet');
   return wb;
@@ -3396,7 +3538,8 @@ function exportWeeklyRegisterPDF(){
     const cells=week.map(d=>{
       const a=readAtt(c.id,d), ab=getAbsence(c.id,d);
       if(ab) return ABS[ab.reason]||'ABS';
-      if(a&&(a.signInTime||a.signOutTime)) return (a.signInTime||'—')+'\n'+(a.signOutTime||'—');
+      const ss=attSessions(a);
+      if(ss.length) return ss.map(s=>`${s.in||'—'}\n${s.out||'—'}`).join('\n');
       if(isScheduled(c,d)) return '·';
       return '';
     });
@@ -3436,18 +3579,25 @@ function exportChildRegisterPDF(){
   const body=[]; let totalMins=0, sessions=0, absHol=0, absIll=0, absOther=0;
   eachDay(from,to).forEach(d=>{
     const a=readAtt(c.id,d), ab=getAbsence(c.id,d), sched=isScheduled(c,d);
-    if((!a||!a.signInTime) && !ab && !sched) return;
-    let inT=a&&a.signInTime?a.signInTime:'', outT=a&&a.signOutTime?a.signOutTime:'', hrs='', note='';
+    const ss=attSessions(a);
+    if(!ss.length && !ab && !sched) return;
     if(ab){
-      note=(ABSENCE_REASONS[ab.reason]?ABSENCE_REASONS[ab.reason].label:ab.reason)+(ab.note?' — '+ab.note:'');
+      const note=(ABSENCE_REASONS[ab.reason]?ABSENCE_REASONS[ab.reason].label:ab.reason)+(ab.note?' — '+ab.note:'');
       if(ab.reason==='holiday') absHol++; else if(ab.reason==='illness') absIll++; else absOther++;
-    } else if(a&&a.signInTime&&a.signOutTime){
-      const mins=pm(a.signOutTime)-pm(a.signInTime);
-      if(mins>0){ hrs=(mins/60).toFixed(2); totalMins+=mins; sessions++; }
-    } else if(a&&a.signInTime){ note='No sign-out recorded'; }
-    else if(sched){ note='Booked'; }
-    const flags=[]; if(a&&a.earlyMins>0) flags.push('Early '+a.earlyMins+'m'); if(a&&a.lateMins>0) flags.push('Late '+a.lateMins+'m');
-    body.push([fmtUK(d),DAYS[d.getDay()].slice(0,3),inT||'—',outT||'—',hrs||'—',flags.join(', '),note]);
+      body.push([fmtUK(d),DAYS[d.getDay()].slice(0,3),'—','—','—','',note]);
+      return;
+    }
+    if(!ss.length){ body.push([fmtUK(d),DAYS[d.getDay()].slice(0,3),'—','—','—','','Booked']); return; }
+    ss.forEach((s,i)=>{
+      let hrs='', note='';
+      if(s.in && s.out){
+        const mins=pm(s.out)-pm(s.in);
+        if(mins>0){ hrs=(mins/60).toFixed(2); totalMins+=mins; sessions++; }
+      } else if(s.in){ note='No sign-out recorded'; }
+      if(ss.length>1) note = (note?note+' · ':'') + (i===0?'Before school':'After school');
+      const flags=[]; if(s.early>0) flags.push('Early '+s.early+'m'); if(s.late>0) flags.push('Late '+s.late+'m');
+      body.push([i===0?fmtUK(d):'', i===0?DAYS[d.getDay()].slice(0,3):'', s.in||'—', s.out||'—', hrs||'—', flags.join(', '), note]);
+    });
   });
   pdfHeader(doc,'Individual Child Register',cName(c)+'   ·   '+(c.type==='ey'?'Early Years':'School')+'   ·   '+fmtUK(from)+' to '+fmtUK(to));
   doc.autoTable({
@@ -3637,6 +3787,23 @@ function endSoleCharge(i){
   showFlash('\u25A0 Sole charge ended \u00B7 '+r.inCharge);
 }
 
+function editSoleChargeTimes(i){
+  const k = dk(viewDate);
+  const r = soleCharge[k] && soleCharge[k][i];
+  if(!r) return;
+  const fromT = prompt(`Start time for ${r.inCharge} (hh:mm, 24hr):`, r.from || '');
+  if(fromT===null) return;
+  if(fromT.trim() && !/^\d{1,2}:\d{2}$/.test(fromT.trim())){ alert('Please enter the time as hh:mm, e.g. 13:05'); return; }
+  const toT = prompt(`End time for ${r.inCharge} (hh:mm, 24hr). Leave blank if still ongoing:`, r.to || '');
+  if(toT===null) return;
+  if(toT.trim() && !/^\d{1,2}:\d{2}$/.test(toT.trim())){ alert('Please enter the time as hh:mm, e.g. 16:40'); return; }
+  if(fromT.trim()) r.from = fromT.trim();
+  if(toT.trim()){ r.to = toT.trim(); r.open = false; } else { r.to = null; r.open = true; }
+  markDirty();
+  renderSoleCharge(true);
+  showFlash(`✓ ${r.inCharge} times updated`);
+}
+
 function renderSoleChargeList(){
   const list = soleCharge[dk(viewDate)] || [];
   const mStart = dk(new Date(viewDate.getFullYear(), viewDate.getMonth(), 1));
@@ -3657,7 +3824,7 @@ function renderSoleChargeList(){
       <div style="display:flex;justify-content:space-between;align-items:start;gap:10px">
         <div>
           <div style="font-weight:700;color:var(--forest);font-size:14px">${r.inCharge} <span style="font-weight:400;color:var(--bark);font-size:12px">in sole charge</span>${open?' <span style="background:var(--forest);color:#fff;font-size:9px;padding:2px 6px;border-radius:8px;vertical-align:middle">ONGOING</span>':''}</div>
-          <div style="font-size:12px;color:var(--bark);margin-top:2px">${open?('since '+(r.from||'?')):((r.from||'?')+' to '+r.to)} · ${r.count} children${r.staffPresent&&r.staffPresent.length?' · with '+r.staffPresent.join(', '):' · alone'}</div>
+          <div style="font-size:12px;color:var(--bark);margin-top:2px">${open?('since '+(r.from||'?')):((r.from||'?')+' to '+r.to)} · ${r.count} children${r.staffPresent&&r.staffPresent.length?' · with '+r.staffPresent.join(', '):' · alone'} <span onclick="editSoleChargeTimes(${i})" style="color:var(--forest);text-decoration:underline;cursor:pointer;margin-left:4px">edit times</span></div>
           ${r.children&&r.children.length?`<div style="font-size:11px;color:var(--moss);margin-top:4px">Children: ${r.children.join(', ')}</div>`:''}
           ${r.note?`<div style="font-size:11px;color:var(--bark);margin-top:4px;font-style:italic">${r.note}</div>`:''}
           <div style="font-size:10px;color:var(--moss);margin-top:4px">Recorded by ${r.recordedBy}</div>
