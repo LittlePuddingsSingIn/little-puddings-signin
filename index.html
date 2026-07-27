@@ -393,12 +393,14 @@
       <div class="mgr-ov-grid" id="overrideChildGrid"></div>
       <div id="overrideTimeRow" style="display:none">
         <div style="margin-top:12px;margin-bottom:6px;font-size:11px;color:rgba(255,255,255,0.5)">Selected: <strong id="overrideChildName" style="color:var(--gold-light)">--</strong></div>
+        <div id="overrideSessions" style="font-size:11px;color:var(--gold-light);margin-bottom:6px"></div>
         <div class="time-row">
           <input class="time-inp" id="overrideTimeIn" type="time" placeholder="Sign in">
           <input class="time-inp" id="overrideTimeOut" type="time" placeholder="Sign out">
           <button class="apply-btn" onclick="applyOverrideTime()">Apply</button>
         </div>
         <div style="margin-top:6px;font-size:10px;color:rgba(255,255,255,0.4)">Empty a box and tap Apply to clear that time. Or tap Clear all to remove both and sign them out of the day.</div>
+        <button onclick="addAnotherSession()" id="addSessionBtn" style="margin-top:6px;width:100%;padding:8px;background:rgba(26,122,74,0.35);color:var(--gold-light);border:none;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;display:none">＋ Add another session (e.g. after school)</button>
         <button onclick="clearOverrideTimes()" style="margin-top:6px;width:100%;padding:8px;background:rgba(161,58,42,0.25);color:#F4DEDA;border:none;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer">Clear all times for this day</button>
       </div>
     </div>
@@ -497,6 +499,16 @@
   <div id="panel-settings" style="display:none">
     <div class="sec-head"><div class="sec-label">Settings</div><div class="sec-line"></div></div>
     <div class="sec-sub">Reset PINs · School run · Term dates</div>
+    <div class="set-section">
+      <div class="set-title">📅 Term dates</div>
+      <div class="sec-sub" style="margin-bottom:8px">Anything outside these dates counts as a school holiday: no 08:55 sign-out, no 15:25 sign-in, and school children are in for full days.</div>
+      <div id="termDatesList"></div>
+      <div style="display:flex;gap:6px;margin-top:8px">
+        <button onclick="addTermRow()" style="flex:1;padding:9px;background:rgba(26,122,74,0.35);color:var(--gold-light);border:none;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer">＋ Add a term</button>
+        <button onclick="saveTermDates()" style="flex:1;padding:9px;background:var(--forest);color:var(--gold-light);border:none;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer">Save term dates</button>
+      </div>
+      <div id="termDatesStatus" style="font-size:11px;margin-top:6px;color:var(--gold-light)"></div>
+    </div>
     <div class="set-section" id="clearSignInSection"></div>
     <div class="set-section" id="droppedAtSchoolSection"></div>
     <div class="set-section" id="collectedFromSchoolSection"></div>
@@ -790,7 +802,11 @@
         <input class="af-input" id="adhocEnd" type="time" value="17:00">
       </div>
     </div>
-    <button class="af-save" onclick="saveAdhocBooking()">Add for Today</button>
+    <div class="af-group">
+      <label class="af-label">Repeat until (optional) — adds the same times to every weekday up to and including this date</label>
+      <input class="af-input" id="adhocUntil" type="date">
+    </div>
+    <button class="af-save" onclick="saveAdhocBooking()">Add</button>
     <button class="af-cancel" onclick="closeAdhoc()">Cancel</button>
   </div>
 </div>
@@ -955,10 +971,10 @@ async function syncWithOneDrive() {
           if (!eventLog[dkk]) eventLog[dkk] = remoteData.eventLog[dkk];
         });
       }
-      if (remoteData.overrides) overrides = { ...remoteData.overrides, ...overrides };
-      if (remoteData.absences) absences = { ...remoteData.absences, ...absences };
-      if (remoteData.collectedFromSchool) collectedFromSchool = { ...remoteData.collectedFromSchool, ...collectedFromSchool };
-      if (remoteData.droppedOffAtSchool) droppedOffAtSchool = { ...remoteData.droppedOffAtSchool, ...droppedOffAtSchool };
+      if (remoteData.overrides) mergeDayEntries(overrides, remoteData.overrides);
+      if (remoteData.absences) mergeDayEntries(absences, remoteData.absences);
+      if (remoteData.collectedFromSchool) mergeDayEntries(collectedFromSchool, remoteData.collectedFromSchool);
+      if (remoteData.droppedOffAtSchool) mergeDayEntries(droppedOffAtSchool, remoteData.droppedOffAtSchool);
       if (remoteData.visitors) {
         Object.keys(remoteData.visitors).forEach(dkk => {
           if (!visitors[dkk]) { visitors[dkk] = remoteData.visitors[dkk]; return; }
@@ -972,12 +988,26 @@ async function syncWithOneDrive() {
       }
       if (remoteData.soleCharge) {
         Object.keys(remoteData.soleCharge).forEach(dkk => {
-          if (!soleCharge[dkk]) soleCharge[dkk] = remoteData.soleCharge[dkk];
+          if (!soleCharge[dkk]) { soleCharge[dkk] = remoteData.soleCharge[dkk]; return; }
+          const local = soleCharge[dkk];
+          remoteData.soleCharge[dkk].forEach(rr => {
+            const lr = local.find(x => x.id === rr.id);
+            if (!lr) local.push(rr);                                  // recorded on another device
+            else {
+              if (!lr.to && rr.to) { lr.to = rr.to; lr.open = false; }  // ended on another device
+              if (rr.deleted) lr.deleted = true;                        // deleted on another device
+            }
+          });
         });
       }
-      if (remoteData.staffOverrides) {
-        Object.keys(remoteData.staffOverrides).forEach(dkk => {
-          if (!staffOverrides[dkk]) staffOverrides[dkk] = remoteData.staffOverrides[dkk];
+      if (remoteData.staffOverrides) mergeDayEntries(staffOverrides, remoteData.staffOverrides);
+      if (remoteData.authorised) {
+        Object.keys(remoteData.authorised).forEach(sid => {
+          if (!authorised[sid]) { authorised[sid] = remoteData.authorised[sid]; return; }
+          Object.keys(remoteData.authorised[sid]).forEach(dkk => {
+            const lv = authorised[sid][dkk], rv = remoteData.authorised[sid][dkk];
+            if (!lv || ((rv && rv.at) || 0) > ((lv && lv.at) || 0)) authorised[sid][dkk] = rv;
+          });
         });
       }
       if (remoteData.overtime) {
@@ -999,21 +1029,27 @@ async function syncWithOneDrive() {
       // For children & staff — only use remote if remote version is same or newer
       const remoteVersion = remoteData.dataVersion || 1;
       const remoteHasNewerData = remoteVersion >= DATA_VERSION;
-      if (remoteData.CHILDREN && remoteData.CHILDREN.length > 0 && !dataDirty && remoteHasNewerData) CHILDREN = remoteData.CHILDREN;
-      if (remoteData.STAFF && remoteData.STAFF.length > 0 && !dataDirty && remoteHasNewerData) {
+      if (remoteData.CHILDREN && remoteData.CHILDREN.length > 0 && !dataDirty) {
+        if (remoteHasNewerData) CHILDREN = remoteData.CHILDREN;
+        else mergePins(CHILDREN, remoteData.CHILDREN); // version bump: keep new structure, keep their PINs
+      }
+      if (remoteData.STAFF && remoteData.STAFF.length > 0 && !dataDirty) {
         // Only use remote staff if it has the new payroll fields
-        if (remoteData.STAFF[0].hourlyRate !== undefined) {
+        if (remoteHasNewerData && remoteData.STAFF[0].hourlyRate !== undefined) {
           STAFF = remoteData.STAFF;
+        } else {
+          mergePins(STAFF, remoteData.STAFF);
         }
       }
       if (remoteData.pinCustomised) pinCustomised = { ...remoteData.pinCustomised, ...pinCustomised };
+      if (remoteData.termDates && remoteData.termDates.length && !dataDirty) { termDates = remoteData.termDates; termRowsDraft = null; }
     }
     
     // Push merged state back to OneDrive
     const payload = JSON.stringify({
       dataVersion: DATA_VERSION,
       CHILDREN, STAFF, attendance, staffLog, eventLog, overrides, absences,
-      collectedFromSchool, droppedOffAtSchool, visitors, soleCharge, staffOverrides, overtime, pinCustomised, timesheet, lastUpdated: new Date().toISOString()
+      collectedFromSchool, droppedOffAtSchool, visitors, soleCharge, staffOverrides, overtime, authorised, pinCustomised, termDates, timesheet, lastUpdated: new Date().toISOString()
     });
     
     const uploadUrl = `https://graph.microsoft.com/v1.0/me/drive/root:/${SYNC_FOLDER}/${encodeURIComponent(SYNC_FILE)}:/content`;
@@ -1065,7 +1101,7 @@ function saveLocal(){
     localStorage.setItem(LOCAL_KEY, JSON.stringify({
       dataVersion: DATA_VERSION,
       CHILDREN, STAFF, attendance, staffLog, eventLog, overrides, absences,
-      collectedFromSchool, droppedOffAtSchool, visitors, soleCharge, staffOverrides, overtime, pinCustomised, timesheet,
+      collectedFromSchool, droppedOffAtSchool, visitors, soleCharge, staffOverrides, overtime, authorised, pinCustomised, termDates, timesheet,
       pendingSync: dataDirty, savedAt: new Date().toISOString()
     }));
   } catch(e){ console.warn('On-device save failed (storage full/unavailable):', e); }
@@ -1088,10 +1124,16 @@ function loadLocal(){
     if(d.staffOverrides) staffOverrides = d.staffOverrides;
     if(d.overtime) overtime = d.overtime;
     if(d.pinCustomised) pinCustomised = d.pinCustomised;
+    if(d.termDates && d.termDates.length) termDates = d.termDates;
+    if(d.authorised) authorised = d.authorised;
     if(d.timesheet) timesheet = d.timesheet;
     if(d.dataVersion === DATA_VERSION){
       if(d.CHILDREN && d.CHILDREN.length) CHILDREN = d.CHILDREN;
       if(d.STAFF && d.STAFF.length && d.STAFF[0].hourlyRate !== undefined) STAFF = d.STAFF;
+    } else {
+      // Version bump: keep the code's structure but never lose their PINs
+      if(d.CHILDREN && d.CHILDREN.length) mergePins(CHILDREN, d.CHILDREN);
+      if(d.STAFF && d.STAFF.length) mergePins(STAFF, d.STAFF);
     }
     // If the device had unsynced changes when last closed, push them on next sync.
     dataDirty = !!d.pendingSync;
@@ -1181,7 +1223,18 @@ async function writeToExcel(child, date, att) {
     // Col D = attendance TIME string (black). "07:41 - Sch - 16:54" for a school child
     // who attended around school that day; "07:41 - 16:54" otherwise.
     const ss = attSessions(att);
-    if (ss.length) {
+    const abs = getAbsence(child.id, date);
+    // Notes for when the parent did the school run themselves
+    const runNotes = [];
+    if (getDropped(date)[child.id]) runNotes.push('parent to school');
+    if (getCollected(date)[child.id]) runNotes.push('parent collected');
+
+    if (abs) {
+      // Absent: record the reason so the invoice is never just blank
+      const r = ABSENCE_REASONS[abs.reason];
+      const label = r ? r.label : 'Absent';
+      updates.push({ address: `${tab}!D${dayRow}`, values: [[abs.note ? `${label} — ${abs.note}` : label]], font: '6B6460' });
+    } else if (ss.length) {
       const firstIn = ss[0].in || '—';
       const lastOut = ss[ss.length-1].out || '';
       let timeStr;
@@ -1191,7 +1244,10 @@ async function writeToExcel(child, date, att) {
       } else {
         timeStr = lastOut ? `${firstIn} - ${lastOut}` : `${firstIn} - in`;
       }
+      if (runNotes.length) timeStr += ` (${runNotes.join(', ')})`;
       updates.push({ address: `${tab}!D${dayRow}`, values: [[timeStr]], font: '000000' });
+    } else if (runNotes.length) {
+      updates.push({ address: `${tab}!D${dayRow}`, values: [[runNotes.join(', ')]], font: '6B6460' });
     } else {
       updates.push({ address: `${tab}!D${dayRow}`, values: [['']] });  // day cleared
     }
@@ -1289,9 +1345,21 @@ const TERM_DATES = [
   [new Date(2027,0,5), new Date(2027,1,12)],
   [new Date(2027,1,22),new Date(2027,2,28)],
 ];
-// Compare by date only. The end dates above are stored at midnight, so comparing a
+// Term dates you can edit in Settings. If none have been saved, the defaults
+// above are used. Stored as plain 'YYYY-MM-DD' strings so they sync cleanly.
+let termDates = [];
+function getTermRanges(){
+  if(Array.isArray(termDates) && termDates.length){
+    return termDates
+      .filter(t=>t && t.s && t.e)
+      .map(t=>{ const [ys,ms,ds]=t.s.split('-').map(Number), [ye,me,de]=t.e.split('-').map(Number);
+                return [new Date(ys,ms-1,ds), new Date(ye,me-1,de)]; });
+  }
+  return TERM_DATES;
+}
+// Compare by date only. The end dates are stored at midnight, so comparing a
 // timestamped "now" against them would treat the LAST DAY of each term as a holiday.
-function isTerm(d)    { const x=new Date(d.getFullYear(),d.getMonth(),d.getDate()); return TERM_DATES.some(([s,e])=>x>=s&&x<=e); }
+function isTerm(d)    { const x=new Date(d.getFullYear(),d.getMonth(),d.getDate()); return getTermRanges().some(([s,e])=>x>=s&&x<=e); }
 function isHoliday(d) { return !isTerm(d); }
 // In the holidays only all-year-round children (ay:true) still have contracted hours
 // that apply. Everyone else attends on booked times, so no automatic early/late
@@ -1378,6 +1446,26 @@ let visitors = {}; // [dateKey] = [{id, name, reason, reg, purpose, signInTime, 
 let soleCharge = {}; // [dateKey] = [{id, inCharge, from, to, staffPresent:[names], children:[names], count, note, recordedBy}]
 let staffOverrides = {}; // [dateKey][staffId] = {action:'add'|'remove'} — staff day changes (cover, day off)
 let overtime = {}; // [staffId][dateKey] = {hours, status:'approved'|'dismissed', note} — confirmed before payroll
+// [staffId][dateKey] = {late:true, early:true, at} — a late start or early finish you
+// have agreed in advance. Authorised time is not counted as lateness and does not
+// come off their time in lieu.
+let authorised = {};
+function getAuth(staffId, d){ const k=dk(d); return (authorised[staffId]&&authorised[staffId][k])||null; }
+function isAuthLate(staffId, d){ const a=getAuth(staffId,d); return !!(a && a.late); }
+function isAuthEarly(staffId, d){ const a=getAuth(staffId,d); return !!(a && a.early); }
+function toggleAuthorised(staffId, which){
+  const k=dk(viewDate);
+  if(!authorised[staffId]) authorised[staffId]={};
+  const cur = authorised[staffId][k] || {};
+  cur[which] = !cur[which];
+  cur.at = Date.now();
+  authorised[staffId][k] = cur;
+  const s=STAFF.find(x=>x.id===staffId);
+  showFlash(`${s.name}: ${which==='late'?'late start':'early finish'} ${cur[which]?'authorised':'no longer authorised'}`);
+  markDirty();
+  if(currentTab==='override')renderOverride(); else renderSettings();
+  if(odConnected) syncWithOneDrive();
+}
 let pinTarget = null, pinEntry = '', pinShaking = false;
 let mgrPinEntry = '', mgrPinShaking = false;
 let actionTarget = null;
@@ -1429,25 +1517,62 @@ function getHolidayUsed(cid, d){
 function getAbsence(cid, d) {
   const k = dk(d);
   if(!absences[k]) return null;
-  return absences[k][cid] || null;
+  const a = absences[k][cid];
+  return (a && !a.deleted && a.reason) ? a : null;   // tombstones read as "no absence"
 }
 
 function setAbsence(cid, d, reason, note) {
   const k = dk(d);
   if(!absences[k]) absences[k] = {};
-  absences[k][cid] = { reason, note: note || '' };
+  absences[k][cid] = { reason, note: note || '', at: Date.now() };
   markDirty();
 }
 
 function clearAbsence(cid, d) {
   const k = dk(d);
   if(absences[k] && absences[k][cid]) {
-    delete absences[k][cid];
+    absences[k][cid] = { deleted: true, at: Date.now() };  // travels to other devices
     markDirty();
   }
 }
 let overrideSelectedChild = null;
 let pinCustomised = {};
+
+// Structure (days, times, rates) comes from the code, but PINs belong to the
+// parents and staff who chose them. When a DATA_VERSION bump means we keep the
+// code's lists, carry their PINs across so a deploy never resets anyone's PIN.
+// Day-keyed stores (day changes, absences, school-run flags, staff cover) are
+// merged entry by entry. Merging whole days meant a change made on another
+// device was thrown away just because this device had opened that day, since
+// simply viewing a day creates an empty entry for it.
+function mergeDayEntries(local, remote){
+  if(!remote || typeof remote !== 'object') return local;
+  Object.keys(remote).forEach(day => {
+    if(!local[day]){ local[day] = remote[day]; return; }
+    const r = remote[day];
+    if(!r || typeof r !== 'object') return;
+    Object.keys(r).forEach(id => {
+      const lv = local[day][id], rv = r[id];
+      if(lv === undefined){ local[day][id] = rv; return; }
+      // Both devices have an entry: the most recent change wins, so an undo or a
+      // cleared absence made on one device is not overwritten by the other.
+      const lt = (lv && lv.at) || 0, rt = (rv && rv.at) || 0;
+      if(rt > lt) local[day][id] = rv;
+    });
+  });
+  return local;
+}
+
+function mergePins(codeArr, storedArr){
+  if(!Array.isArray(storedArr) || !Array.isArray(codeArr)) return codeArr;
+  const byId = {};
+  storedArr.forEach(x => { if(x && x.id) byId[x.id] = x; });
+  codeArr.forEach(item => {
+    const stored = byId[item.id];
+    if(stored && stored.pin) item.pin = stored.pin;
+  });
+  return codeArr;
+}
 let adminEditTarget = null; // {type, id} or null for new
 let adminFormDays = [];
 let adminFormEmoji = '🌱';
@@ -1934,8 +2059,10 @@ function toggleStaffOverride(sid, action){
   const s = STAFF.find(x=>x.id===sid);
   if(!s) return;
   const cur = sov[sid] ? sov[sid].action : null;
-  if(cur === action) delete sov[sid];             // tap again to undo
-  else sov[sid] = { action };
+  // Tap again to undo. Recorded as an explicit entry (not a deletion) with a
+  // timestamp, so the undo reaches the other devices too.
+  if(cur === action) sov[sid] = { action: null, at: Date.now() };
+  else sov[sid] = { action, at: Date.now() };
   const nowOn = staffScheduledToday(s, viewDate);
   showFlash(`${s.name} ${nowOn ? 'added to' : 'removed from'} today`);
   markDirty();
@@ -2026,7 +2153,7 @@ function saveAbsence() {
   showFlash(`${r.emoji} ${c.name} marked as ${r.label}`);
   closeAbsence();
   renderOverride(); renderChildren(); updateStatusBar();
-  if(odConnected) syncWithOneDrive();
+  if(odConnected){ writeToExcel(c, viewDate, getAtt(c.id, viewDate)); syncWithOneDrive(); }
 }
 
 function clearAbsenceAction() {
@@ -2036,7 +2163,7 @@ function clearAbsenceAction() {
   showFlash(`${c.name}'s absence cleared`);
   closeAbsence();
   renderOverride(); renderChildren(); updateStatusBar();
-  if(odConnected) syncWithOneDrive();
+  if(odConnected){ writeToExcel(c, viewDate, getAtt(c.id, viewDate)); syncWithOneDrive(); }
 }
 
 function closeAbsence() {
@@ -2050,8 +2177,8 @@ let adhocTarget = null;
 function toggleOverride(cid, action) {
   const ov = getOv(viewDate);
   if (action === 'remove') {
-    if (ov[cid] && ov[cid].action === 'remove') delete ov[cid];
-    else ov[cid] = { action: 'remove' };
+    if (ov[cid] && ov[cid].action === 'remove') ov[cid] = { action: null, at: Date.now() };
+    else ov[cid] = { action: 'remove', at: Date.now() };
     const c = CHILDREN.find(x => x.id === cid);
     showFlash(`${c.emoji} ${c.name} removed from today`);
     renderOverride(); renderChildren(); updateStatusBar();
@@ -2060,7 +2187,7 @@ function toggleOverride(cid, action) {
   } else if (action === 'add') {
     // Check if already added
     if (ov[cid] && ov[cid].action === 'add') {
-      delete ov[cid];
+      ov[cid] = { action: null, at: Date.now() };
       const c = CHILDREN.find(x => x.id === cid);
       showFlash(`${c.emoji} ${c.name} removed from today`);
       renderOverride(); renderChildren(); updateStatusBar();
@@ -2080,6 +2207,7 @@ function openAdhoc(cid) {
   // Default to child's normal contracted times if they have them, otherwise 08:00-17:00
   document.getElementById('adhocStart').value = c.cs || '08:00';
   document.getElementById('adhocEnd').value = c.ce || '17:00';
+  document.getElementById('adhocUntil').value = '';
   document.getElementById('adhocOv').classList.add('vis');
 }
 
@@ -2093,10 +2221,23 @@ function saveAdhocBooking() {
   const startTime = document.getElementById('adhocStart').value;
   const endTime = document.getElementById('adhocEnd').value;
   if (!startTime || !endTime) { showFlash('Please set both times'); return; }
-  const ov = getOv(viewDate);
-  ov[adhocTarget] = { action: 'add', cs: startTime, ce: endTime };
   const c = CHILDREN.find(x => x.id === adhocTarget);
-  showFlash(`${c.emoji} ${c.name} added for today, ${startTime}–${endTime}`);
+  const untilVal = document.getElementById('adhocUntil').value;
+  const until = untilVal ? parseDInput(untilVal) : null;
+  let days = 0;
+  if (until && until > viewDate) {
+    // Book the whole run in one go: every weekday from this date to the end date
+    eachDay(viewDate, until).forEach(d => {
+      const dow = d.getDay();
+      if (dow === 0 || dow === 6) return;            // skip weekends
+      getOv(d)[adhocTarget] = { action: 'add', cs: startTime, ce: endTime, at: Date.now() };
+      days++;
+    });
+    showFlash(`${c.emoji} ${c.name} added for ${days} days, ${startTime}–${endTime}`);
+  } else {
+    getOv(viewDate)[adhocTarget] = { action: 'add', cs: startTime, ce: endTime, at: Date.now() };
+    showFlash(`${c.emoji} ${c.name} added for today, ${startTime}–${endTime}`);
+  }
   closeAdhoc();
   renderOverride(); renderChildren(); updateStatusBar();
   markDirty();
@@ -2691,6 +2832,41 @@ function closeLeave() {
 }
 
 
+// ── Term dates editor ──────────────────────────────
+function dkFromDate(d){ return `${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`; }
+function currentTermRows(){
+  if(Array.isArray(termDates) && termDates.length) return termDates.map(t=>({s:t.s,e:t.e}));
+  return TERM_DATES.map(([s,e])=>({s:dkFromDate(s), e:dkFromDate(e)}));
+}
+let termRowsDraft = null;
+function renderTermDates(){
+  const box=document.getElementById('termDatesList');
+  if(!box) return;
+  if(!termRowsDraft) termRowsDraft = currentTermRows();
+  box.innerHTML = termRowsDraft.map((t,i)=>`<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">
+      <span style="font-size:11px;color:rgba(255,255,255,0.4);width:16px">${i+1}</span>
+      <input type="date" class="time-inp" style="flex:1;min-width:0" value="${t.s}" onchange="termRowsDraft[${i}].s=this.value">
+      <span style="font-size:11px;color:rgba(255,255,255,0.4)">to</span>
+      <input type="date" class="time-inp" style="flex:1;min-width:0" value="${t.e}" onchange="termRowsDraft[${i}].e=this.value">
+      <button onclick="removeTermRow(${i})" style="background:none;border:none;color:var(--error);font-size:15px;cursor:pointer">✕</button>
+    </div>`).join('') || '<div style="font-size:11px;color:rgba(255,255,255,0.4)">No terms set, so every day counts as a holiday. Add at least one.</div>';
+}
+function addTermRow(){ if(!termRowsDraft) termRowsDraft=currentTermRows(); termRowsDraft.push({s:'',e:''}); renderTermDates(); }
+function removeTermRow(i){ termRowsDraft.splice(i,1); renderTermDates(); }
+function saveTermDates(){
+  const rows=(termRowsDraft||[]).filter(t=>t.s&&t.e);
+  const bad=rows.find(t=>t.s>t.e);
+  if(bad){ document.getElementById('termDatesStatus').textContent='Check that each term starts before it ends.'; return; }
+  rows.sort((a,b)=>a.s.localeCompare(b.s));
+  termDates=rows;
+  termRowsDraft=rows.map(t=>({s:t.s,e:t.e}));
+  markDirty();
+  renderTermDates(); renderAll();
+  if(odConnected) syncWithOneDrive();
+  const st=document.getElementById('termDatesStatus');
+  st.textContent=`✓ Saved ${rows.length} term${rows.length!==1?'s':''}. Today counts as ${isTerm(new Date())?'term time':'a school holiday'}.`;
+}
+
 function renderOverrideGrid(){
   const grid=document.getElementById('overrideChildGrid');
   if(!grid) return; // only present on the visible panel
@@ -2724,12 +2900,25 @@ function renderOverrideGrid(){
       document.getElementById('overrideChildName').textContent=c.name;
       document.getElementById('overrideTimeIn').value=att.signInTime||'';
       document.getElementById('overrideTimeOut').value=att.signOutTime||'';
+      const ss=attSessions(att);
+      const sessEl=document.getElementById('overrideSessions');
+      sessEl.innerHTML = ss.length>1
+        ? 'Recorded today: '+ss.map(s=>`${s.in||'—'} to ${s.out||'still in'}`).join(' &nbsp;·&nbsp; ')+'<br><span style="color:rgba(255,255,255,0.4)">The boxes below edit the last one.</span>'
+        : (ss.length ? '' : '<span style="color:rgba(255,255,255,0.4)">Nothing recorded today.</span>');
+      const btn=document.getElementById('addSessionBtn');
+      btn.style.display = (att.signInTime && att.signOutTime) ? 'block' : 'none';
     } else if(overrideSelectedChild.startsWith('staff_')){
       const sid=overrideSelectedChild.slice(6);
       const s=STAFF.find(x=>x.id===sid),log=getSLog(sid,viewDate);
       document.getElementById('overrideChildName').textContent=s.name+' (staff)';
       document.getElementById('overrideTimeIn').value=log.clockInTime||'';
       document.getElementById('overrideTimeOut').value=log.clockOutTime||'';
+      const aL=isAuthLate(sid,viewDate), aE=isAuthEarly(sid,viewDate);
+      document.getElementById('overrideSessions').innerHTML =
+        `<div style="margin:2px 0 4px">Authorised for this day (not counted as late, no lieu deducted):</div>
+         <button onclick="toggleAuthorised('${sid}','late')" style="padding:5px 9px;margin-right:5px;border:none;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer;background:${aL?'var(--forest)':'rgba(255,255,255,0.12)'};color:${aL?'var(--gold-light)':'rgba(255,255,255,0.7)'}">${aL?'✓ ':''}Late start</button>
+         <button onclick="toggleAuthorised('${sid}','early')" style="padding:5px 9px;border:none;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer;background:${aE?'var(--forest)':'rgba(255,255,255,0.12)'};color:${aE?'var(--gold-light)':'rgba(255,255,255,0.7)'}">${aE?'✓ ':''}Early finish</button>`;
+      document.getElementById('addSessionBtn').style.display='none';
     }
   } else {
     row.style.display='none';
@@ -2737,6 +2926,7 @@ function renderOverrideGrid(){
 }
 
 function renderSettings(){
+  renderTermDates();
   const collected=getCollected(viewDate);
 
   // Clear sign-in section
@@ -2837,6 +3027,18 @@ function applyOverrideTime(){
   overrideSelectedChild=null;if(currentTab==='override')renderOverride();else renderSettings();renderChildren();renderStaff();updateStatusBar();
   markDirty();
   if(odConnected) syncWithOneDrive();
+}
+
+function addAnotherSession(){
+  if(!overrideSelectedChild || !overrideSelectedChild.startsWith('child_')) return;
+  const cid=overrideSelectedChild.slice(6);
+  const c=CHILDREN.find(x=>x.id===cid), att=getAtt(cid,viewDate);
+  if(!att.signInTime || !att.signOutTime){ alert('Finish the current session first: it needs both a sign in and a sign out time.'); return; }
+  attStartNewSession(att);              // keep what's there, start a fresh session
+  markDirty();
+  if(currentTab==='override')renderOverride(); else renderSettings();
+  renderChildren(); updateStatusBar();
+  showFlash(`Now enter ${c.name}'s next times, then tap Apply`);
 }
 
 function clearOverrideTimes(){
@@ -2990,7 +3192,15 @@ function openAction(type,id){
     document.getElementById('actBtnIn').textContent='✓ Clock In';
     document.getElementById('actBtnOut').textContent='✗ Clock Out';
     if(!isIn){
-      // staff late warning removed: hours vary daily, fixed schedule can't judge lateness fairly
+      // Private late notice, shown only to the person clocking in (never on the
+      // cards other staff and parents can see), so the time sheet is no surprise.
+      const dow=viewDate.getDay(), sched=e.sch[dow];
+      if(sched && nowMins > pm(sched.s) && !isAuthLate(e.id, viewDate)){
+        const late = nowMins - pm(sched.s);
+        warn.style.display='block';
+        document.getElementById('actWarnTitle').textContent=`Clocking in ${fmins(late)} after your start time`;
+        document.getElementById('actWarnDetail').textContent=`Due ${sched.s} · now ${ts(now)}. This shows on your time sheet and comes off your time in lieu. Speak to Sussie if it was agreed.`;
+      }
     }
   }
   document.getElementById('actOv').classList.add('vis');
@@ -3068,6 +3278,19 @@ function showFlash(msg){ const f=document.getElementById('flash');f.textContent=
 // ════════════════════════════════════════════════
 function getCollected(d){ const k=dk(d);if(!collectedFromSchool[k])collectedFromSchool[k]={};return collectedFromSchool[k]; }
 
+// Is this child here AFTER school today? Normally driven by their fixed
+// afterSchoolDays, but a child added for the day (variable hours) has no fixed
+// list, so fall back to the times booked for that day: staying past 15:25 counts.
+function afterSchoolToday(c, d){
+  if(c.afterSchoolDays && c.afterSchoolDays.includes(d.getDay())) return true;
+  const ov = getOv(d)[c.id];
+  if(ov && ov.action === 'add'){
+    const t = effectiveTimes(c, d);
+    if(t && t.ce) return pm(t.ce) > (15*60+25);
+  }
+  return false;
+}
+
 function schoolRunTick() {
   const now = new Date();
   const todayKey = dk(now);
@@ -3106,7 +3329,7 @@ function schoolRunTick() {
   if(nowMins >= 15*60+25) {
     const collected=getCollected(now);
     let anySignedIn = false;
-    CHILDREN.filter(c=>c.schoolRun && c.afterSchoolDays && c.afterSchoolDays.includes(now.getDay()) && childScheduledToday(c,now)).forEach(c=>{
+    CHILDREN.filter(c=>c.schoolRun && afterSchoolToday(c,now) && childScheduledToday(c,now)).forEach(c=>{
       if(collected[c.id]) return;
       const att=getAtt(c.id,now);
       // Only auto sign-in if they haven't been signed in yet this afternoon
@@ -3218,10 +3441,10 @@ function staffLateEarly(staffId, d){
   const man = getTs(staffId, d);
   let late = 0, early = 0;
   if(sched && log && (!man || man.type==='worked')){
-    if(log.clockInTime){ const m = pm(log.clockInTime) - pm(sched.s); if(m > 0) late = m; }
-    if(log.clockOutTime){ const m = pm(sched.e) - pm(log.clockOutTime); if(m > 0) early = m; }
+    if(log.clockInTime && !isAuthLate(staffId,d)){ const m = pm(log.clockInTime) - pm(sched.s); if(m > 0) late = m; }
+    if(log.clockOutTime && !isAuthEarly(staffId,d)){ const m = pm(sched.e) - pm(log.clockOutTime); if(m > 0) early = m; }
   }
-  return {late, early};
+  return {late, early, authLate: isAuthLate(staffId,d), authEarly: isAuthEarly(staffId,d)};
 }
 
 function staffPeriodRows(staffId, from, to){
@@ -3245,6 +3468,8 @@ function staffPeriodRows(staffId, from, to){
       worked=(man&&man.type==='worked')?man.hours:w;
     }
     const le = staffLateEarly(staffId, d);
+    if(le.authLate)  note = (note?note+' · ':'') + 'Authorised late start';
+    if(le.authEarly) note = (note?note+' · ':'') + 'Authorised early finish';
     totWorked+=worked;
     totLate+=le.late;
     totEarly+=le.early;
@@ -3811,7 +4036,7 @@ function editSoleChargeTimes(i){
 }
 
 function renderSoleChargeList(){
-  const list = soleCharge[dk(viewDate)] || [];
+  const list = (soleCharge[dk(viewDate)] || []).filter(r=>!r.deleted);
   const mStart = dk(new Date(viewDate.getFullYear(), viewDate.getMonth(), 1));
   let listHtml = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px">
      <div style="font-size:12px;color:rgba(255,255,255,0.6);text-transform:uppercase;letter-spacing:0.5px">Records for this day (${list.length})</div>
@@ -3849,10 +4074,9 @@ function deleteSoleCharge(i){
   const k = dk(viewDate);
   if(soleCharge[k] && soleCharge[k][i]){
     if(!confirm('Delete this sole-charge record?')) return;
-    soleCharge[k].splice(i,1);
-    if(!soleCharge[k].length) delete soleCharge[k];
+    soleCharge[k][i].deleted = true;   // marked, not removed, so the deletion syncs
     markDirty();
-    renderSoleCharge();
+    renderSoleCharge(true);
   }
 }
 
@@ -3865,7 +4089,7 @@ function exportSoleChargePDF(){
   const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
   const body=[];
   eachDay(f,t).forEach(d=>{
-    (soleCharge[dk(d)]||[]).forEach(r=>{
+    (soleCharge[dk(d)]||[]).filter(r=>!r.deleted).forEach(r=>{
       body.push([fmtUK(d), r.inCharge, (r.from||'?')+'–'+(r.to||'ongoing'), String(r.count), (r.staffPresent||[]).join(', ')||'alone', (r.children||[]).join(', '), r.note||'']);
     });
   });
