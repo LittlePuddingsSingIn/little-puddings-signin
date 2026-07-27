@@ -1001,6 +1001,12 @@ async function syncWithOneDrive() {
         });
       }
       if (remoteData.staffOverrides) mergeDayEntries(staffOverrides, remoteData.staffOverrides);
+      if (remoteData.archivedState) {
+        Object.keys(remoteData.archivedState).forEach(key => {
+          const lv = archivedState[key], rv = remoteData.archivedState[key];
+          if (!lv || ((rv && rv.at) || 0) > ((lv && lv.at) || 0)) archivedState[key] = rv;
+        });
+      }
       if (remoteData.authorised) {
         Object.keys(remoteData.authorised).forEach(sid => {
           if (!authorised[sid]) { authorised[sid] = remoteData.authorised[sid]; return; }
@@ -1041,6 +1047,7 @@ async function syncWithOneDrive() {
           mergePins(STAFF, remoteData.STAFF);
         }
       }
+      applyArchivedState();
       if (remoteData.pinCustomised) pinCustomised = { ...remoteData.pinCustomised, ...pinCustomised };
       if (remoteData.termDates && remoteData.termDates.length && !dataDirty) { termDates = remoteData.termDates; termRowsDraft = null; }
     }
@@ -1049,7 +1056,7 @@ async function syncWithOneDrive() {
     const payload = JSON.stringify({
       dataVersion: DATA_VERSION,
       CHILDREN, STAFF, attendance, staffLog, eventLog, overrides, absences,
-      collectedFromSchool, droppedOffAtSchool, visitors, soleCharge, staffOverrides, overtime, authorised, pinCustomised, termDates, timesheet, lastUpdated: new Date().toISOString()
+      collectedFromSchool, droppedOffAtSchool, visitors, soleCharge, staffOverrides, overtime, authorised, archivedState, pinCustomised, termDates, timesheet, lastUpdated: new Date().toISOString()
     });
     
     const uploadUrl = `https://graph.microsoft.com/v1.0/me/drive/root:/${SYNC_FOLDER}/${encodeURIComponent(SYNC_FILE)}:/content`;
@@ -1101,7 +1108,7 @@ function saveLocal(){
     localStorage.setItem(LOCAL_KEY, JSON.stringify({
       dataVersion: DATA_VERSION,
       CHILDREN, STAFF, attendance, staffLog, eventLog, overrides, absences,
-      collectedFromSchool, droppedOffAtSchool, visitors, soleCharge, staffOverrides, overtime, authorised, pinCustomised, termDates, timesheet,
+      collectedFromSchool, droppedOffAtSchool, visitors, soleCharge, staffOverrides, overtime, authorised, archivedState, pinCustomised, termDates, timesheet,
       pendingSync: dataDirty, savedAt: new Date().toISOString()
     }));
   } catch(e){ console.warn('On-device save failed (storage full/unavailable):', e); }
@@ -1126,6 +1133,8 @@ function loadLocal(){
     if(d.pinCustomised) pinCustomised = d.pinCustomised;
     if(d.termDates && d.termDates.length) termDates = d.termDates;
     if(d.authorised) authorised = d.authorised;
+    if(d.archivedState) archivedState = d.archivedState;
+    applyArchivedState();
     if(d.timesheet) timesheet = d.timesheet;
     if(d.dataVersion === DATA_VERSION){
       if(d.CHILDREN && d.CHILDREN.length) CHILDREN = d.CHILDREN;
@@ -1561,6 +1570,12 @@ function mergeDayEntries(local, remote){
     });
   });
   return local;
+}
+
+let archivedState = {}; // ['child_'+id | 'staff_'+id] = {archived:bool, at} — survives a version bump
+function applyArchivedState(){
+  CHILDREN.forEach(c=>{ const a=archivedState['child_'+c.id]; if(a) c.archived=!!a.archived; });
+  STAFF.forEach(s=>{ const a=archivedState['staff_'+s.id]; if(a) s.archived=!!a.archived; });
 }
 
 function mergePins(codeArr, storedArr){
@@ -2415,8 +2430,11 @@ function archiveEntity(){
   const type=adminEditTarget.type==='staff'?'staff':'child';
   const entity=type==='staff'?STAFF.find(x=>x.id===adminEditTarget.id):CHILDREN.find(x=>x.id===adminEditTarget.id);
   entity.archived=!entity.archived;
+  archivedState[type+'_'+entity.id] = { archived: entity.archived, at: Date.now() };
   showFlash(entity.archived?`${entity.name} archived`:`${entity.name} restored`);
+  markDirty();
   closeAdminForm();renderAll();
+  if(odConnected) syncWithOneDrive();
 }
 
 // ════════════════════════════════════════════════
@@ -3407,7 +3425,14 @@ function renderReports(){
   const sel=document.getElementById('childRegSelect');
   if(sel){
     const cur=sel.value;
-    sel.innerHTML=CHILDREN.filter(c=>!c.archived).sort((a,b)=>cName(a).localeCompare(cName(b))).map(c=>`<option value="${c.id}">${cName(c)}</option>`).join('');
+    const active=CHILDREN.filter(c=>!c.archived).sort((a,b)=>cName(a).localeCompare(cName(b)));
+    const archived=CHILDREN.filter(c=>c.archived).sort((a,b)=>cName(a).localeCompare(cName(b)));
+    let html=active.map(c=>`<option value="${c.id}">${cName(c)}</option>`).join('');
+    if(archived.length){
+      html+=`<optgroup label="Archived (left the setting)">`+
+        archived.map(c=>`<option value="${c.id}">${cName(c)} — archived</option>`).join('')+`</optgroup>`;
+    }
+    sel.innerHTML=html;
     if(cur) sel.value=cur;
   }
   const m1=dk(new Date(today.getFullYear(),today.getMonth(),1));
