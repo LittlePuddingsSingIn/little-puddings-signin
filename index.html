@@ -1398,7 +1398,14 @@ function isHoliday(d) { return !isTerm(d); }
 // In the holidays only all-year-round children (ay:true) still have contracted hours
 // that apply. Everyone else attends on booked times, so no automatic early/late
 // charge is calculated for them; add any holiday charge by hand on the invoice.
-function chargesApply(c, d) { return c.ay === true || isTerm(d); }
+function hasAdhocTimes(c, d){
+  const ov = getOv(d)[c.id];
+  return !!(ov && ov.action === 'add' && ov.cs && ov.ce);
+}
+// Early/late charges apply for an all-year child, in term time, OR when you have
+// booked this child in for the day with explicit times (an ad hoc holiday booking):
+// those times are deliberate, so a late collection against them should flag.
+function chargesApply(c, d) { return c.ay === true || isTerm(d) || hasAdhocTimes(c, d); }
 const AC = ['#2C4A3E','#4A7C6A','#6B4F3A','#7FA99A','#C9A84C','#5a6e5a','#8B6914','#3d7a6a','#7a4f2e','#4e7a5a','#6a3d2e'];
 const EMOJIS = ['🌱','🌿','🌸','🌺','🌻','🌼','🍃','🍂','🌊','🦔','🐸','🐝','🦋','🚂','🐛','🦚','🦊','🌍','⭐','🚀','🌈','⚡','🌙','🌟','🕊️','🦁','🌷','🌹','🐠','🐞','🦎'];
 
@@ -2503,6 +2510,12 @@ function clearTs(staffId, d) {
 }
 
 // Calculate worked hours from clock-in/out times
+// Round hours to the nearest quarter hour (0.25) for cleaner payroll figures.
+function round15(hrs){ return Math.round(hrs*4)/4; }
+// A late arrival or early finish within this many minutes is not flagged (small
+// buffer for clocking a moment out). Genuine lateness/early leaving beyond it still shows.
+const LATE_EARLY_GRACE = 10;
+
 function calcWorkedHours(staffId, d) {
   const log = getSLog(staffId, d);
   if (log.clockInTime && log.clockOutTime) {
@@ -3084,8 +3097,8 @@ function applyOverrideTime(){
     // Empty box = clear that time. This also lets you undo an accidental sign in/out.
     att.signInTime = inVal || null;
     att.signOutTime = outVal || null;
-    if(inVal){ const grace=graceMins(c.cs),thresh=pm(c.cs)-grace,inMins=pm(inVal); att.earlyMins=(inMins<thresh&&chargesApply(c,viewDate))?thresh-inMins:0; } else { att.earlyMins=0; }
-    if(outVal){ const outMins=pm(outVal); att.lateMins=(outMins>pm(c.ce)&&chargesApply(c,viewDate))?outMins-pm(c.ce):0; } else { att.lateMins=0; }
+    if(inVal){ const et=effectiveTimes(c,viewDate); const grace=graceMins(et.cs),thresh=pm(et.cs)-grace,inMins=pm(inVal); att.earlyMins=(inMins<thresh&&chargesApply(c,viewDate))?thresh-inMins:0; } else { att.earlyMins=0; }
+    if(outVal){ const et=effectiveTimes(c,viewDate); const outMins=pm(outVal); att.lateMins=(outMins>pm(et.ce)&&chargesApply(c,viewDate))?outMins-pm(et.ce):0; } else { att.lateMins=0; }
     att.signedIn = !!inVal && !outVal;              // in but not out = on site; both/neither = not
     if(!inVal && !outVal) att.sessions=[];          // fully cleared, drop any earlier sessions too
     getLog(viewDate).unshift({name:c.name,type:'child',action:'override',time:inVal||outVal||'cleared',extra:0,verified:true,note:'Manager override'});
@@ -3531,8 +3544,8 @@ function staffLateEarly(staffId, d){
   const man = getTs(staffId, d);
   let late = 0, early = 0;
   if(sched && log && (!man || man.type==='worked')){
-    if(log.clockInTime && !isAuthLate(staffId,d)){ const m = pm(log.clockInTime) - pm(sched.s); if(m > 0) late = m; }
-    if(log.clockOutTime && !isAuthEarly(staffId,d)){ const m = pm(sched.e) - pm(log.clockOutTime); if(m > 0) early = m; }
+    if(log.clockInTime && !isAuthLate(staffId,d)){ const m = pm(log.clockInTime) - pm(sched.s); if(m > LATE_EARLY_GRACE) late = m; }
+    if(log.clockOutTime && !isAuthEarly(staffId,d)){ const m = pm(sched.e) - pm(log.clockOutTime); if(m > LATE_EARLY_GRACE) early = m; }
   }
   return {late, early, authLate: isAuthLate(staffId,d), authEarly: isAuthEarly(staffId,d)};
 }
@@ -3557,6 +3570,7 @@ function staffPeriodRows(staffId, from, to){
       const w=calcWorkedHours(staffId,d);
       worked=(man&&man.type==='worked')?man.hours:w;
     }
+    worked = round15(worked); // nearest quarter hour for cleaner payroll figures
     const le = staffLateEarly(staffId, d);
     if(le.authLate)  note = (note?note+' · ':'') + 'Authorised late start';
     if(le.authEarly) note = (note?note+' · ':'') + 'Authorised early finish';
