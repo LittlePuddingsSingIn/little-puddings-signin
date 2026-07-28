@@ -1448,9 +1448,9 @@ let STAFF = [
   {id:'sussie',    name:'Sussie',    role:'Registered Childminder', color:AC[0],pin:'5840',sch:{1:{s:'07:30',e:'17:30'},2:{s:'07:30',e:'17:30'},3:{s:'07:30',e:'17:30'},4:{s:'07:30',e:'17:30'},5:{s:'07:30',e:'17:30'}},archived:false,hourlyRate:15.50,paidHoursPerWeek:16,actualHoursPerWeek:50,annualLeaveHours:280,startDate:'2025-04-01',isApprentice:false},
   {id:'claire',    name:'Claire',    role:'Level 4 Educator',       color:AC[1],pin:'1111',sch:{1:{s:'07:45',e:'17:00'},3:{s:'08:00',e:'16:15'},4:{s:'08:00',e:'16:15'}},archived:false,hourlyRate:14.50,paidHoursPerWeek:26,actualHoursPerWeek:26,annualLeaveHours:96.2,startDate:'2025-04-01',isApprentice:false},
   {id:'courtney',  name:'Courtney',  role:'Level 3 Educator',       color:AC[2],pin:'2222',sch:{2:{s:'07:30',e:'17:00'},3:{s:'07:30',e:'17:00'},4:{s:'07:30',e:'17:00'},5:{s:'08:00',e:'16:30'}},archived:false,hourlyRate:13.00,paidHoursPerWeek:37,actualHoursPerWeek:37,annualLeaveHours:192.4,startDate:'2025-04-01',isApprentice:false},
-  {id:'alexandra', name:'Alexandra', role:'Early Years Apprentice', color:AC[3],pin:'3333',sch:{1:{s:'07:30',e:'16:30'},4:{s:'07:30',e:'12:30'},5:{s:'07:30',e:'17:30'}},archived:false,hourlyRate:8.00,paidHoursPerWeek:24,actualHoursPerWeek:24,annualLeaveHours:152,startDate:'2026-05-11',isApprentice:true,collegeStartDate:'2026-07-06'},
-  {id:'chloe',     name:'Chloe',     role:'Early Years Apprentice', color:AC[4],pin:'4444',sch:{1:{s:'07:45',e:'17:15'},2:{s:'07:45',e:'17:15'},3:{s:'07:30',e:'12:30'}},archived:false,hourlyRate:8.00,paidHoursPerWeek:24,actualHoursPerWeek:24,annualLeaveHours:168,startDate:'2025-09-01',isApprentice:true,collegeStartDate:'2026-07-06'},
-  {id:'leah',      name:'Leah',      role:'Early Years Apprentice', color:AC[5],pin:'5555',sch:{2:{s:'08:30',e:'16:00'},3:{s:'12:30',e:'17:30'},4:{s:'12:30',e:'17:30'},5:{s:'08:30',e:'15:00'}},archived:false,hourlyRate:8.00,paidHoursPerWeek:24,actualHoursPerWeek:24,annualLeaveHours:168,startDate:'2025-09-01',isApprentice:true,collegeStartDate:'2026-07-06'},
+  {id:'alexandra', name:'Alexandra', role:'Early Years Apprentice', color:AC[3],pin:'3333',sch:{1:{s:'07:30',e:'16:30'},4:{s:'07:30',e:'12:30'},5:{s:'07:30',e:'17:30'}},archived:false,hourlyRate:8.00,paidHoursPerWeek:30,actualHoursPerWeek:24,annualLeaveHours:152,startDate:'2026-05-11',isApprentice:true,collegeStartDate:'2026-07-06'},
+  {id:'chloe',     name:'Chloe',     role:'Early Years Apprentice', color:AC[4],pin:'4444',sch:{1:{s:'07:45',e:'17:15'},2:{s:'07:45',e:'17:15'},3:{s:'07:30',e:'12:30'}},archived:false,hourlyRate:8.00,paidHoursPerWeek:30,actualHoursPerWeek:24,annualLeaveHours:168,startDate:'2025-09-01',isApprentice:true,collegeStartDate:'2026-07-06'},
+  {id:'leah',      name:'Leah',      role:'Early Years Apprentice', color:AC[5],pin:'5555',sch:{2:{s:'08:30',e:'16:00'},3:{s:'12:30',e:'17:30'},4:{s:'12:30',e:'17:30'},5:{s:'08:30',e:'15:00'}},archived:false,hourlyRate:8.00,paidHoursPerWeek:30,actualHoursPerWeek:24,annualLeaveHours:168,startDate:'2025-09-01',isApprentice:true,collegeStartDate:'2026-07-06'},
 ];
 
 // Staff timesheet entries — [staffId][dateKey] = { type: 'worked'|'annual'|'sick'|'unpaid'|'bank'|'offthejob', hours: number, note: '' }
@@ -1461,7 +1461,7 @@ let timesheet = {};
 // ════════════════════════════════════════════════
 // Data version — bump this whenever CHILDREN or STAFF structure changes in the code
 // so that OneDrive syncs pick up the code changes rather than being overwritten
-const DATA_VERSION = 13;
+const DATA_VERSION = 14;
 
 let viewDate = new Date(); viewDate.setHours(0,0,0,0);
 let managerMode = false;
@@ -2752,6 +2752,26 @@ function openStaffDetail(staffId) {
       <div><strong>Unpaid leave:</strong> ${year.unpaid.toFixed(1)} hrs</div>
       <div><strong>${s.isApprentice ? 'Off-the-job' : 'Other'}:</strong> ${year.offthejob.toFixed(1)} hrs</div>
     </div>
+    ${(function(){
+      const days=[];
+      if(timesheet[s.id]){
+        Object.keys(timesheet[s.id]).forEach(k=>{
+          const d=new Date(k); if(d>=getFinancialYearStart(viewDate)&&d<=getFinancialYearEnd(viewDate)){
+            const e=timesheet[s.id][k];
+            if(e.type==='annual'||e.type==='bank') days.push({k,d,e});
+          }
+        });
+      }
+      days.sort((a,b)=>a.d-b.d);
+      if(!days.length) return '<div style="font-size:11px;color:var(--bark);margin-top:10px">No annual or bank-holiday leave recorded yet this year. Use the button below to add it, past dates included.</div>';
+      return `<div style="margin-top:10px;border-top:1px solid rgba(0,0,0,0.08);padding-top:8px">
+        <div style="font-size:11px;font-weight:700;color:var(--forest);margin-bottom:5px">Leave taken this year</div>
+        ${days.map(x=>`<div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;padding:3px 0">
+          <span>${fmtUK(x.d)} · <b>${x.e.hours}h</b> ${LEAVE_TYPES[x.e.type].label}${x.e.note?' · '+x.e.note:''}</span>
+          <span onclick="removeLeaveDay('${s.id}','${x.k}')" style="color:var(--error);cursor:pointer;font-size:13px">✕</span>
+        </div>`).join('')}
+      </div>`;
+    })()}
   </div>
   
   <!-- Lieu (time off in lieu) -->
@@ -2849,6 +2869,15 @@ function updateLeaveBalanceInfo() {
   }
   info.style.display = 'block';
 }
+function removeLeaveDay(staffId, dateKey){
+  if(!confirm('Remove this leave entry?')) return;
+  clearTs(staffId, new Date(dateKey));
+  markDirty();
+  if(detailStaffId) openStaffDetail(detailStaffId); else renderPayroll();
+  if(odConnected) syncWithOneDrive();
+  showFlash('Leave entry removed');
+}
+
 function saveLeave() {
   if (!leaveTarget || !leaveSelectedType) { showFlash('Please select a type'); return; }
   const dateVal = document.getElementById('leaveDate').value;
@@ -3488,6 +3517,12 @@ function exportPeriod(){
 // Lateness / early-leaving computed from the schedule, for the STAFF TIME SHEET and
 // lieu only. This is deliberately NOT shown on the public cards (staff privacy);
 // it is recalculated here from the clock times so supervisions have the record.
+function scheduledHours(staffId, d){
+  const s = STAFF.find(x=>x.id===staffId);
+  const sch = s && s.sch[d.getDay()];
+  return sch ? Number(((pm(sch.e)-pm(sch.s))/60).toFixed(2)) : 0;
+}
+
 function staffLateEarly(staffId, d){
   const s = STAFF.find(x=>x.id===staffId);
   const sched = s && s.sch[d.getDay()];
@@ -3783,6 +3818,10 @@ function renderOvertimeSection(){
   </div>`;
 }
 const PAY_COL={ sussie:'E', claire:'H', courtney:'K', leah:'N', chloe:'Q', alexandra:'T' };
+// The column immediately to the LEFT of each pay column holds the DATE, the pay
+// column itself holds the HOURS, for SSP/sick days (staff work varied hours, so the
+// hours lost must be shown, not just the date).
+function colLeft(letter){ return String.fromCharCode(letter.charCodeAt(0)-1); }
 const PAY_ROWS={ ssp:[22,27], deduction:[34,37], overtime:[40,45], leave:[53,64] };
 let payPreviewUpdates=[];
 let payPreviewMonth=null;
@@ -3814,12 +3853,12 @@ function buildPayPreview(){
       Object.keys(timesheet[s.id]).forEach(k=>{
         const d=parseDInput(k); if(!d||d.getFullYear()!==y||d.getMonth()!==m-1) return;
         const e=timesheet[s.id][k];
-        if(e.type==='sick') sick.push(d);
+        if(e.type==='sick') sick.push({d, hrs: scheduledHours(s.id, d)});
         else if(e.type==='unpaid'){ unpaid.push(d); unpaidHrs+=e.hours||0; }
         else if(e.type==='annual') annual.push(d);
       });
     }
-    sick.sort((a,b)=>a-b); unpaid.sort((a,b)=>a-b); annual.sort((a,b)=>a-b);
+    sick.sort((a,b)=>a.d-b.d); unpaid.sort((a,b)=>a-b); annual.sort((a,b)=>a-b);
     const otData = overtimeFor(s.id, new Date(y,m-1,1), new Date(y,m,0));
     const otDates = otData.approved.map(a=>a.date).sort((a,b)=>a-b);
     const ups=[];
@@ -3829,7 +3868,13 @@ function buildPayPreview(){
     ups.push({address:col+'19', value:Number(unpaidHrs.toFixed(2)), label:'Deduction hours'});
     ups.push({address:col+'16', value:Number(otData.approvedHours.toFixed(2)), label:'Overtime hours (approved)'});
     const fill=(arr,range,lbl)=>{ arr.forEach((d,i)=>{ const r=range[0]+i; if(r<=range[1]) ups.push({address:col+r,value:fmtUK(d),label:lbl}); }); if(arr.length>(range[1]-range[0]+1)) warnings.push(`${s.name}: ${arr.length} ${lbl.toLowerCase()} entries but only ${range[1]-range[0]+1} rows (${range[0]}–${range[1]}). Extra ones are not written.`); };
-    fill(sick,PAY_ROWS.ssp,'SSP/sick date');
+    // SSP: date in the left column, hours lost in the pay column, side by side
+    const dateCol = colLeft(col);
+    sick.forEach((item,i)=>{ const r=PAY_ROWS.ssp[0]+i; if(r<=PAY_ROWS.ssp[1]){
+      ups.push({address:dateCol+r, value:fmtUK(item.d), label:'SSP/sick date'});
+      ups.push({address:col+r, value:item.hrs, label:'SSP/sick hours'});
+    }});
+    if(sick.length>(PAY_ROWS.ssp[1]-PAY_ROWS.ssp[0]+1)) warnings.push(`${s.name}: ${sick.length} sick days but only ${PAY_ROWS.ssp[1]-PAY_ROWS.ssp[0]+1} SSP rows. Extra ones are not written.`);
     fill(unpaid,PAY_ROWS.deduction,'Deduction date');
     fill(otDates,PAY_ROWS.overtime,'Overtime date');
     fill(annual,PAY_ROWS.leave,'Leave taken date');
