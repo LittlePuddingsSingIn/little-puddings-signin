@@ -3902,12 +3902,20 @@ function buildPayPreview(){
       ...sick.map(x=>({d:x.d, hrs:x.hrs, label:'sick day'})),
       ...unpaid.map(d=>({d, hrs:null, label:'unpaid leave'}))
     ].sort((a,b)=>a.d-b.d);
-    deductions.forEach((item,i)=>{ const r=PAY_ROWS.deduction[0]+i; if(r<=PAY_ROWS.deduction[1]){
+    // List each deduction day (date left, hours in pay col, label right), then the
+    // summed total on the row below the list — matching the workbook's "total below
+    // the line" layout. Rows 34-36 for days, row 37 for the total.
+    const dedRowStart = PAY_ROWS.deduction[0];      // 34
+    const dedRowTotal = PAY_ROWS.deduction[1];      // 37 — total sits here, below the line
+    const dedDays = deductions.slice(0, dedRowTotal - dedRowStart); // up to 3 days (34,35,36)
+    dedDays.forEach((item,i)=>{ const r=dedRowStart+i;
       ups.push({address:dateCol+r, value:fmtUK(item.d), label:'Deduction date'});
       if(item.hrs!=null) ups.push({address:col+r, value:item.hrs, label:'Deduction hours'});
       ups.push({address:labelCol+r, value:item.label, label:'Deduction type'});
-    }});
-    if(deductions.length>(PAY_ROWS.deduction[1]-PAY_ROWS.deduction[0]+1)) warnings.push(`${s.name}: ${deductions.length} deduction days but only ${PAY_ROWS.deduction[1]-PAY_ROWS.deduction[0]+1} rows. Extra ones are not written.`);
+    });
+    const dedTotal = deductions.reduce((t,x)=>t+(x.hrs||0),0);
+    ups.push({address:col+dedRowTotal, value:Number(dedTotal.toFixed(2)), label:'Deduction total'});
+    if(deductions.length>dedDays.length) warnings.push(`${s.name}: ${deductions.length} deduction days but only ${dedDays.length} list rows before the total. Extra ones are not written.`);
     // Overtime: date in the left column, hours in the pay column, side by side
     otData.approved.sort((a,b)=>a.date-b.date).forEach((a,i)=>{ const r=PAY_ROWS.overtime[0]+i; if(r<=PAY_ROWS.overtime[1]){
       ups.push({address:dateCol+r, value:fmtUK(a.date), label:'Overtime date'});
