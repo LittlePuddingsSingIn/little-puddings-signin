@@ -246,7 +246,9 @@
   .af-title{font-family:'Playfair Display',serif;font-size:18px;color:var(--forest);margin-bottom:16px}
   .af-group{margin-bottom:12px}
   .af-label{font-size:11px;font-weight:700;color:var(--moss);letter-spacing:0.5px;text-transform:uppercase;margin-bottom:4px;display:block}
-  .af-input{width:100%;padding:10px 12px;border:2px solid var(--sage);border-radius:9px;font-family:'Lato',sans-serif;font-size:13px;background:var(--parchment);outline:none;transition:border-color 0.15s}
+  .adhoc-day{font-size:12px;background:rgba(127,169,154,0.14);border-radius:7px;padding:5px 9px;cursor:pointer;user-select:none;color:var(--forest)}
+.adhoc-day input{margin-right:3px}
+.af-input{width:100%;padding:10px 12px;border:2px solid var(--sage);border-radius:9px;font-family:'Lato',sans-serif;font-size:13px;background:var(--parchment);outline:none;transition:border-color 0.15s}
   .af-input:focus{border-color:var(--forest)}
   .af-select{width:100%;padding:10px 12px;border:2px solid var(--sage);border-radius:9px;font-family:'Lato',sans-serif;font-size:13px;background:var(--parchment);outline:none}
   .af-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
@@ -529,7 +531,7 @@
     <div class="sec-sub" style="margin-bottom:10px;color:var(--bark)">Nothing is written until you tap Confirm. Check the target file, tab name and every cell below against the real workbook the first time.</div>
     <div class="af-group">
       <label class="af-label">Target file (in OneDrive folder "2026-2027 INVOICES")</label>
-      <input class="af-input" id="payFileName" type="text" value="PAY_2026-2027.xlsx">
+      <input class="af-input" id="payFileName" type="text" value="PAY 2026-2027.xlsx">
     </div>
     <div class="af-group">
       <label class="af-label">Target tab (month sheet name in the PAY workbook)</label>
@@ -803,8 +805,20 @@
       </div>
     </div>
     <div class="af-group">
-      <label class="af-label">Repeat until (optional) — adds the same times to every weekday up to and including this date</label>
-      <input class="af-input" id="adhocUntil" type="date">
+      <label class="af-label">Repeat until (optional) — books the same times up to and including this date</label>
+      <input class="af-input" id="adhocUntil" type="date" oninput="document.getElementById('adhocDaysRow').style.display=this.value?'block':'none'">
+      <div id="adhocDaysRow" style="display:none;margin-top:8px">
+        <label class="af-label">On these days only</label>
+        <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:4px">
+          ${''}
+          <label class="adhoc-day"><input type="checkbox" class="adhocDay" value="1" checked> Mon</label>
+          <label class="adhoc-day"><input type="checkbox" class="adhocDay" value="2" checked> Tue</label>
+          <label class="adhoc-day"><input type="checkbox" class="adhocDay" value="3" checked> Wed</label>
+          <label class="adhoc-day"><input type="checkbox" class="adhocDay" value="4" checked> Thu</label>
+          <label class="adhoc-day"><input type="checkbox" class="adhocDay" value="5" checked> Fri</label>
+        </div>
+        <div style="font-size:10px;color:var(--moss);margin-top:5px">Untick any day she is not in that week. For different hours on a day, add that day on its own afterwards.</div>
+      </div>
     </div>
     <button class="af-save" onclick="saveAdhocBooking()">Add</button>
     <button class="af-cancel" onclick="closeAdhoc()">Cancel</button>
@@ -1212,12 +1226,19 @@ function startSync() {
 async function writeToExcel(child, date, att) {
   if (!odConnected || !odAccessToken) return;
   try {
-    const fullName = child.surname ? `${child.name} ${child.surname}` : child.name;
-    // Handle special filename formats from the actual workbooks
+    // The register shows a disambiguating initial (e.g. "Thea R") when two children
+    // share a first name, but the invoice file is named with the real first + last
+    // name ("Thea Rose"). Strip a trailing single-letter initial so the filename matches.
+    const firstName = child.name.replace(/\s+[A-Z]\.?$/,'').trim();
+    const fullName = child.surname ? `${firstName} ${child.surname}` : firstName;
     let fileNameStr = `${fullName} - Invoice - 2026-2027.xlsx`;
+    // Exact filenames for workbooks that don't follow the standard pattern
+    if (child.id === 'thear') fileNameStr = 'Thea Rose - Invoice - 2026-2027.xlsx';
     if (child.id === 'theat') fileNameStr = 'Thea Topliss Invoice - 2026-2027.xlsx';
     if (child.id === 'oliver') fileNameStr = 'Oliver Booker- Invoice - 2026-2027.xlsx';
     if (child.id === 'rory') fileNameStr = 'Rory Dickins- Invoice - 2026-2027.xlsx';
+    if (child.id === 'evelyndad') fileNameStr = 'Evelyn Betts -DAD - Invoice - 2026-2027.xlsx';
+    if (child.id === 'evelynmum') fileNameStr = 'Evelyn Betts -MUM - Invoice - 2026-2027.xlsx';
     const fileName = encodeURIComponent(fileNameStr);
     const folderPath = '2026-2027 INVOICES';
     const tab = MONTH_TABS[date.getMonth()+1];
@@ -1345,6 +1366,9 @@ const DEPUTY_PIN = '2468'; // deputy (limited) access; change here if needed
 const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 const MONTH_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const MONTH_TABS  = ['','JAN27','FEB27','MAR27','APR26','MAY26','JUN26','JUL26','AUG26','SEP26','OCT26','NOV26','DEC26'];
+// The PAY workbook names its month tabs differently to the child invoices
+// (e.g. "JULY 26" rather than "JUL26"), so it has its own list. Index = month (1-12).
+const PAY_MONTH_TABS = ['','JANUARY 27','FEBRUARY 27','MARCH 27','APRIL 26','MAY 26','JUNE 26','JULY 26','AUGUST 26','SEPTEMBER 26','OCTOBER 26','NOVEMBER 26','DECEMBER 26'];
 const GRACE = { '08:30': 3 };
 const TERM_DATES = [
   [new Date(2026,3,22),new Date(2026,4,22)],
@@ -1665,17 +1689,18 @@ function fmtSessions(att, sep){
 
 function childScheduledToday(c,d){
   if(c.archived)return false;
-  if(c.startDate && dk(d)<c.startDate)return false;
-  if(c.endDate   && dk(d)>c.endDate)  return false;
-  const dow=d.getDay();
   const ov=getOv(d);
-  // Handle both old format (string) and new format (object with action)
+  // An explicit "add for today" always wins, even past an end date or before a
+  // start date, so a returning or not-yet-started child can be booked in.
   if(ov[c.id]){
     const action = typeof ov[c.id] === 'string' ? ov[c.id] : ov[c.id].action;
     if(action==='add')return true;
     if(action==='remove')return false;
   }
+  if(c.startDate && dk(d)<c.startDate)return false;
+  if(c.endDate   && dk(d)>c.endDate)  return false;
   if(!c.days || c.days.length === 0)return false; // ad hoc only
+  const dow=d.getDay();
   if(!c.days.includes(dow))return false;
   if(c.ay===false||c.ay==='true')return isTerm(d);
   if(c.ay==='holidays')return isHoliday(d);
@@ -2223,6 +2248,8 @@ function openAdhoc(cid) {
   document.getElementById('adhocStart').value = c.cs || '08:00';
   document.getElementById('adhocEnd').value = c.ce || '17:00';
   document.getElementById('adhocUntil').value = '';
+  const dr=document.getElementById('adhocDaysRow'); if(dr) dr.style.display='none';
+  document.querySelectorAll('.adhocDay').forEach(cb=>cb.checked=true);
   document.getElementById('adhocOv').classList.add('vis');
 }
 
@@ -2242,9 +2269,11 @@ function saveAdhocBooking() {
   let days = 0;
   if (until && until > viewDate) {
     // Book the whole run in one go: every weekday from this date to the end date
+    const picked = Array.from(document.querySelectorAll('.adhocDay:checked')).map(cb => Number(cb.value));
     eachDay(viewDate, until).forEach(d => {
       const dow = d.getDay();
       if (dow === 0 || dow === 6) return;            // skip weekends
+      if (!picked.includes(dow)) return;             // only the days she is in
       getOv(d)[adhocTarget] = { action: 'add', cs: startTime, ce: endTime, at: Date.now() };
       days++;
     });
@@ -3543,12 +3572,75 @@ function downloadStaffTimesheet(staffId){
   XLSX.writeFile(buildStaffTimesheetWB(staffId,from,to), `${s.name} Time Sheet ${dk(from)}_to_${dk(to)}.xlsx`);
 }
 
+function downloadStaffTimesheetPDF(staffId){
+  if(!window.jspdf){ alert('PDF library not loaded. Check the internet connection and refresh (Ctrl+F5).'); return; }
+  const {from,to}=exportPeriod();
+  const s=STAFF.find(x=>x.id===staffId);
+  const {rows,totWorked,totLate,totEarly,totExpected}=staffPeriodRows(staffId,from,to);
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+  pdfHeader(doc, 'Staff Time Sheet', `${s.name} · ${s.role}`);
+  // sub line: period + rate + contracted
+  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(107,100,96);
+  doc.text(`Period: ${fmtUK(from)} to ${fmtUK(to)}     Rate: £${s.hourlyRate.toFixed(2)}/hr     Contracted: ${s.paidHoursPerWeek} hrs/week`, 12, 40);
+
+  const body = rows.map(r=>[
+    r[0], r[1],                    // date, day
+    r[2], r[5],                    // scheduled in/out
+    (r[3]||'—')+' / '+(r[4]||'—'), // actual in / out
+    r[6]!==''?r[6]:'—',            // expected hrs
+    r[7]!==''?r[7]:'—',            // worked hrs
+    r[8]!==''?r[8]+'m':'',         // late
+    r[9]!==''?r[9]+'m':'',         // early
+    r[10]||''                      // note
+  ]);
+  doc.autoTable({
+    startY:46,
+    head:[['Date','Day','Due in','Due out','Actual in / out','Exp','Wkd','Late','Early','Leave / Note']],
+    body: body.length?body:[['No hours recorded for this period','','','','','','','','','']],
+    styles:{fontSize:8,cellPadding:1.8,valign:'middle',lineColor:[204,204,204],lineWidth:0.1,textColor:[40,40,40]},
+    headStyles:{fillColor:[26,122,74],textColor:[255,255,255],fontStyle:'bold',halign:'center'},
+    columnStyles:{
+      0:{cellWidth:20},1:{cellWidth:11,halign:'center'},2:{cellWidth:14,halign:'center'},3:{cellWidth:14,halign:'center'},
+      4:{cellWidth:30,halign:'center'},5:{cellWidth:12,halign:'center'},6:{cellWidth:12,halign:'center'},
+      7:{cellWidth:13,halign:'center'},8:{cellWidth:13,halign:'center'},9:{halign:'left'}
+    },
+    alternateRowStyles:{fillColor:[247,243,236]},
+    foot:[['','','','','Totals', Number(totExpected.toFixed(2)), Number(totWorked.toFixed(2)), totLate+'m', totEarly+'m','']],
+    footStyles:{fillColor:[232,241,236],textColor:[26,122,74],fontStyle:'bold'},
+    margin:{left:12,right:12},
+    didDrawPage:()=>pdfFooter(doc)
+  });
+  let y=doc.lastAutoTable.finalY+8;
+  // Lieu summary box
+  const lieu=computeLieu(staffId, to);
+  doc.setFillColor(232,241,236); doc.roundedRect(12,y,doc.internal.pageSize.getWidth()-24,20,2,2,'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(26,122,74);
+  doc.text('Time off in lieu (year to date)', 16, y+6);
+  doc.setFont('helvetica','normal'); doc.setTextColor(60,60,60);
+  doc.text(`Accrued ${fmtMin(lieu.accruedMin)}    ·    Taken ${fmtMin(lieu.takenMin)}    ·    Lost to lateness ${fmtMin(lieu.lateMin||0)}    ·    Balance ${fmtMin(lieu.balanceMin)}`, 16, y+13);
+  y+=26;
+  // Signature lines for supervision
+  doc.setDrawColor(150,150,150); doc.setLineWidth(0.2);
+  doc.line(16,y+10,80,y+10); doc.line(110,y+10,180,y+10);
+  doc.setFontSize(8); doc.setTextColor(107,100,96);
+  doc.text('Staff signature',16,y+14); doc.text('Manager signature',110,y+14);
+  doc.text(`Generated ${fmtUK(new Date())} · Little Puddings`, 16, y+22);
+
+  doc.save(`${s.name} Time Sheet ${dk(from)}_${dk(to)}.pdf`);
+  showFlash('📄 Time sheet PDF generated');
+}
+
 function downloadAllStaffTimesheets(){
   if(typeof XLSX==='undefined'){ alert('Excel library not loaded. Check the internet connection and refresh (Ctrl+F5).'); return; }
   const {from}=exportPeriod();
   const box=document.getElementById('staffTimesheetLinks');
   box.innerHTML=STAFF.filter(s=>!s.archived).map(s=>
-    `<button onclick="downloadStaffTimesheet('${s.id}')" style="padding:9px;background:var(--sage);color:var(--forest-dark);border:none;border-radius:8px;font-weight:700;font-size:11px;cursor:pointer">⬇ ${s.name}</button>`
+    `<div style="display:flex;gap:5px;align-items:center;margin-bottom:5px">
+       <span style="flex:1;font-size:12px;color:var(--forest);font-weight:700">${s.name}</span>
+       <button onclick="downloadStaffTimesheet('${s.id}')" style="padding:8px 12px;background:var(--sage);color:var(--forest-dark);border:none;border-radius:8px;font-weight:700;font-size:11px;cursor:pointer">⬇ Excel</button>
+       <button onclick="downloadStaffTimesheetPDF('${s.id}')" style="padding:8px 12px;background:var(--forest);color:var(--gold-light);border:none;border-radius:8px;font-weight:700;font-size:11px;cursor:pointer">📄 PDF</button>
+     </div>`
   ).join('');
   showFlash('Tap each name to download their '+MONTH_SHORT[from.getMonth()]+' time sheet');
 }
@@ -3571,7 +3663,20 @@ function setOT(staffId, d, val){ const k=dk(d); if(!overtime[staffId])overtime[s
 function overtimeFor(staffId, from, to){
   const s = STAFF.find(x=>x.id===staffId);
   const candidates=[], approved=[]; let approvedHours=0;
-  if(!s || OT_EXCLUDE.includes(staffId)) return {candidates, approved, approvedHours};
+  if(!s) return {candidates, approved, approvedHours};
+  const excluded = OT_EXCLUDE.includes(staffId);
+  if(excluded){
+    // No auto-detection for excluded staff (e.g. Sussie), but any overtime added
+    // by hand still counts and reaches payroll.
+    eachDay(from,to).forEach(d=>{
+      const rec = getOT(staffId, d);
+      if(rec && rec.status==='approved'){
+        approved.push({date:d, hours:rec.hours, note:rec.note||'', extraMins:rec.hours*60, sched:true});
+        approvedHours += rec.hours;
+      }
+    });
+    return {candidates, approved, approvedHours};
+  }
   eachDay(from,to).forEach(d=>{
     const k=dk(d);
     const man = timesheet[staffId] && timesheet[staffId][k];
@@ -3666,6 +3771,15 @@ function renderOvertimeSection(){
     <div style="font-family:'Playfair Display',serif;font-size:14px;color:var(--forest);margin-bottom:4px">⏱ Overtime to confirm · ${mLabel}</div>
     <div style="font-size:11px;color:var(--bark);margin-bottom:10px">${anyCand?anyCand+' possible overtime day'+(anyCand!==1?'s':'')+' found. Approve or dismiss each one. Only approved overtime goes to payroll.':'Nothing to confirm. Approved overtime is listed below if any.'}</div>
     ${html || '<div style="font-size:12px;color:var(--bark)">No overtime detected this month.</div>'}
+    <div style="border-top:1px solid rgba(0,0,0,0.08);margin-top:10px;padding-top:10px">
+      <div style="font-size:11px;color:var(--bark);margin-bottom:6px">Add overtime by hand (e.g. staff meeting, a job off the clock):</div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <select id="otManualWho" style="flex:1;padding:8px;border-radius:8px;border:1px solid rgba(0,0,0,0.15);font-size:12px">
+          ${STAFF.filter(s=>!s.archived).map(s=>`<option value="${s.id}">${s.name}</option>`).join('')}
+        </select>
+        <button onclick="addManualOT(document.getElementById('otManualWho').value)" style="padding:8px 14px;background:var(--forest);color:var(--gold-light);border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">+ Add</button>
+      </div>
+    </div>
   </div>`;
 }
 const PAY_COL={ sussie:'E', claire:'H', courtney:'K', leah:'N', chloe:'Q', alexandra:'T' };
@@ -3679,7 +3793,9 @@ function previewPayWorkbook(){
   payPreviewMonth={y,m,from,to};
   const tabField=document.getElementById('payTabName');
   let saved=''; try{ saved=localStorage.getItem('payTab_'+y+'_'+m)||''; }catch(e){}
-  tabField.value=saved || MONTH_TABS[m] || '';
+  // Ignore an old saved tab left over from before the PAY tab naming was corrected
+  if(saved && MONTH_TABS.includes(saved) && !PAY_MONTH_TABS.includes(saved)) saved='';
+  tabField.value=saved || PAY_MONTH_TABS[m] || '';
   document.getElementById('payPreviewTitle').textContent='Preview — PAY workbook · '+MONTH_SHORT[m-1]+' '+y;
   buildPayPreview();
   document.getElementById('payPreviewStatus').textContent='';
@@ -3739,7 +3855,7 @@ async function confirmPayWorkbookWrite(){
   try{ localStorage.setItem('payTab_'+y+'_'+m, tab); }catch(e){}
   const btn=document.getElementById('payConfirmBtn'); btn.disabled=true;
   const statusEl=document.getElementById('payPreviewStatus');
-  const folderPath='2026-2027 INVOICES';
+  const folderPath='PAYROLL';
   let ok=0, fail=0, firstErr='';
   for(const u of payPreviewUpdates){
     statusEl.textContent=`Writing ${u.address}…  (${ok+fail+1} of ${payPreviewUpdates.length})`;
