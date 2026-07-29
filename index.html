@@ -3547,15 +3547,17 @@ function staffLateEarly(staffId, d){
     if(log.clockInTime){
       const m = pm(log.clockInTime) - pm(sched.s);
       if(m > 0){
-        if(isAuthLate(staffId,d)) authLateMins = m;   // authorised: always shown, however small
-        else if(m > LATE_EARLY_GRACE) late = m;       // unauthorised: only flags beyond the grace
+        // Under the grace (or manually authorised) counts as authorised — shown but
+        // not held against them. Over the grace and not authorised = a real late start.
+        if(m <= LATE_EARLY_GRACE || isAuthLate(staffId,d)) authLateMins = m;
+        else late = m;
       }
     }
     if(log.clockOutTime){
       const m = pm(sched.e) - pm(log.clockOutTime);
       if(m > 0){
-        if(isAuthEarly(staffId,d)) authEarlyMins = m; // authorised: always shown, however small
-        else if(m > LATE_EARLY_GRACE) early = m;      // unauthorised: only flags beyond the grace
+        if(m <= LATE_EARLY_GRACE || isAuthEarly(staffId,d)) authEarlyMins = m;
+        else early = m;
       }
     }
   }
