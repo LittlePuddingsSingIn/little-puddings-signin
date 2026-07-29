@@ -3547,15 +3547,17 @@ function staffLateEarly(staffId, d){
     if(log.clockInTime){
       const m = pm(log.clockInTime) - pm(sched.s);
       if(m > 0){
-        // Under the grace (or manually authorised) counts as authorised — shown but
-        // not held against them. Over the grace and not authorised = a real late start.
-        if(m <= LATE_EARLY_GRACE || isAuthLate(staffId,d)) authLateMins = m;
+        // Late arrivals NEVER auto-authorise — they show and count until you
+        // personally authorise the day. Only a manual authorisation clears them.
+        if(isAuthLate(staffId,d)) authLateMins = m;
         else late = m;
       }
     }
     if(log.clockOutTime){
       const m = pm(sched.e) - pm(log.clockOutTime);
       if(m > 0){
+        // Early finishes: 10 min or under auto-authorise (less for you to do),
+        // over that needs your nod.
         if(m <= LATE_EARLY_GRACE || isAuthEarly(staffId,d)) authEarlyMins = m;
         else early = m;
       }
