@@ -3542,17 +3542,23 @@ function staffLateEarly(staffId, d){
   const sched = s && s.sch[d.getDay()];
   const log = staffLog[staffId] && staffLog[staffId][dk(d)];
   const man = getTs(staffId, d);
-  let late = 0, early = 0;
+  let late = 0, early = 0, authLateMins = 0, authEarlyMins = 0;
   if(sched && log && (!man || man.type==='worked')){
-    if(log.clockInTime && !isAuthLate(staffId,d)){ const m = pm(log.clockInTime) - pm(sched.s); if(m > LATE_EARLY_GRACE) late = m; }
-    if(log.clockOutTime && !isAuthEarly(staffId,d)){ const m = pm(sched.e) - pm(log.clockOutTime); if(m > LATE_EARLY_GRACE) early = m; }
+    if(log.clockInTime){
+      const m = pm(log.clockInTime) - pm(sched.s);
+      if(m > LATE_EARLY_GRACE){ if(isAuthLate(staffId,d)) authLateMins = m; else late = m; }
+    }
+    if(log.clockOutTime){
+      const m = pm(sched.e) - pm(log.clockOutTime);
+      if(m > LATE_EARLY_GRACE){ if(isAuthEarly(staffId,d)) authEarlyMins = m; else early = m; }
+    }
   }
-  return {late, early, authLate: isAuthLate(staffId,d), authEarly: isAuthEarly(staffId,d)};
+  return {late, early, authLate: isAuthLate(staffId,d), authEarly: isAuthEarly(staffId,d), authLateMins, authEarlyMins};
 }
 
 function staffPeriodRows(staffId, from, to){
   const s=STAFF.find(x=>x.id===staffId);
-  const rows=[]; let totWorked=0, totLate=0, totEarly=0, totExpected=0;
+  const rows=[]; let totWorked=0, totLate=0, totEarly=0, totExpected=0, totLieu=0;
   eachDay(from,to).forEach(d=>{
     const dow=d.getDay();
     const sched=s.sch[dow];
@@ -3578,6 +3584,13 @@ function staffPeriodRows(staffId, from, to){
     totLate+=le.late;
     totEarly+=le.early;
     totExpected+=expected;
+    // Authorised minutes are shown (so you can see the time given) but marked, and
+    // are NOT added to the counted totals above.
+    // Lieu earned this day: a full day (>= 6h worked) accrues 30 min.
+    const lieuCell = (worked >= LIEU_FULL_DAY_HOURS) ? '+'+LIEU_MIN_PER_FULL_DAY+'m' : '';
+    if(worked >= LIEU_FULL_DAY_HOURS) totLieu += LIEU_MIN_PER_FULL_DAY;
+    const lateCell  = le.late  ? String(le.late)  : (le.authLateMins  ? le.authLateMins+'m (auth)'  : '');
+    const earlyCell = le.early ? String(le.early) : (le.authEarlyMins ? le.authEarlyMins+'m (auth)' : '');
     rows.push([
       fmtUK(d), DAYS[dow].slice(0,3),
       sched?sched.s:'—',
@@ -3586,30 +3599,31 @@ function staffPeriodRows(staffId, from, to){
       sched?sched.e:'—',
       expected?expected:'',
       worked?Number(worked.toFixed(2)):'',
-      le.late?le.late:'',
-      le.early?le.early:'',
+      lateCell,
+      earlyCell,
+      lieuCell,
       note
     ]);
   });
-  return {rows,totWorked,totLate,totEarly,totExpected};
+  return {rows,totWorked,totLate,totEarly,totExpected,totLieu};
 }
 
 function buildStaffTimesheetWB(staffId,from,to){
   const s=STAFF.find(x=>x.id===staffId);
-  const {rows,totWorked,totLate,totEarly,totExpected}=staffPeriodRows(staffId,from,to);
+  const {rows,totWorked,totLate,totEarly,totExpected,totLieu}=staffPeriodRows(staffId,from,to);
   const aoa=[
     ['Little Puddings — Staff Time Sheet'],
     [s.name+'  ·  '+s.role],
     ['Period: '+fmtUK(from)+' to '+fmtUK(to)],
     ['Rate: £'+s.hourlyRate.toFixed(2)+'/hr    Contracted: '+s.paidHoursPerWeek+' hrs/week'],
     [],
-    ['Date','Day','Sched In','Clock In','Clock Out','Sched Out','Expected hrs','Worked hrs','Late (min)','Early out (min)','Leave / Note']
+    ['Date','Day','Sched In','Clock In','Clock Out','Sched Out','Expected hrs','Worked hrs','Late (min)','Early out (min)','Lieu earned','Leave / Note']
   ].concat(rows).concat([
     [],
-    ['','','','','','TOTAL',Number(totExpected.toFixed(2)),Number(totWorked.toFixed(2)),totLate,totEarly,'']
+    ['','','','','','TOTAL',Number(totExpected.toFixed(2)),Number(totWorked.toFixed(2)),totLate,totEarly,'+'+totLieu+'m','']
   ]);
   const ws=XLSX.utils.aoa_to_sheet(aoa);
-  ws['!cols']=[{wch:12},{wch:6},{wch:9},{wch:9},{wch:9},{wch:9},{wch:12},{wch:11},{wch:11},{wch:13},{wch:28}];
+  ws['!cols']=[{wch:12},{wch:6},{wch:9},{wch:9},{wch:9},{wch:9},{wch:12},{wch:11},{wch:11},{wch:13},{wch:11},{wch:28}];
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,'Time Sheet');
   return wb;
@@ -3626,7 +3640,7 @@ function downloadStaffTimesheetPDF(staffId){
   if(!window.jspdf){ alert('PDF library not loaded. Check the internet connection and refresh (Ctrl+F5).'); return; }
   const {from,to}=exportPeriod();
   const s=STAFF.find(x=>x.id===staffId);
-  const {rows,totWorked,totLate,totEarly,totExpected}=staffPeriodRows(staffId,from,to);
+  const {rows,totWorked,totLate,totEarly,totExpected,totLieu}=staffPeriodRows(staffId,from,to);
   const {jsPDF}=window.jspdf;
   const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
   pdfHeader(doc, 'Staff Time Sheet', `${s.name} · ${s.role}`);
@@ -3640,23 +3654,24 @@ function downloadStaffTimesheetPDF(staffId){
     (r[3]||'—')+' / '+(r[4]||'—'), // actual in / out
     r[6]!==''?r[6]:'—',            // expected hrs
     r[7]!==''?r[7]:'—',            // worked hrs
-    r[8]!==''?r[8]+'m':'',         // late
-    r[9]!==''?r[9]+'m':'',         // early
-    r[10]||''                      // note
+    r[8]!==''?(/\D/.test(String(r[8]))?r[8]:r[8]+'m'):'',  // late (already has suffix if authorised)
+    r[9]!==''?(/\D/.test(String(r[9]))?r[9]:r[9]+'m'):'',  // early
+    r[10]||'',                     // lieu earned
+    r[11]||''                      // note
   ]);
   doc.autoTable({
     startY:51,
-    head:[['Date','Day','Due in','Due out','Actual in / out','Exp','Wkd','Late','Early','Leave / Note']],
+    head:[['Date','Day','Due in','Due out','Actual in / out','Exp','Wkd','Late','Early','Lieu','Leave / Note']],
     body: body.length?body:[['No hours recorded for this period','','','','','','','','','']],
     styles:{fontSize:8,cellPadding:1.8,valign:'middle',lineColor:[204,204,204],lineWidth:0.1,textColor:[40,40,40]},
     headStyles:{fillColor:[26,122,74],textColor:[255,255,255],fontStyle:'bold',halign:'center'},
     columnStyles:{
-      0:{cellWidth:20},1:{cellWidth:11,halign:'center'},2:{cellWidth:14,halign:'center'},3:{cellWidth:14,halign:'center'},
-      4:{cellWidth:30,halign:'center'},5:{cellWidth:12,halign:'center'},6:{cellWidth:12,halign:'center'},
-      7:{cellWidth:13,halign:'center'},8:{cellWidth:13,halign:'center'},9:{halign:'left'}
+      0:{cellWidth:19},1:{cellWidth:10,halign:'center'},2:{cellWidth:13,halign:'center'},3:{cellWidth:13,halign:'center'},
+      4:{cellWidth:28,halign:'center'},5:{cellWidth:11,halign:'center'},6:{cellWidth:11,halign:'center'},
+      7:{cellWidth:12,halign:'center'},8:{cellWidth:12,halign:'center'},9:{cellWidth:12,halign:'center'},10:{halign:'left'}
     },
     alternateRowStyles:{fillColor:[247,243,236]},
-    foot:[['','','','','Totals', Number(totExpected.toFixed(2)), Number(totWorked.toFixed(2)), totLate+'m', totEarly+'m','']],
+    foot:[['','','','','Totals', Number(totExpected.toFixed(2)), Number(totWorked.toFixed(2)), totLate+'m', totEarly+'m', '+'+totLieu+'m','']],
     footStyles:{fillColor:[232,241,236],textColor:[26,122,74],fontStyle:'bold'},
     margin:{left:12,right:12},
     didDrawPage:()=>pdfFooter(doc)
@@ -3748,7 +3763,7 @@ function overtimeFor(staffId, from, to){
     }
     if(rec && rec.status==='dismissed') return;            // manager said no
     if(extraMins >= OT_MIN_MINUTES){
-      candidates.push({date:d, hours:Number((extraMins/60).toFixed(2)), extraMins, sched:!!sched,
+      candidates.push({date:d, hours:round15(extraMins/60), extraMins, sched:!!sched,
                        workedMins, schedMins, in:log.clockInTime, out:log.clockOutTime});
     }
   });
@@ -3902,20 +3917,18 @@ function buildPayPreview(){
       ...sick.map(x=>({d:x.d, hrs:x.hrs, label:'sick day'})),
       ...unpaid.map(d=>({d, hrs:null, label:'unpaid leave'}))
     ].sort((a,b)=>a.d-b.d);
-    // List each deduction day (date left, hours in pay col, label right), then the
-    // summed total on the row below the list — matching the workbook's "total below
-    // the line" layout. Rows 34-36 for days, row 37 for the total.
-    const dedRowStart = PAY_ROWS.deduction[0];      // 34
-    const dedRowTotal = PAY_ROWS.deduction[1];      // 37 — total sits here, below the line
-    const dedDays = deductions.slice(0, dedRowTotal - dedRowStart); // up to 3 days (34,35,36)
-    dedDays.forEach((item,i)=>{ const r=dedRowStart+i;
+    // Rows 31-34 hold the individual deduction days. Row 35 is an auto-SUM formula
+    // for 31:34, so it is NEVER written to — the workbook totals the days itself.
+    const dedFirst = 31, dedLast = 34;               // day rows
+    const dedMaxDays = dedLast - dedFirst + 1;        // 4 rows available
+    const dedList = deductions.slice(-dedMaxDays);    // most recent if more than fits
+    dedList.forEach((item,idx)=>{
+      const r = dedLast - (dedList.length-1) + idx;   // fill upward, last day on row 34
       ups.push({address:dateCol+r, value:fmtUK(item.d), label:'Deduction date'});
       if(item.hrs!=null) ups.push({address:col+r, value:item.hrs, label:'Deduction hours'});
       ups.push({address:labelCol+r, value:item.label, label:'Deduction type'});
     });
-    const dedTotal = deductions.reduce((t,x)=>t+(x.hrs||0),0);
-    ups.push({address:col+dedRowTotal, value:Number(dedTotal.toFixed(2)), label:'Deduction total'});
-    if(deductions.length>dedDays.length) warnings.push(`${s.name}: ${deductions.length} deduction days but only ${dedDays.length} list rows before the total. Extra ones are not written.`);
+    if(deductions.length>dedMaxDays) warnings.push(`${s.name}: ${deductions.length} deduction days but rows 31-34 only hold ${dedMaxDays}. Add more rows in the workbook (and extend the SUM), then record the oldest by hand for now.`);
     // Overtime: date in the left column, hours in the pay column, side by side
     otData.approved.sort((a,b)=>a.date-b.date).forEach((a,i)=>{ const r=PAY_ROWS.overtime[0]+i; if(r<=PAY_ROWS.overtime[1]){
       ups.push({address:dateCol+r, value:fmtUK(a.date), label:'Overtime date'});
