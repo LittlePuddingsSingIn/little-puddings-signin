@@ -3566,7 +3566,7 @@ function staffLateEarly(staffId, d){
 
 function staffPeriodRows(staffId, from, to){
   const s=STAFF.find(x=>x.id===staffId);
-  const rows=[]; let totWorked=0, totLate=0, totEarly=0, totExpected=0, totLieu=0;
+  const rows=[]; let totWorked=0, totLate=0, totEarly=0, totExpected=0, totLieu=0, totAuthLate=0, totAuthEarly=0;
   eachDay(from,to).forEach(d=>{
     const dow=d.getDay();
     const sched=s.sch[dow];
@@ -3591,6 +3591,8 @@ function staffPeriodRows(staffId, from, to){
     totWorked+=worked;
     totLate+=le.late;
     totEarly+=le.early;
+    totAuthLate+=le.authLateMins;
+    totAuthEarly+=le.authEarlyMins;
     totExpected+=expected;
     // Authorised minutes are shown (so you can see the time given) but marked, and
     // are NOT added to the counted totals above.
@@ -3613,12 +3615,14 @@ function staffPeriodRows(staffId, from, to){
       note
     ]);
   });
-  return {rows,totWorked,totLate,totEarly,totExpected,totLieu};
+  return {rows,totWorked,totLate,totEarly,totExpected,totLieu,totAuthLate,totAuthEarly};
 }
 
 function buildStaffTimesheetWB(staffId,from,to){
   const s=STAFF.find(x=>x.id===staffId);
-  const {rows,totWorked,totLate,totEarly,totExpected,totLieu}=staffPeriodRows(staffId,from,to);
+  const {rows,totWorked,totLate,totEarly,totExpected,totLieu,totAuthLate,totAuthEarly}=staffPeriodRows(staffId,from,to);
+  const lateTot=(totLate?totLate+'m':'0m')+(totAuthLate?' (+'+totAuthLate+'m auth)':'');
+  const earlyTot=(totEarly?totEarly+'m':'0m')+(totAuthEarly?' (+'+totAuthEarly+'m auth)':'');
   const aoa=[
     ['Little Puddings — Staff Time Sheet'],
     [s.name+'  ·  '+s.role],
@@ -3628,7 +3632,7 @@ function buildStaffTimesheetWB(staffId,from,to){
     ['Date','Day','Sched In','Clock In','Clock Out','Sched Out','Expected hrs','Worked hrs','Late (min)','Early out (min)','Lieu earned','Leave / Note']
   ].concat(rows).concat([
     [],
-    ['','','','','','TOTAL',Number(totExpected.toFixed(2)),Number(totWorked.toFixed(2)),totLate,totEarly,'+'+totLieu+'m','']
+    ['','','','','','TOTAL',Number(totExpected.toFixed(2)),Number(totWorked.toFixed(2)),lateTot,earlyTot,'+'+totLieu+'m','']
   ]);
   const ws=XLSX.utils.aoa_to_sheet(aoa);
   ws['!cols']=[{wch:12},{wch:6},{wch:9},{wch:9},{wch:9},{wch:9},{wch:12},{wch:11},{wch:11},{wch:13},{wch:11},{wch:28}];
@@ -3648,7 +3652,7 @@ function downloadStaffTimesheetPDF(staffId){
   if(!window.jspdf){ alert('PDF library not loaded. Check the internet connection and refresh (Ctrl+F5).'); return; }
   const {from,to}=exportPeriod();
   const s=STAFF.find(x=>x.id===staffId);
-  const {rows,totWorked,totLate,totEarly,totExpected,totLieu}=staffPeriodRows(staffId,from,to);
+  const {rows,totWorked,totLate,totEarly,totExpected,totLieu,totAuthLate,totAuthEarly}=staffPeriodRows(staffId,from,to);
   const {jsPDF}=window.jspdf;
   const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
   pdfHeader(doc, 'Staff Time Sheet', `${s.name} · ${s.role}`);
@@ -3679,7 +3683,7 @@ function downloadStaffTimesheetPDF(staffId){
       7:{cellWidth:12,halign:'center'},8:{cellWidth:12,halign:'center'},9:{cellWidth:12,halign:'center'},10:{halign:'left'}
     },
     alternateRowStyles:{fillColor:[247,243,236]},
-    foot:[['','','','','Totals', Number(totExpected.toFixed(2)), Number(totWorked.toFixed(2)), totLate+'m', totEarly+'m', '+'+totLieu+'m','']],
+    foot:[['','','','','Totals', Number(totExpected.toFixed(2)), Number(totWorked.toFixed(2)), (totLate?totLate+'m':'0m')+(totAuthLate?' +'+totAuthLate+'a':''), (totEarly?totEarly+'m':'0m')+(totAuthEarly?' +'+totAuthEarly+'a':''), '+'+totLieu+'m','']],
     footStyles:{fillColor:[232,241,236],textColor:[26,122,74],fontStyle:'bold'},
     margin:{left:12,right:12},
     didDrawPage:()=>pdfFooter(doc)
