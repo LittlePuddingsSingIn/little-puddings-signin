@@ -547,7 +547,7 @@
     </div>
   </div>
 </div>
-<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 27Aug-d</div>
+<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 27Aug-g</div>
 
 <!-- PAY WORKBOOK EXPORT PREVIEW OVERLAY -->
 <div class="overlay" id="payPreviewOv">
@@ -1055,6 +1055,12 @@ async function syncWithOneDrive() {
           if (!lv || ((rv && rv.at) || 0) > ((lv && lv.at) || 0)) archivedState[key] = rv;
         });
       }
+      if (remoteData.carriedOver) {
+        Object.keys(remoteData.carriedOver).forEach(key => {
+          const lv = carriedOver[key], rv = remoteData.carriedOver[key];
+          if (!lv || ((rv && rv.at) || 0) > ((lv && lv.at) || 0)) carriedOver[key] = rv;
+        });
+      }
       if (remoteData.authorised) {
         Object.keys(remoteData.authorised).forEach(sid => {
           if (!authorised[sid]) { authorised[sid] = remoteData.authorised[sid]; return; }
@@ -1109,7 +1115,7 @@ async function syncWithOneDrive() {
     const payload = JSON.stringify({
       dataVersion: DATA_VERSION,
       CHILDREN, STAFF, attendance, staffLog, eventLog, overrides, absences,
-      collectedFromSchool, droppedOffAtSchool, visitors, soleCharge, staffOverrides, overtime, authorised, archivedState, pinCustomised, termDates, timesheet, lastUpdated: new Date().toISOString()
+      collectedFromSchool, droppedOffAtSchool, visitors, soleCharge, staffOverrides, overtime, authorised, archivedState, carriedOver, pinCustomised, termDates, timesheet, lastUpdated: new Date().toISOString()
     });
     
     const uploadUrl = `https://graph.microsoft.com/v1.0/me/drive/root:/${SYNC_FOLDER}/${encodeURIComponent(SYNC_FILE)}:/content`;
@@ -1161,7 +1167,7 @@ function saveLocal(){
     localStorage.setItem(LOCAL_KEY, JSON.stringify({
       dataVersion: DATA_VERSION,
       CHILDREN, STAFF, attendance, staffLog, eventLog, overrides, absences,
-      collectedFromSchool, droppedOffAtSchool, visitors, soleCharge, staffOverrides, overtime, authorised, archivedState, pinCustomised, termDates, timesheet,
+      collectedFromSchool, droppedOffAtSchool, visitors, soleCharge, staffOverrides, overtime, authorised, archivedState, carriedOver, pinCustomised, termDates, timesheet,
       pendingSync: dataDirty, savedAt: new Date().toISOString()
     }));
   } catch(e){ console.warn('On-device save failed (storage full/unavailable):', e); }
@@ -1187,6 +1193,7 @@ function loadLocal(){
     if(d.termDates && d.termDates.length) termDates = d.termDates;
     if(d.authorised) authorised = d.authorised;
     if(d.archivedState) archivedState = d.archivedState;
+    if(d.carriedOver) carriedOver = d.carriedOver;
     applyArchivedState();
     if(d.timesheet) timesheet = d.timesheet;
     if(d.dataVersion === DATA_VERSION){
@@ -1656,6 +1663,36 @@ function mergeDayEntries(local, remote){
 }
 
 let archivedState = {}; // ['child_'+id | 'staff_'+id] = {archived:bool, at} — survives a version bump
+// Carried-over leave hours: extra entitlement earned before this leave year (e.g.
+// accrued in March), added on top of the standard allowance. Keyed by staff id,
+// survives version bumps and syncs like archivedState.
+let carriedOver = {}; // [staffId] = { hours, at }
+function carriedOverHours(staffId){ const c=carriedOver[staffId]; return c ? (c.hours||0) : 0; }
+// Standard allowance, pro-rata'd if the person started partway through the current
+// leave year (1 Apr to 31 Mar). A start on/before 1 Apr gets the full allowance.
+function proRataAllowance(staffId, refDate){
+  const s=STAFF.find(x=>x.id===staffId);
+  if(!s) return 0;
+  const full=s.annualLeaveHours||0;
+  if(!s.startDate) return full;
+  const fyStart=getFinancialYearStart(refDate||new Date());
+  const fyEnd=getFinancialYearEnd(refDate||new Date());
+  const start=new Date(s.startDate);
+  if(start<=fyStart) return full;               // started before this leave year
+  if(start>fyEnd) return 0;                      // starts after this year (shouldn't happen)
+  const daysInYear=Math.round((fyEnd-fyStart)/86400000)+1;
+  const daysWorked=Math.round((fyEnd-start)/86400000)+1;
+  return Math.round(full*(daysWorked/daysInYear)*100)/100;
+}
+function allowanceFor(staffId, refDate){
+  return proRataAllowance(staffId, refDate) + carriedOverHours(staffId);
+}
+function setCarriedOver(staffId, hours){
+  carriedOver[staffId] = { hours: Number(hours)||0, at: Date.now() };
+  markDirty();
+  if(detailStaffId) openStaffDetail(detailStaffId); else renderPayroll();
+  if(odConnected) syncWithOneDrive();
+}
 function applyArchivedState(){
   CHILDREN.forEach(c=>{ const a=archivedState['child_'+c.id]; if(a) c.archived=!!a.archived; });
   STAFF.forEach(s=>{ const a=archivedState['staff_'+s.id]; if(a) s.archived=!!a.archived; });
@@ -2650,11 +2687,12 @@ function leaverSummary(staffId){
   // Leave already taken this year (annual + bank).
   const year=getYearTotals(staffId, end);
   const taken = year.annual + year.bank;
-  const owedLeave = Math.round((proRata - taken)*100)/100;   // may be negative if overtaken
+  const carried = carriedOverHours(staffId);   // March hours added by hand
+  const owedLeave = Math.round((proRata + carried - taken)*100)/100;   // may be negative if overtaken
   const lieu=computeLieu(staffId, end);
   return {
     end, fyStart, fyEnd, empStart, daysInYear, daysEmployed,
-    fraction, fullEntitlement, proRata, taken,
+    fraction, fullEntitlement, proRata, taken, carried,
     owedLeave, lieuMin: lieu.balanceMin,
     hourlyRate: s.hourlyRate || 0
   };
@@ -2747,10 +2785,11 @@ function renderPayroll() {
     const month = getMonthTotals(s.id, refDate);
     const year = getYearTotals(s.id, refDate);
     const lieu = computeLieu(s.id, refDate);
-    const leaveRemaining = (s.annualLeaveHours || 0) - year.annual - year.bank;
-    const leavePct = ((year.annual + year.bank) / (s.annualLeaveHours || 1)) * 100;
+    const allowance = allowanceFor(s.id, refDate);
+    const leaveRemaining = allowance - year.annual - year.bank;
+    const leavePct = ((year.annual + year.bank) / (allowance || 1)) * 100;
     const monthExpected = (s.paidHoursPerWeek || 0) * 4.33;
-    const isLeaveLow = leaveRemaining < ((s.annualLeaveHours || 0) * 0.25);
+    const isLeaveLow = leaveRemaining < (allowance * 0.25);
     return `<div onclick="openStaffDetail('${s.id}')" style="background:var(--cream);border-radius:13px;padding:14px;margin-bottom:10px;cursor:pointer;border-left:5px solid ${s.color};transition:transform 0.15s">
       <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:10px">
         <div>
@@ -2803,7 +2842,8 @@ function openStaffDetail(staffId) {
   const month = getMonthTotals(staffId, refDate);
   const year = getYearTotals(staffId, refDate);
   const lieu = computeLieu(staffId, refDate);
-  const leaveRemaining = (s.annualLeaveHours || 0) - year.annual - year.bank;
+  const allowance = allowanceFor(s.id, refDate);
+  const leaveRemaining = allowance - year.annual - year.bank;
   const monthName = MONTH_SHORT[refDate.getMonth()];
   const fyStart = getFinancialYearStart(refDate);
   const fyLabel = `${fyStart.getFullYear()}–${fyStart.getFullYear()+1}`;
@@ -2846,12 +2886,24 @@ function openStaffDetail(staffId) {
   <div style="background:var(--cream);border-radius:13px;padding:14px;margin-bottom:10px">
     <div style="font-family:'Playfair Display',serif;font-size:13px;color:var(--forest);margin-bottom:10px">Leave Year ${fyLabel}</div>
     <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;font-size:12px">
-      <div><strong>Annual leave allowance:</strong> ${(s.annualLeaveHours || 0).toFixed(1)} hrs</div>
+      <div><strong>Annual leave allowance:</strong> ${allowance.toFixed(1)} hrs${(function(){
+        const pr=proRataAllowance(s.id, refDate), co=carriedOverHours(s.id), base=(s.annualLeaveHours||0);
+        const bits=[];
+        if(pr<base) bits.push(`${pr.toFixed(1)} pro-rata from ${fmtUK(new Date(s.startDate))}`);
+        else if(co) bits.push(`${base.toFixed(1)}`);
+        if(co) bits.push(`${co.toFixed(1)} carried over`);
+        return bits.length? ` <span style="color:var(--moss)">(${bits.join(' + ')})</span>`:'';
+      })()}</div>
       <div><strong>Used:</strong> ${(year.annual + year.bank).toFixed(1)} hrs (${year.annual.toFixed(1)} AL + ${year.bank.toFixed(1)} BH)</div>
-      <div><strong>Remaining:</strong> <span style="color:${leaveRemaining<((s.annualLeaveHours||0)*0.25)?'var(--error)':'var(--ok)'};font-weight:700">${leaveRemaining.toFixed(1)} hrs</span></div>
+      <div><strong>Remaining:</strong> <span style="color:${leaveRemaining<(allowance*0.25)?'var(--error)':'var(--ok)'};font-weight:700">${leaveRemaining.toFixed(1)} hrs</span></div>
       <div><strong>Sick (SSP):</strong> ${year.sick.toFixed(1)} hrs</div>
       <div><strong>Unpaid leave:</strong> ${year.unpaid.toFixed(1)} hrs</div>
       <div><strong>${s.isApprentice ? 'Off-the-job' : 'Other'}:</strong> ${year.offthejob.toFixed(1)} hrs</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;margin-top:10px;padding-top:8px;border-top:1px solid rgba(0,0,0,0.08)">
+      <label style="font-size:11px;color:var(--bark);flex:1"><strong>Carried over from last year</strong> (hrs earned in March, added to allowance)</label>
+      <input type="number" step="0.25" value="${carriedOverHours(s.id)||''}" placeholder="0" id="carryInput_${s.id}" style="width:70px;padding:6px;border:1px solid rgba(0,0,0,0.15);border-radius:7px;font-size:12px;text-align:right">
+      <button onclick="setCarriedOver('${s.id}', document.getElementById('carryInput_${s.id}').value)" style="padding:6px 10px;background:var(--forest);color:var(--gold-light);border:none;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer">Save</button>
     </div>
     ${(function(){
       const days=[];
@@ -2904,7 +2956,7 @@ function openStaffDetail(staffId) {
         Employed this leave year: <b>${L.daysEmployed} of ${L.daysInYear} days</b> (${Math.round(L.fraction*100)}%)<br>
         Full entitlement: <b>${L.fullEntitlement}h</b> → pro-rata to leaving: <b>${L.proRata}h</b><br>
         Leave taken so far: <b>${L.taken.toFixed(1)}h</b><br>
-        Leave to pay out: <b>${L.owedLeave>=0?L.owedLeave:0}h</b> ${L.owedLeave<0?'('+owedLeaveTxt+')':''}<br>
+        ${L.carried?`Carried over from March: <b>${L.carried.toFixed(1)}h</b><br>`:''}Leave to pay out: <b>${L.owedLeave>=0?L.owedLeave:0}h</b> ${L.owedLeave<0?'('+owedLeaveTxt+')':''}<br>
         Lieu to pay out: <b>${fmtMin(L.lieuMin)}</b>
       </div>
       <div style="font-size:10px;color:var(--bark);margin-top:8px;background:rgba(212,160,23,0.12);border-radius:7px;padding:8px">
@@ -3052,6 +3104,7 @@ function recordClosure(){
   eachDay(from,to).forEach(d=>{
     const dow=d.getDay(); if(dow===0||dow===6) return;   // weekend
     STAFF.filter(s=>!s.archived).forEach(s=>{
+      if(!employedOn(s.id, d)) return;                    // before start / after leaving
       const rota=scheduledHours(s.id, d);
       if(!rota) return;                                   // not their working day
       const existing=getTs(s.id, d);
@@ -3073,6 +3126,7 @@ function recordBankHolidays(){
   BANK_HOLIDAYS.forEach(bh=>{
     const d=new Date(bh);
     STAFF.filter(s=>!s.archived).forEach(s=>{
+      if(!employedOn(s.id, d)) return;          // before start / after leaving
       const rota=scheduledHours(s.id, d);
       if(!rota) return;                         // not a working day for them
       staffDays++;
@@ -3111,6 +3165,7 @@ function saveLeave() {
     const dow = d.getDay();
     if (dow === 0 || dow === 6) return;                 // weekend
     if (isBankHoliday(d)) { skipped++; return; }        // closed on bank holidays
+    if (!employedOn(leaveTarget, d)) return;             // before start / after leaving
     const rota = scheduledHours(leaveTarget, d);
     if (!rota) return;                                   // not a day they work
     // Use the typed hours only for a SINGLE day (a part day); for a block use each
@@ -3780,6 +3835,18 @@ function exportPeriod(){
 // Lateness / early-leaving computed from the schedule, for the STAFF TIME SHEET and
 // lieu only. This is deliberately NOT shown on the public cards (staff privacy);
 // it is recalculated here from the clock times so supervisions have the record.
+// True only if the staff member is employed on this date — on or after their start
+// date, and on or before their end date. Auto-recorders (bank holidays, closures,
+// block leave) must not write leave outside someone's employment.
+function employedOn(staffId, d){
+  const s = STAFF.find(x=>x.id===staffId);
+  if(!s) return false;
+  const k = dk(d);
+  if(s.startDate && k < s.startDate) return false;
+  if(s.endDate && k > s.endDate) return false;
+  return true;
+}
+
 function scheduledHours(staffId, d){
   const s = STAFF.find(x=>x.id===staffId);
   const sch = s && s.sch[d.getDay()];
@@ -3908,7 +3975,8 @@ function downloadLeaverPDF(staffId){
     ['Full annual entitlement', `${L.fullEntitlement} h`],
     ['Pro-rata entitlement to leaving date', `${L.proRata} h`],
     ['Annual + bank leave already taken', `${L.taken.toFixed(1)} h`],
-    ['Leave to pay out (before adjustments)', `${L.owedLeave>=0?L.owedLeave:0} h${L.owedLeave<0?'  (overtaken by '+Math.abs(L.owedLeave)+'h)':''}`],
+    ['Carried over from last year (March)', `${(L.carried||0).toFixed(1)} h`],
+    ['Leave to pay out', `${L.owedLeave>=0?L.owedLeave:0} h${L.owedLeave<0?'  (overtaken by '+Math.abs(L.owedLeave)+'h)':''}`],
     ['Time off in lieu to pay out', fmtMin(L.lieuMin)],
   ];
   doc.autoTable({
