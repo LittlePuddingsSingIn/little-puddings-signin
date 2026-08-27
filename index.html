@@ -547,7 +547,7 @@
     </div>
   </div>
 </div>
-<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 27Aug-c</div>
+<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 27Aug-d</div>
 
 <!-- PAY WORKBOOK EXPORT PREVIEW OVERLAY -->
 <div class="overlay" id="payPreviewOv">
@@ -818,7 +818,7 @@
     <button class="af-save" onclick="saveLeave()">Save Entry</button>
     <button class="af-archive" id="leaveClearBtn" onclick="clearLeaveEntry()" style="display:none">Clear Entry</button>
     <button onclick="clearLeaveRange()" style="width:100%;padding:11px;margin-top:6px;background:var(--burgundy,#A13A2A);color:#fff;border:none;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer">🗑 Clear ALL entries in the date range above</button>
-    <div style="font-size:10px;color:var(--moss);margin-top:4px">Removes every leave, sick, closure and override entry for this person between the two dates. Use it to wipe a wrong batch, then re-enter.</div>
+    <div style="font-size:10px;color:var(--moss);margin-top:4px">Pick a type above (e.g. Annual Leave) to clear only that type in the range, keeping sick days. Pick no type to clear everything in the range.</div>
     <button class="af-cancel" onclick="closeLeave()">Cancel</button>
   </div>
 </div>
@@ -3136,12 +3136,18 @@ function clearLeaveRange(){
   const from=new Date(fromV), to=new Date(toV);
   if(to<from){ showFlash('The "to" date is before the start date'); return; }
   const s=STAFF.find(x=>x.id===leaveTarget);
+  // If a type is selected at the top of this screen, only clear that type (so you can
+  // wipe wrong Annual Leave without touching sick days). No type selected = clear all.
+  const onlyType = leaveSelectedType || null;
+  const typeLabel = onlyType ? (LEAVE_TYPES[onlyType]?LEAVE_TYPES[onlyType].label:onlyType) : null;
+  const match = d => { const e=getTs(leaveTarget,d); return e && (!onlyType || e.type===onlyType); };
   let n=0;
-  eachDay(from,to).forEach(d=>{ if(getTs(leaveTarget,d)){ n++; } });
-  if(!n){ showFlash('No entries to clear in that range'); return; }
-  if(!confirm(`Clear ${n} entr${n===1?'y':'ies'} for ${s.name} between ${fmtUK(from)} and ${fmtUK(to)}? This cannot be undone.`)) return;
-  eachDay(from,to).forEach(d=>{ if(getTs(leaveTarget,d)) clearTs(leaveTarget,d); });
-  showFlash(`Cleared ${n} entr${n===1?'y':'ies'} for ${s.name}`);
+  eachDay(from,to).forEach(d=>{ if(match(d)) n++; });
+  if(!n){ showFlash(onlyType?`No ${typeLabel} entries in that range`:'No entries to clear in that range'); return; }
+  const what = onlyType ? `${n} ${typeLabel} entr${n===1?'y':'ies'}` : `${n} entr${n===1?'y':'ies'} (all types)`;
+  if(!confirm(`Clear ${what} for ${s.name} between ${fmtUK(from)} and ${fmtUK(to)}?${onlyType?' Sick and other types are kept.':''} This cannot be undone.`)) return;
+  eachDay(from,to).forEach(d=>{ if(match(d)) clearTsByKey(leaveTarget, dk(d)); });
+  showFlash(`Cleared ${what} for ${s.name}`);
   closeLeave();
   if(detailStaffId) openStaffDetail(detailStaffId); else renderPayroll();
   if(odConnected) syncWithOneDrive();
