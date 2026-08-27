@@ -1074,7 +1074,12 @@ async function syncWithOneDrive() {
         Object.keys(remoteData.timesheet).forEach(sid => {
           if (!timesheet[sid]) timesheet[sid] = {};
           Object.keys(remoteData.timesheet[sid]).forEach(dkk => {
-            if (!timesheet[sid][dkk]) timesheet[sid][dkk] = remoteData.timesheet[sid][dkk];
+            const lv = timesheet[sid][dkk], rv = remoteData.timesheet[sid][dkk];
+            if (!lv) { timesheet[sid][dkk] = rv; return; }
+            // Both have an entry: newest wins, so a deletion (tombstone) on one device
+            // is not undone by a stale copy on another.
+            const lt = (lv && lv.at) || 0, rt = (rv && rv.at) || 0;
+            if (rt > lt) timesheet[sid][dkk] = rv;
           });
         });
       }
@@ -2539,20 +2544,22 @@ const LEAVE_TYPES = {
 function getTs(staffId, d) {
   const k = dk(d);
   if (!timesheet[staffId]) return null;
-  return timesheet[staffId][k] || null;
+  const e = timesheet[staffId][k];
+  return (e && !e.deleted) ? e : null;   // tombstones read as "no entry"
 }
 function setTs(staffId, d, entry) {
   const k = dk(d);
   if (!timesheet[staffId]) timesheet[staffId] = {};
-  timesheet[staffId][k] = entry;
+  timesheet[staffId][k] = { ...entry, at: Date.now() };
   markDirty();
 }
 function clearTs(staffId, d) {
   const k = dk(d);
-  if (timesheet[staffId] && timesheet[staffId][k]) {
-    delete timesheet[staffId][k];
-    markDirty();
-  }
+  if (!timesheet[staffId]) timesheet[staffId] = {};
+  // Tombstone rather than plain-delete, so the removal travels to other devices and
+  // is not re-added from OneDrive on the next sync.
+  timesheet[staffId][k] = { deleted: true, at: Date.now() };
+  markDirty();
 }
 
 // Calculate worked hours from clock-in/out times
@@ -2600,7 +2607,8 @@ function computeLieu(staffId, refDate){
   let guard = 0;
   while (cur <= end && guard < 400) {
     const k = dk(cur);
-    const man = (timesheet[staffId] && timesheet[staffId][k]) ? timesheet[staffId][k] : null;
+    let man = (timesheet[staffId] && timesheet[staffId][k]) ? timesheet[staffId][k] : null;
+    if (man && man.deleted) man = null;
     let workedHrs = 0, isLeaveDay = false;
     if (man) {
       if (man.type === 'worked') workedHrs = man.hours || 0;
@@ -2849,7 +2857,7 @@ function openStaffDetail(staffId) {
         Object.keys(timesheet[s.id]).forEach(k=>{
           const d=new Date(k); if(d>=getFinancialYearStart(viewDate)&&d<=getFinancialYearEnd(viewDate)){
             const e=timesheet[s.id][k];
-            if(e.type==='annual'||e.type==='bank') days.push({k,d,e});
+            if(e && !e.deleted && (e.type==='annual'||e.type==='bank')) days.push({k,d,e});
           }
         });
       }
@@ -4006,7 +4014,8 @@ function overtimeFor(staffId, from, to){
   }
   eachDay(from,to).forEach(d=>{
     const k=dk(d);
-    const man = timesheet[staffId] && timesheet[staffId][k];
+    let man = timesheet[staffId] && timesheet[staffId][k];
+    if (man && man.deleted) man = null;
     if(man && man.type!=='worked') return;                 // leave/sick day, not overtime
     const log = staffLog[staffId] && staffLog[staffId][k];
     if(!log || !log.clockInTime || !log.clockOutTime) return;
@@ -4145,6 +4154,7 @@ function buildPayPreview(){
       Object.keys(timesheet[s.id]).forEach(k=>{
         const d=parseDInput(k); if(!d||d.getFullYear()!==y||d.getMonth()!==m-1) return;
         const e=timesheet[s.id][k];
+        if(e && e.deleted) return;
         if(e.type==='sick') sick.push({d, hrs: scheduledHours(s.id, d)});
         else if(e.type==='unpaid'){ unpaid.push(d); unpaidHrs+=e.hours||0; }
         else if(e.type==='annual') annual.push(d);
