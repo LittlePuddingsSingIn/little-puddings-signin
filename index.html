@@ -447,7 +447,7 @@
       <div class="set-title">🎌 Bank holidays</div>
       <div class="sec-sub" style="margin-bottom:8px">The setting is closed on bank holidays. This records each bank holiday as paid annual leave (off entitlement) for everyone scheduled to work that day. Safe to run more than once, it will not double up.</div>
       <button onclick="recordBankHolidays()" style="width:100%;padding:11px;background:var(--forest);color:var(--gold-light);border:none;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer">Record this year's bank holidays as leave</button>
-      <button onclick="resetSchedulesFromContracts()" style="width:100%;padding:10px;margin-top:6px;background:var(--gold);color:var(--forest);border:none;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer">⏱ Reset staff schedules to contracted times</button>
+      <button onclick="resetSchedulesFromContracts()" style="width:100%;padding:10px;margin-top:6px;background:var(--gold);color:var(--forest);border:none;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer">⏱ Reset schedules &amp; leave allowances to contracted figures</button>
       <button onclick="tidyOutOfEmployment()" style="width:100%;padding:10px;margin-top:6px;background:var(--burgundy,#A13A2A);color:#fff;border:none;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer">🧹 Fix leave: remove out-of-employment entries and correct wrong hours</button>
       <div id="bankHolStatus" style="font-size:11px;margin-top:8px;color:var(--forest)"></div>
     </div>
@@ -549,7 +549,7 @@
     </div>
   </div>
 </div>
-<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 27Aug-j</div>
+<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 27Aug-m</div>
 
 <!-- PAY WORKBOOK EXPORT PREVIEW OVERLAY -->
 <div class="overlay" id="payPreviewOv">
@@ -1501,8 +1501,8 @@ let CHILDREN = [
 
 let STAFF = [
   {id:'sussie',    name:'Sussie',    role:'Registered Childminder', color:AC[0],pin:'5840',sch:{1:{s:'07:30',e:'17:30'},2:{s:'07:30',e:'17:30'},3:{s:'07:30',e:'17:30'},4:{s:'07:30',e:'17:30'},5:{s:'07:30',e:'17:30'}},archived:false,hourlyRate:15.50,paidHoursPerWeek:16,actualHoursPerWeek:50,annualLeaveHours:280,startDate:'2025-04-01',isApprentice:false},
-  {id:'claire',    name:'Claire',    role:'Level 4 Educator',       color:AC[1],pin:'1111',sch:{1:{s:'07:45',e:'17:00'},3:{s:'08:00',e:'16:15'},4:{s:'08:00',e:'16:15'}},archived:false,hourlyRate:14.50,paidHoursPerWeek:26,actualHoursPerWeek:26,annualLeaveHours:96.2,startDate:'2025-04-01',isApprentice:false},
-  {id:'courtney',  name:'Courtney',  role:'Level 3 Educator',       color:AC[2],pin:'2222',sch:{2:{s:'07:30',e:'17:00'},3:{s:'07:30',e:'17:00'},4:{s:'07:30',e:'17:00'},5:{s:'08:00',e:'16:30'}},archived:false,hourlyRate:13.00,paidHoursPerWeek:37,actualHoursPerWeek:37,annualLeaveHours:192.4,startDate:'2025-04-01',isApprentice:false},
+  {id:'claire',    name:'Claire',    role:'Level 4 Educator',       color:AC[1],pin:'1111',sch:{1:{s:'07:45',e:'17:00'},3:{s:'08:00',e:'16:15'},4:{s:'08:00',e:'16:15'}},archived:false,hourlyRate:14.50,paidHoursPerWeek:26,actualHoursPerWeek:26,annualLeaveHours:145.6,startDate:'2025-04-01',isApprentice:false},
+  {id:'courtney',  name:'Courtney',  role:'Level 3 Educator',       color:AC[2],pin:'2222',sch:{2:{s:'07:30',e:'17:00'},3:{s:'07:30',e:'17:00'},4:{s:'07:30',e:'17:00'},5:{s:'08:00',e:'16:30'}},archived:false,hourlyRate:13.00,paidHoursPerWeek:37,actualHoursPerWeek:37,annualLeaveHours:207.2,startDate:'2025-04-01',isApprentice:false},
   {id:'alexandra', name:'Alexandra', role:'Early Years Apprentice', color:AC[3],pin:'3333',sch:{1:{s:'07:30',e:'16:30'},4:{s:'07:30',e:'12:30'},5:{s:'07:30',e:'17:30'}},archived:false,hourlyRate:8.00,paidHoursPerWeek:30,actualHoursPerWeek:24,annualLeaveHours:152,startDate:'2026-05-11',isApprentice:true,collegeStartDate:'2026-07-06'},
   {id:'chloe',     name:'Chloe',     role:'Early Years Apprentice', color:AC[4],pin:'4444',sch:{1:{s:'07:45',e:'17:15'},2:{s:'07:45',e:'17:15'},3:{s:'07:30',e:'12:30'}},archived:false,hourlyRate:8.00,paidHoursPerWeek:30,actualHoursPerWeek:24,annualLeaveHours:168,startDate:'2025-09-01',isApprentice:true,collegeStartDate:'2026-07-06'},
   {id:'leah',      name:'Leah',      role:'Early Years Apprentice', color:AC[5],pin:'5555',sch:{2:{s:'08:30',e:'16:00'},3:{s:'12:30',e:'17:30'},4:{s:'12:30',e:'17:30'},5:{s:'08:30',e:'15:00'}},archived:false,hourlyRate:8.00,paidHoursPerWeek:30,actualHoursPerWeek:24,annualLeaveHours:168,startDate:'2025-09-01',isApprentice:true,collegeStartDate:'2026-07-06'},
@@ -1519,14 +1519,27 @@ const CORRECT_SCHEDULES = {
   chloe:    {1:{s:'07:45',e:'17:15'},2:{s:'07:45',e:'17:15'},3:{s:'07:30',e:'12:30'}},
   leah:     {2:{s:'08:30',e:'16:00'},3:{s:'12:30',e:'17:30'},4:{s:'12:30',e:'17:30'},5:{s:'08:30',e:'15:00'}}
 };
+// Annual leave entitlement = contracted weekly hours × 5.6 statutory weeks.
+const CORRECT_ALLOWANCE = {
+  claire: 145.6,     // 26 × 5.6
+  courtney: 207.2,   // 37 × 5.6
+  alexandra: 168.0,  // 30 × 5.6
+  chloe: 168.0,      // 30 × 5.6
+  leah: 168.0        // 30 × 5.6
+  // Sussie left as-is (director — check separately)
+};
 function resetSchedulesFromContracts(){
   let n=0;
-  STAFF.forEach(s=>{ if(CORRECT_SCHEDULES[s.id]){ s.sch = JSON.parse(JSON.stringify(CORRECT_SCHEDULES[s.id])); n++; } });
+  STAFF.forEach(s=>{
+    if(CORRECT_SCHEDULES[s.id]){ s.sch = JSON.parse(JSON.stringify(CORRECT_SCHEDULES[s.id])); n++; }
+    if(CORRECT_ALLOWANCE[s.id]!==undefined){ s.annualLeaveHours = CORRECT_ALLOWANCE[s.id]; }
+    delete s.leaveOverride;   // clear any pinned figure so the accurate pro-rata applies
+  });
   markDirty();
   if(detailStaffId) openStaffDetail(detailStaffId); else renderPayroll();
   if(odConnected) syncWithOneDrive();
   const st=document.getElementById('bankHolStatus');
-  if(st) st.textContent = `✓ Reset ${n} staff schedules to contracted times. Now tap the Fix leave button to correct recorded hours.`;
+  if(st) st.textContent = `✓ Reset ${n} staff schedules and leave allowances to contracted figures. Now tap the Fix leave button to correct recorded hours.`;
 }
 let timesheet = {};
 
@@ -1691,9 +1704,11 @@ let carriedOver = {}; // [staffId] = { hours, at }
 function carriedOverHours(staffId){ const c=carriedOver[staffId]; return c ? (c.hours||0) : 0; }
 // Standard allowance, pro-rata'd if the person started partway through the current
 // leave year (1 Apr to 31 Mar). A start on/before 1 Apr gets the full allowance.
+// A manual override (s.leaveOverride) wins over the calculation when set.
 function proRataAllowance(staffId, refDate){
   const s=STAFF.find(x=>x.id===staffId);
   if(!s) return 0;
+  if(typeof s.leaveOverride === 'number') return s.leaveOverride;   // fixed figure set by hand
   const full=s.annualLeaveHours||0;
   if(!s.startDate) return full;
   const fyStart=getFinancialYearStart(refDate||new Date());
