@@ -547,7 +547,7 @@
     </div>
   </div>
 </div>
-<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027</div>
+<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 29Jul-b</div>
 
 <!-- PAY WORKBOOK EXPORT PREVIEW OVERLAY -->
 <div class="overlay" id="payPreviewOv">
@@ -3020,11 +3020,18 @@ function updateLeaveBalanceInfo() {
 }
 function removeLeaveDay(staffId, dateKey){
   if(!confirm('Remove this leave entry?')) return;
-  clearTs(staffId, new Date(dateKey));
+  clearTsByKey(staffId, dateKey);
   markDirty();
   if(detailStaffId) openStaffDetail(detailStaffId); else renderPayroll();
   if(odConnected) syncWithOneDrive();
   showFlash('Leave entry removed');
+}
+// Tombstone by the EXACT stored key, avoiding a Date round-trip (new Date(k) then
+// dk() can shift the key by a day across timezones and miss the entry).
+function clearTsByKey(staffId, k){
+  if(!timesheet[staffId]) timesheet[staffId] = {};
+  timesheet[staffId][k] = { deleted: true, at: Date.now() };
+  markDirty();
 }
 
 function recordClosure(){
