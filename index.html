@@ -549,7 +549,7 @@
     </div>
   </div>
 </div>
-<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 27Aug-o</div>
+<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 27Aug-p</div>
 
 <!-- PAY WORKBOOK EXPORT PREVIEW OVERLAY -->
 <div class="overlay" id="payPreviewOv">
@@ -4325,8 +4325,9 @@ function previewPayWorkbook(){
   payPreviewMonth={y,m,from,to};
   const tabField=document.getElementById('payTabName');
   let saved=''; try{ saved=localStorage.getItem('payTab_'+y+'_'+m)||''; }catch(e){}
-  // Ignore an old saved tab left over from before the PAY tab naming was corrected
-  if(saved && MONTH_TABS.includes(saved) && !PAY_MONTH_TABS.includes(saved)) saved='';
+  // Ignore any old saved tab that isn't the corrected PAY tab name for this month
+  // (e.g. a leftover "AUGUST 26" from before the naming was fixed).
+  if(saved && saved !== PAY_MONTH_TABS[m]) saved='';
   tabField.value=saved || PAY_MONTH_TABS[m] || '';
   document.getElementById('payPreviewTitle').textContent='Preview — PAY workbook · '+MONTH_SHORT[m-1]+' '+y;
   buildPayPreview();
