@@ -447,7 +447,7 @@
       <div class="set-title">🎌 Bank holidays</div>
       <div class="sec-sub" style="margin-bottom:8px">The setting is closed on bank holidays. This records each bank holiday as paid annual leave (off entitlement) for everyone scheduled to work that day. Safe to run more than once, it will not double up.</div>
       <button onclick="recordBankHolidays()" style="width:100%;padding:11px;background:var(--forest);color:var(--gold-light);border:none;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer">Record this year's bank holidays as leave</button>
-      <button onclick="tidyOutOfEmployment()" style="width:100%;padding:10px;margin-top:6px;background:var(--burgundy,#A13A2A);color:#fff;border:none;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer">🧹 Remove leave recorded before a start / after a leaving date</button>
+      <button onclick="tidyOutOfEmployment()" style="width:100%;padding:10px;margin-top:6px;background:var(--burgundy,#A13A2A);color:#fff;border:none;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer">🧹 Fix leave: remove out-of-employment entries and correct wrong hours</button>
       <div id="bankHolStatus" style="font-size:11px;margin-top:8px;color:var(--forest)"></div>
     </div>
 
@@ -548,7 +548,7 @@
     </div>
   </div>
 </div>
-<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 27Aug-h</div>
+<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 27Aug-i</div>
 
 <!-- PAY WORKBOOK EXPORT PREVIEW OVERLAY -->
 <div class="overlay" id="payPreviewOv">
@@ -3123,7 +3123,7 @@ function recordClosure(){
 }
 
 function tidyOutOfEmployment(){
-  let removed=0;
+  let removed=0, corrected=0;
   STAFF.forEach(s=>{
     if(!timesheet[s.id]) return;
     Object.keys(timesheet[s.id]).forEach(k=>{
@@ -3135,6 +3135,14 @@ function tidyOutOfEmployment(){
       if(!employedOn(s.id, d)){
         timesheet[s.id][k] = { deleted:true, at:Date.now() };
         removed++;
+        return;
+      }
+      // In employment but hours don't match the rota for that weekday (old flat-value
+      // bug): correct to the right per-day hours.
+      const rota = scheduledHours(s.id, d);
+      if(rota && Math.abs((e.hours||0) - rota) > 0.01){
+        timesheet[s.id][k] = { ...e, hours: rota, at: Date.now() };
+        corrected++;
       }
     });
   });
@@ -3142,9 +3150,12 @@ function tidyOutOfEmployment(){
   if(detailStaffId) openStaffDetail(detailStaffId); else renderPayroll();
   if(odConnected) syncWithOneDrive();
   const st=document.getElementById('bankHolStatus');
-  if(st) st.textContent = removed
-    ? `✓ Removed ${removed} leave/bank-holiday entr${removed===1?'y':'ies'} recorded outside employment dates`
-    : 'Nothing to tidy — no leave sits outside anyone\u2019s start/end dates.';
+  if(st){
+    const bits=[];
+    if(removed) bits.push(`removed ${removed} entr${removed===1?'y':'ies'} outside employment`);
+    if(corrected) bits.push(`fixed hours on ${corrected} entr${corrected===1?'y':'ies'}`);
+    st.textContent = bits.length ? '✓ '+bits.join(', ') : 'Nothing to tidy — all leave sits within employment dates at the right hours.';
+  }
 }
 
 function recordBankHolidays(){
@@ -3157,7 +3168,13 @@ function recordBankHolidays(){
       if(!rota) return;                         // not a working day for them
       staffDays++;
       const existing=getTs(s.id, d);
-      if(existing && existing.type==='bank'){ already++; return; }  // already recorded
+      if(existing && existing.type==='bank'){
+        // Already recorded. If the hours are wrong (old buggy flat value), correct
+        // them to this day's rota; otherwise leave it.
+        if(Math.abs((existing.hours||0) - rota) > 0.01){ setTs(s.id, d, { type:'bank', hours:rota, note:'Bank holiday' }); recorded++; }
+        else already++;
+        return;
+      }
       setTs(s.id, d, { type:'bank', hours:rota, note:'Bank holiday' });
       recorded++;
     });
