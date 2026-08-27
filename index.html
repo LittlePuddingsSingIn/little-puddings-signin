@@ -547,7 +547,7 @@
     </div>
   </div>
 </div>
-<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 27Aug-b</div>
+<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 27Aug-c</div>
 
 <!-- PAY WORKBOOK EXPORT PREVIEW OVERLAY -->
 <div class="overlay" id="payPreviewOv">
@@ -3022,12 +3022,14 @@ function removeLeaveDay(staffId, dateKey){
   if(!confirm('Remove this leave entry?')) return;
   clearTsByKey(staffId, dateKey);
   markDirty();
-  const sc = document.querySelector('#payrollDetail') ? document.querySelector('#payrollDetail').scrollTop : 0;
-  const pageY = window.scrollY;
+  const y = window.scrollY || window.pageYOffset || document.documentElement.scrollTop || 0;
   if(detailStaffId) openStaffDetail(detailStaffId); else renderPayroll();
-  // Rebuilding the card scrolls it back to the top; put the view back where it was
-  // so removing several entries in a row doesn't keep jumping.
-  requestAnimationFrame(()=>{ window.scrollTo(0, pageY); const pd=document.querySelector('#payrollDetail'); if(pd) pd.scrollTop=sc; });
+  // Rebuilding replaces the card's HTML and the page springs to the top. Put the
+  // scroll back where it was, after layout settles, so clearing several entries in a
+  // row doesn't keep bouncing to the top.
+  window.scrollTo(0, y);
+  requestAnimationFrame(()=>window.scrollTo(0, y));
+  setTimeout(()=>window.scrollTo(0, y), 60);
   if(odConnected) syncWithOneDrive();
   showFlash('Leave entry removed');
 }
