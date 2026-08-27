@@ -549,7 +549,7 @@
     </div>
   </div>
 </div>
-<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 27Aug-m</div>
+<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 27Aug-n</div>
 
 <!-- PAY WORKBOOK EXPORT PREVIEW OVERLAY -->
 <div class="overlay" id="payPreviewOv">
@@ -3238,17 +3238,21 @@ function saveLeave() {
   const end = toVal ? new Date(toVal) : start;
   if (end < start) { showFlash('The "to" date is before the start date'); return; }
 
+  const singleTyped = (!toVal && !isNaN(typedHours) && typedHours>0);
   let recorded = 0, skipped = 0;
   eachDay(start, end).forEach(d => {
     const dow = d.getDay();
     if (dow === 0 || dow === 6) return;                 // weekend
-    if (isBankHoliday(d)) { skipped++; return; }        // closed on bank holidays
     if (!employedOn(leaveTarget, d)) return;             // before start / after leaving
+    // For a SINGLE day where you typed the hours, trust it — allow bank holidays and
+    // days not on the current rota (e.g. hours that changed partway through the year).
+    if (!singleTyped) {
+      if (isBankHoliday(d)) { skipped++; return; }       // block auto-fill on bank holidays
+      if (!scheduledHours(leaveTarget, d)) return;        // not a day they work
+    }
     const rota = scheduledHours(leaveTarget, d);
-    if (!rota) return;                                   // not a day they work
-    // Use the typed hours only for a SINGLE day (a part day); for a block use each
-    // day's own rota hours so different-length days are correct.
-    const hrs = (!toVal && !isNaN(typedHours) && typedHours>0) ? typedHours : rota;
+    const hrs = singleTyped ? typedHours : rota;
+    if (!hrs) return;                                     // nothing to record
     setTs(leaveTarget, d, { type: leaveSelectedType, hours: hrs, note: noteVal });
     recorded++;
   });
