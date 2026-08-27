@@ -443,6 +443,30 @@
       <div id="staffTimesheetLinks" class="timesheet-grid"></div>
     </div>
 
+    <div class="set-section">
+      <div class="set-title">🎌 Bank holidays</div>
+      <div class="sec-sub" style="margin-bottom:8px">The setting is closed on bank holidays. This records each bank holiday as paid annual leave (off entitlement) for everyone scheduled to work that day. Safe to run more than once, it will not double up.</div>
+      <button onclick="recordBankHolidays()" style="width:100%;padding:11px;background:var(--forest);color:var(--gold-light);border:none;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer">Record this year's bank holidays as leave</button>
+      <div id="bankHolStatus" style="font-size:11px;margin-top:8px;color:var(--forest)"></div>
+    </div>
+
+    <div class="set-section">
+      <div class="set-title">🚪 Planned closure</div>
+      <div class="sec-sub" style="margin-bottom:8px">A week or period when the setting is shut. Records paid annual leave (off entitlement) for every working day in the range, for all staff scheduled. Remove anyone who should not be on it from their own card afterwards.</div>
+      <div style="display:flex;gap:6px;align-items:flex-end;flex-wrap:wrap">
+        <div class="af-group" style="flex:1;min-width:120px">
+          <label class="af-label">From</label>
+          <input class="af-input" id="closureFrom" type="date">
+        </div>
+        <div class="af-group" style="flex:1;min-width:120px">
+          <label class="af-label">To</label>
+          <input class="af-input" id="closureTo" type="date">
+        </div>
+      </div>
+      <button onclick="recordClosure()" style="width:100%;padding:11px;margin-top:8px;background:var(--forest);color:var(--gold-light);border:none;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer">Record closure as leave for all staff</button>
+      <div id="closureStatus" style="font-size:11px;margin-top:8px;color:var(--forest)"></div>
+    </div>
+
     <div id="overtimePanel"></div>
     <div id="payrollOverview"></div>
     <div id="payrollDetail" style="display:none"></div>
@@ -771,14 +795,21 @@
     </div>
     <div class="af-row">
       <div class="af-group">
-        <label class="af-label">Date</label>
-        <input class="af-input" id="leaveDate" type="date">
+        <label class="af-label">Date (or first day of a block)</label>
+        <input class="af-input" id="leaveDate" type="date" onchange="autoFillLeaveHours()">
       </div>
       <div class="af-group">
-        <label class="af-label">Hours</label>
+        <label class="af-label">To (optional — for a block)</label>
+        <input class="af-input" id="leaveDateTo" type="date">
+      </div>
+    </div>
+    <div class="af-row">
+      <div class="af-group">
+        <label class="af-label">Hours per day</label>
         <input class="af-input" id="leaveHours" type="number" step="0.25" placeholder="e.g. 10">
       </div>
     </div>
+    <div style="font-size:10px;color:var(--moss);margin:-6px 0 8px">Leave the hours to auto-fill from the rota for each day. A block records every working day between the two dates (weekends and bank holidays skipped). Override the hours only if it is the same part-day throughout.</div>
     <div class="af-group">
       <label class="af-label">Note (optional)</label>
       <input class="af-input" id="leaveNote" type="text" placeholder="e.g. dentist">
@@ -1474,6 +1505,19 @@ const DATA_VERSION = 14;
 let viewDate = new Date(); viewDate.setHours(0,0,0,0);
 let managerMode = false;
 let deputyMode = false; // limited access for when the manager is not present
+// Auto-logout: if manager/deputy mode is left idle (e.g. tablet sitting in the
+// hallway), drop back to the normal locked view after this many seconds.
+const MODE_IDLE_MS = 60000;
+let modeIdleTimer = null;
+function resetModeIdle(){
+  if(modeIdleTimer) clearTimeout(modeIdleTimer);
+  if(!elevated()) return;
+  modeIdleTimer = setTimeout(()=>{
+    if(elevated()){ exitMode(); showFlash('🔒 Locked after 60s inactivity'); }
+  }, MODE_IDLE_MS);
+}
+['click','keydown','touchstart'].forEach(ev=>
+  document.addEventListener(ev, ()=>{ if(elevated()) resetModeIdle(); }, true));
 function elevated(){ return managerMode || deputyMode; }
 let currentTab = 'children';
 let attendance = {};
@@ -1758,10 +1802,11 @@ function enterManager(){
   document.getElementById('mgrBanner').style.display='flex';
   document.getElementById('dateNav').style.display='flex';
   document.querySelectorAll('.mgr-only').forEach(el=>el.style.display='');
-  updateDateNav();renderAll();showFlash('⚙ Manager mode unlocked');
+  updateDateNav();renderAll();resetModeIdle();showFlash('⚙ Manager mode unlocked');
 }
 function exitManager(){
   managerMode=false;
+  if(modeIdleTimer) clearTimeout(modeIdleTimer);
   document.getElementById('mgrBtn').classList.remove('active');
   document.getElementById('mgrBanner').style.display='none';
   document.getElementById('dateNav').style.display='none';
@@ -1778,10 +1823,11 @@ function enterDeputy(){
   document.getElementById('mgrBanner').style.display='flex';
   document.getElementById('dateNav').style.display='flex';
   document.querySelectorAll('.dep-ok').forEach(el=>el.style.display='');
-  updateDateNav();renderAll();showFlash('👤 Deputy mode unlocked');
+  updateDateNav();renderAll();resetModeIdle();showFlash('👤 Deputy mode unlocked');
 }
 function exitDeputy(){
   deputyMode=false;
+  if(modeIdleTimer) clearTimeout(modeIdleTimer);
   document.getElementById('depBtn').classList.remove('active');
   document.getElementById('mgrBanner').style.display='none';
   document.getElementById('dateNav').style.display='none';
@@ -2573,6 +2619,37 @@ function computeLieu(staffId, refDate){
 }
 
 // Get leave year (April to March) totals for a staff member
+// Leaver summary: pro-rata entitlement to the leaving date, leave already taken,
+// and lieu to pay out. The pro-rata is a guide from the days actually employed in
+// the leave year; the carried-over-from-last-year and any special adjustments are
+// entered by hand (in the note), since only Sussie knows those figures.
+function leaverSummary(staffId){
+  const s=STAFF.find(x=>x.id===staffId);
+  if(!s || !s.endDate) return null;
+  const end=new Date(s.endDate);
+  const fyStart=getFinancialYearStart(end);
+  const fyEnd=getFinancialYearEnd(end);
+  // Days employed in this leave year (start of year, or their start date if later,
+  // to their leaving date).
+  const empStart = (s.startDate && new Date(s.startDate)>fyStart) ? new Date(s.startDate) : fyStart;
+  const daysInYear = Math.round((fyEnd - fyStart)/86400000) + 1;
+  const daysEmployed = Math.max(0, Math.round((end - empStart)/86400000) + 1);
+  const fraction = Math.min(1, daysEmployed / daysInYear);
+  const fullEntitlement = s.annualLeaveHours || 0;
+  const proRata = Math.round(fullEntitlement * fraction * 100)/100;
+  // Leave already taken this year (annual + bank).
+  const year=getYearTotals(staffId, end);
+  const taken = year.annual + year.bank;
+  const owedLeave = Math.round((proRata - taken)*100)/100;   // may be negative if overtaken
+  const lieu=computeLieu(staffId, end);
+  return {
+    end, fyStart, fyEnd, empStart, daysInYear, daysEmployed,
+    fraction, fullEntitlement, proRata, taken,
+    owedLeave, lieuMin: lieu.balanceMin,
+    hourlyRate: s.hourlyRate || 0
+  };
+}
+
 function getYearTotals(staffId, refDate) {
   const fyStart = getFinancialYearStart(refDate);
   const fyEnd = getFinancialYearEnd(refDate);
@@ -2806,6 +2883,26 @@ function openStaffDetail(staffId) {
   
   <!-- Add entry button -->
   <button onclick="openLeaveEntry('${staffId}')" style="width:100%;padding:13px;background:var(--forest);color:var(--gold-light);border:none;border-radius:11px;font-weight:700;cursor:pointer;margin-bottom:14px">＋ Record Leave / Sick / Override Day</button>
+
+  ${(function(){
+    const L=leaverSummary(staffId);
+    if(!L) return '';
+    const owedLeaveTxt = L.owedLeave>=0 ? `${L.owedLeave}h still owed` : `${Math.abs(L.owedLeave)}h overtaken`;
+    return `<div style="background:#FBF3DC;border-radius:13px;padding:14px;margin-bottom:14px;border-left:5px solid var(--gold)">
+      <div style="font-family:'Playfair Display',serif;font-size:13px;color:var(--forest);margin-bottom:8px">🚪 Leaver summary · finishing ${fmtUK(L.end)}</div>
+      <div style="font-size:12px;color:var(--bark);line-height:1.7">
+        Employed this leave year: <b>${L.daysEmployed} of ${L.daysInYear} days</b> (${Math.round(L.fraction*100)}%)<br>
+        Full entitlement: <b>${L.fullEntitlement}h</b> → pro-rata to leaving: <b>${L.proRata}h</b><br>
+        Leave taken so far: <b>${L.taken.toFixed(1)}h</b><br>
+        Leave to pay out: <b>${L.owedLeave>=0?L.owedLeave:0}h</b> ${L.owedLeave<0?'('+owedLeaveTxt+')':''}<br>
+        Lieu to pay out: <b>${fmtMin(L.lieuMin)}</b>
+      </div>
+      <div style="font-size:10px;color:var(--bark);margin-top:8px;background:rgba(212,160,23,0.12);border-radius:7px;padding:8px">
+        <b>Adjust by hand:</b> this pro-rata is from days employed this leave year only. Add any leave <b>carried over from last year</b>, and the extra you owe for <b>this March</b>, to the "leave to pay out" figure before finalising. The lieu figure is the current balance owed.
+      </div>
+      <button onclick="downloadLeaverPDF('${staffId}')" style="width:100%;padding:10px;margin-top:10px;background:var(--forest);color:var(--gold-light);border:none;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer">📄 Leaver summary PDF</button>
+    </div>`;
+  })()}
   
   <!-- Entries -->
   <div style="background:var(--cream);border-radius:13px;padding:14px;margin-bottom:10px">
@@ -2835,6 +2932,31 @@ function closeStaffDetail() {
 
 let leaveTarget = null;
 let leaveSelectedType = null;
+// England bank holidays for the 2026-27 leave year (setting is always closed).
+// A bank holiday on a day someone normally works is recorded as paid leave that
+// comes off their entitlement.
+const BANK_HOLIDAYS = [
+  '2026-04-03', // Good Friday
+  '2026-04-06', // Easter Monday
+  '2026-05-04', // Early May
+  '2026-05-25', // Spring
+  '2026-08-31', // Summer
+  '2026-12-25', // Christmas Day
+  '2026-12-28', // Boxing Day (substitute)
+  '2027-01-01', // New Year's Day
+  '2027-03-26'  // (placeholder end-of-year; adjust in code if needed)
+];
+function isBankHoliday(d){ return BANK_HOLIDAYS.includes(dk(d)); }
+
+function autoFillLeaveHours(){
+  const box=document.getElementById('leaveHours');
+  if(box.value) return;                       // don't override a figure you typed
+  const dv=document.getElementById('leaveDate').value;
+  if(!dv || !leaveTarget) return;
+  const h=scheduledHours(leaveTarget, new Date(dv));
+  if(h) box.placeholder='auto: '+h+'h from rota';
+}
+
 function openLeaveEntry(staffId) {
   leaveTarget = staffId;
   leaveSelectedType = null;
@@ -2842,10 +2964,12 @@ function openLeaveEntry(staffId) {
   document.getElementById('leaveTitle').textContent = `${s.name} — Record Entry`;
   document.getElementById('leaveSubtitle').textContent = `Pick the type then enter the date and hours`;
   document.getElementById('leaveDate').value = dk(viewDate);
+  document.getElementById('leaveDateTo').value = '';
   document.getElementById('leaveHours').value = '';
   document.getElementById('leaveNote').value = '';
   document.getElementById('leaveClearBtn').style.display = 'none';
   renderLeaveTypeGrid();
+  autoFillLeaveHours();
   updateLeaveBalanceInfo();
   document.getElementById('leaveOv').classList.add('vis');
 }
@@ -2892,17 +3016,89 @@ function removeLeaveDay(staffId, dateKey){
   showFlash('Leave entry removed');
 }
 
+function recordClosure(){
+  const fromV=document.getElementById('closureFrom').value;
+  const toV=document.getElementById('closureTo').value;
+  const st=document.getElementById('closureStatus');
+  if(!fromV||!toV){ if(st)st.textContent='Pick both a from and a to date.'; return; }
+  const from=new Date(fromV), to=new Date(toV);
+  if(to<from){ if(st)st.textContent='The "to" date is before the "from" date.'; return; }
+  let recorded=0, already=0;
+  eachDay(from,to).forEach(d=>{
+    const dow=d.getDay(); if(dow===0||dow===6) return;   // weekend
+    STAFF.filter(s=>!s.archived).forEach(s=>{
+      const rota=scheduledHours(s.id, d);
+      if(!rota) return;                                   // not their working day
+      const existing=getTs(s.id, d);
+      if(existing && existing.type==='annual'){ already++; return; }
+      setTs(s.id, d, { type:'annual', hours:rota, note:'Setting closed' });
+      recorded++;
+    });
+  });
+  markDirty();
+  if(detailStaffId) openStaffDetail(detailStaffId); else renderPayroll();
+  if(odConnected) syncWithOneDrive();
+  if(st) st.textContent = recorded
+    ? `✓ Recorded ${recorded} leave day${recorded!==1?'s':''} across the closure` + (already?` (${already} already in)`:'') + '. Remove anyone who should not be on it from their card.'
+    : (already? 'Those days are already recorded as leave.' : 'No staff are scheduled to work in that range.');
+}
+
+function recordBankHolidays(){
+  let recorded=0, already=0, staffDays=0;
+  BANK_HOLIDAYS.forEach(bh=>{
+    const d=new Date(bh);
+    STAFF.filter(s=>!s.archived).forEach(s=>{
+      const rota=scheduledHours(s.id, d);
+      if(!rota) return;                         // not a working day for them
+      staffDays++;
+      const existing=getTs(s.id, d);
+      if(existing && existing.type==='bank'){ already++; return; }  // already recorded
+      setTs(s.id, d, { type:'bank', hours:rota, note:'Bank holiday' });
+      recorded++;
+    });
+  });
+  markDirty();
+  if(detailStaffId) openStaffDetail(detailStaffId); else renderPayroll();
+  if(odConnected) syncWithOneDrive();
+  const st=document.getElementById('bankHolStatus');
+  if(st) st.textContent = recorded
+    ? `✓ Recorded ${recorded} bank-holiday day${recorded!==1?'s':''} as leave` + (already?` (${already} were already in)`:'')
+    : (already? `All bank holidays are already recorded (${already} days).` : 'No staff are scheduled on the bank-holiday dates.');
+}
+
 function saveLeave() {
   if (!leaveTarget || !leaveSelectedType) { showFlash('Please select a type'); return; }
   const dateVal = document.getElementById('leaveDate').value;
-  const hoursVal = parseFloat(document.getElementById('leaveHours').value);
+  const toVal = document.getElementById('leaveDateTo').value;
+  const typedHours = parseFloat(document.getElementById('leaveHours').value); // may be NaN
   const noteVal = document.getElementById('leaveNote').value;
-  if (!dateVal || isNaN(hoursVal) || hoursVal <= 0) { showFlash('Please enter a date and hours'); return; }
-  const d = new Date(dateVal);
-  setTs(leaveTarget, d, { type: leaveSelectedType, hours: hoursVal, note: noteVal });
+  if (!dateVal) { showFlash('Please pick a date'); return; }
   const s = STAFF.find(x=>x.id===leaveTarget);
   const lt = LEAVE_TYPES[leaveSelectedType];
-  showFlash(`${lt.emoji} ${s.name} — ${hoursVal}h ${lt.label} recorded`);
+
+  // Build the list of days: a single day, or every working day in the block.
+  const start = new Date(dateVal);
+  const end = toVal ? new Date(toVal) : start;
+  if (end < start) { showFlash('The "to" date is before the start date'); return; }
+
+  let recorded = 0, skipped = 0;
+  eachDay(start, end).forEach(d => {
+    const dow = d.getDay();
+    if (dow === 0 || dow === 6) return;                 // weekend
+    if (isBankHoliday(d)) { skipped++; return; }        // closed on bank holidays
+    const rota = scheduledHours(leaveTarget, d);
+    if (!rota) return;                                   // not a day they work
+    // Use the typed hours only for a SINGLE day (a part day); for a block use each
+    // day's own rota hours so different-length days are correct.
+    const hrs = (!toVal && !isNaN(typedHours) && typedHours>0) ? typedHours : rota;
+    setTs(leaveTarget, d, { type: leaveSelectedType, hours: hrs, note: noteVal });
+    recorded++;
+  });
+
+  if (!recorded) { showFlash(`No working days for ${s.name} in that range`); return; }
+  showFlash(recorded===1
+    ? `${lt.emoji} ${s.name} — ${lt.label} recorded`
+    : `${lt.emoji} ${s.name} — ${lt.label} recorded for ${recorded} days`);
   closeLeave();
   if (detailStaffId) openStaffDetail(detailStaffId); else renderPayroll();
   if (odConnected) syncWithOneDrive();
@@ -3520,8 +3716,11 @@ function exportPeriod(){
   const el=document.getElementById('exportMonth');
   let y,m; const mv=el?el.value:'';
   if(mv){ [y,m]=mv.split('-').map(Number); } else { const t=new Date(); y=t.getFullYear(); m=t.getMonth()+1; }
-  const from=new Date(y,m-1,1); from.setHours(0,0,0,0);
-  const to=new Date(y,m,0); to.setHours(0,0,0,0);
+  // Payroll runs 29th of the previous month to 28th of the chosen month (Sussie
+  // sends to the accountant on the 28th), so late sick/leave in the last days of a
+  // month land in that month's run rather than being missed.
+  const to=new Date(y,m-1,28); to.setHours(0,0,0,0);
+  const from=new Date(y,m-2,29); from.setHours(0,0,0,0);
   return {from,to,y,m};
 }
 
@@ -3641,6 +3840,53 @@ function buildStaffTimesheetWB(staffId,from,to){
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,'Time Sheet');
   return wb;
+}
+
+function downloadLeaverPDF(staffId){
+  if(!window.jspdf){ alert('PDF library not loaded. Check the internet connection and refresh (Ctrl+F5).'); return; }
+  const s=STAFF.find(x=>x.id===staffId);
+  const L=leaverSummary(staffId);
+  if(!L){ alert('Set a leaving date on this staff member first (Admin, tap them, End date).'); return; }
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+  pdfHeader(doc, 'Leaver Summary', `${s.name} · ${s.role}`);
+  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(107,100,96);
+  doc.text(`Leaving date: ${fmtUK(L.end)}     Leave year: ${fmtUK(L.fyStart)} to ${fmtUK(L.fyEnd)}     Rate: £${L.hourlyRate.toFixed(2)}/hr`, 12, 46);
+
+  const body=[
+    ['Days employed this leave year', `${L.daysEmployed} of ${L.daysInYear} (${Math.round(L.fraction*100)}%)`],
+    ['Full annual entitlement', `${L.fullEntitlement} h`],
+    ['Pro-rata entitlement to leaving date', `${L.proRata} h`],
+    ['Annual + bank leave already taken', `${L.taken.toFixed(1)} h`],
+    ['Leave to pay out (before adjustments)', `${L.owedLeave>=0?L.owedLeave:0} h${L.owedLeave<0?'  (overtaken by '+Math.abs(L.owedLeave)+'h)':''}`],
+    ['Time off in lieu to pay out', fmtMin(L.lieuMin)],
+  ];
+  doc.autoTable({
+    startY:52,
+    body,
+    styles:{fontSize:10,cellPadding:3,lineColor:[204,204,204],lineWidth:0.1,textColor:[40,40,40]},
+    columnStyles:{0:{cellWidth:120,fontStyle:'normal'},1:{halign:'right',fontStyle:'bold'}},
+    alternateRowStyles:{fillColor:[247,243,236]},
+    margin:{left:12,right:12},
+    didDrawPage:()=>pdfFooter(doc)
+  });
+  let y=doc.lastAutoTable.finalY+8;
+  doc.setFillColor(251,243,220); doc.roundedRect(12,y,doc.internal.pageSize.getWidth()-24,32,2,2,'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(180,120,20);
+  doc.text('To adjust by hand before finalising:', 16, y+7);
+  doc.setFont('helvetica','normal'); doc.setTextColor(60,60,60); doc.setFontSize(8.5);
+  doc.text('The pro-rata above counts days employed in this leave year only. Add any leave carried over', 16, y+14);
+  doc.text('from last year, plus the extra owed for this March, to the leave-to-pay-out figure. The lieu', 16, y+20);
+  doc.text('figure is the current balance owed. Both leave and lieu are paid out on the final payroll.', 16, y+26);
+  y+=40;
+  doc.setDrawColor(150,150,150); doc.setLineWidth(0.2);
+  doc.line(16,y+8,90,y+8); doc.line(115,y+8,185,y+8);
+  doc.setFontSize(8); doc.setTextColor(107,100,96);
+  doc.text('Manager signature',16,y+12); doc.text('Date',115,y+12);
+  doc.text(`Generated ${fmtUK(new Date())} · Little Puddings · Grounded & Curious Ltd`, 16, y+22);
+
+  doc.save(`${s.name} Leaver Summary ${dk(L.end)}.pdf`);
+  showFlash('📄 Leaver summary PDF generated');
 }
 
 function downloadStaffTimesheet(staffId){
