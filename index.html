@@ -549,7 +549,7 @@
     </div>
   </div>
 </div>
-<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 27Aug-p</div>
+<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 27Aug-s</div>
 
 <!-- PAY WORKBOOK EXPORT PREVIEW OVERLAY -->
 <div class="overlay" id="payPreviewOv">
@@ -4315,7 +4315,7 @@ const PAY_COL={ sussie:'E', claire:'H', courtney:'K', leah:'N', chloe:'Q', alexa
 // column itself holds the HOURS, for SSP/sick days (staff work varied hours, so the
 // hours lost must be shown, not just the date).
 function colLeft(letter){ return String.fromCharCode(letter.charCodeAt(0)-1); }
-const PAY_ROWS={ ssp:[22,27], deduction:[34,37], overtime:[40,45], leave:[53,64] };
+const PAY_ROWS={ ssp:[22,27], deduction:[31,41], overtime:[47,49], leave:[58,69] };
 let payPreviewUpdates=[];
 let payPreviewMonth=null;
 
@@ -4359,7 +4359,8 @@ function buildPayPreview(){
     const ups=[];
     ups.push({address:col+'6', value:s.hourlyRate, label:'Hourly rate'});
     ups.push({address:col+'8', value:s.paidHoursPerWeek, label:'Contracted hrs/wk'});
-    ups.push({address:col+'51', value:s.annualLeaveHours, label:'Annual leave entitlement'});
+    // (Annual leave entitlement figure not written — it's reference only and its row
+    // shifts when rows are inserted; leave it to be set by hand if wanted.)
     const sickHrs = sick.reduce((t,x)=>t+(x.hrs||0),0);
     ups.push({address:col+'19', value:Number((unpaidHrs+sickHrs).toFixed(2)), label:'Deduction hours (sick + unpaid)'});
     ups.push({address:col+'16', value:Number(otData.approvedHours.toFixed(2)), label:'Overtime hours (approved)'});
@@ -4378,27 +4379,26 @@ function buildPayPreview(){
     const labelCol = String.fromCharCode(col.charCodeAt(0)+1);
     const deductions = [
       ...sick.map(x=>({d:x.d, hrs:x.hrs, label:'sick day'})),
-      ...unpaid.map(d=>({d, hrs:null, label:'unpaid leave'}))
+      ...unpaid.map(d=>({d, hrs:scheduledHours(s.id, d), label:'unpaid leave'}))
     ].sort((a,b)=>a.d-b.d);
-    // Rows 31-34 hold the individual deduction days. Row 35 is an auto-SUM formula
-    // for 31:34, so it is NEVER written to — the workbook totals the days itself.
-    const dedFirst = 31, dedLast = 34;               // day rows
-    const dedMaxDays = dedLast - dedFirst + 1;        // 4 rows available
-    const dedList = deductions.slice(-dedMaxDays);    // most recent if more than fits
-    dedList.forEach((item,idx)=>{
-      const r = dedLast - (dedList.length-1) + idx;   // fill upward, last day on row 34
+    // Individual deduction days start at row 31 and go DOWN, one row per day, for
+    // however many there are (no 4-row cap). The workbook's SUM should sit on the row
+    // just below the last day written.
+    const dedFirst = 31, dedLastAllowed = 41;         // rows 31-41, SUM sits on row 42
+    deductions.slice(0, dedLastAllowed-dedFirst+1).forEach((item,idx)=>{
+      const r = dedFirst + idx;                        // fill downward from row 31
       ups.push({address:dateCol+r, value:fmtUK(item.d), label:'Deduction date'});
       if(item.hrs!=null) ups.push({address:col+r, value:item.hrs, label:'Deduction hours'});
       ups.push({address:labelCol+r, value:item.label, label:'Deduction type'});
     });
-    if(deductions.length>dedMaxDays) warnings.push(`${s.name}: ${deductions.length} deduction days but rows 31-34 only hold ${dedMaxDays}. Add more rows in the workbook (and extend the SUM), then record the oldest by hand for now.`);
+    if(deductions.length>(dedLastAllowed-dedFirst+1)) warnings.push(`${s.name}: ${deductions.length} deduction days but only rows ${dedFirst}–${dedLastAllowed} available before the SUM. Extra ones are not written.`);
     // Overtime: date in the left column, hours in the pay column, side by side
     otData.approved.sort((a,b)=>a.date-b.date).forEach((a,i)=>{ const r=PAY_ROWS.overtime[0]+i; if(r<=PAY_ROWS.overtime[1]){
       ups.push({address:dateCol+r, value:fmtUK(a.date), label:'Overtime date'});
       ups.push({address:col+r, value:Number(a.hours), label:'Overtime hours'});
     }});
     if(otData.approved.length>(PAY_ROWS.overtime[1]-PAY_ROWS.overtime[0]+1)) warnings.push(`${s.name}: more overtime days than the ${PAY_ROWS.overtime[1]-PAY_ROWS.overtime[0]+1} rows allow. Extra ones are not written.`);
-    fill(annual,PAY_ROWS.leave,'Leave taken date');
+    // (Annual leave dates are no longer written to the workbook — removed at Sussie's request.)
     payPreviewUpdates.push(...ups);
     html+=`<div style="margin:8px 0;padding:8px 10px;background:var(--parchment);border-radius:8px">
       <div style="font-weight:700;color:var(--forest);margin-bottom:3px">${s.name} <span style="font-weight:400;color:var(--bark)">→ column ${col}</span></div>
@@ -4406,7 +4406,7 @@ function buildPayPreview(){
       <div style="font-size:11px;margin-top:4px;line-height:1.7">${ups.map(u=>`<span style="display:inline-block;margin:0 6px 0 0"><code style="background:#fff;padding:0 3px;border-radius:3px">${u.address}</code>=<b>${u.value}</b></span>`).join('')}</div>
     </div>`;
   });
-  html+=`<div style="margin-top:8px;padding:8px 10px;background:#FBF3DC;border-left:3px solid var(--gold);border-radius:6px;font-size:11px;color:var(--bark)">Overtime (row 16 and rows 40–45) only includes days you have approved on the Payroll tab. Anything still awaiting confirmation is not written.</div>`;
+  html+=`<div style="margin-top:8px;padding:8px 10px;background:#FBF3DC;border-left:3px solid var(--gold);border-radius:6px;font-size:11px;color:var(--bark)">Overtime (row 16 and rows 45–50) only includes days you have approved on the Payroll tab. Anything still awaiting confirmation is not written.</div>`;
   if(warnings.length) html+=`<div style="margin-top:8px;padding:8px 10px;background:#F4DEDA;border-left:3px solid #A13A2A;border-radius:6px;font-size:11px;color:#7a2418"><b>Please check:</b><br>${warnings.join('<br>')}</div>`;
   document.getElementById('payPreviewBody').innerHTML=html;
 }
