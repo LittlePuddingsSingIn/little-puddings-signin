@@ -447,6 +447,7 @@
       <div class="set-title">🎌 Bank holidays</div>
       <div class="sec-sub" style="margin-bottom:8px">The setting is closed on bank holidays. This records each bank holiday as paid annual leave (off entitlement) for everyone scheduled to work that day. Safe to run more than once, it will not double up.</div>
       <button onclick="recordBankHolidays()" style="width:100%;padding:11px;background:var(--forest);color:var(--gold-light);border:none;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer">Record this year's bank holidays as leave</button>
+      <button onclick="resetSchedulesFromContracts()" style="width:100%;padding:10px;margin-top:6px;background:var(--gold);color:var(--forest);border:none;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer">⏱ Reset staff schedules to contracted times</button>
       <button onclick="tidyOutOfEmployment()" style="width:100%;padding:10px;margin-top:6px;background:var(--burgundy,#A13A2A);color:#fff;border:none;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer">🧹 Fix leave: remove out-of-employment entries and correct wrong hours</button>
       <div id="bankHolStatus" style="font-size:11px;margin-top:8px;color:var(--forest)"></div>
     </div>
@@ -548,7 +549,7 @@
     </div>
   </div>
 </div>
-<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 27Aug-i</div>
+<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 27Aug-j</div>
 
 <!-- PAY WORKBOOK EXPORT PREVIEW OVERLAY -->
 <div class="overlay" id="payPreviewOv">
@@ -1507,7 +1508,26 @@ let STAFF = [
   {id:'leah',      name:'Leah',      role:'Early Years Apprentice', color:AC[5],pin:'5555',sch:{2:{s:'08:30',e:'16:00'},3:{s:'12:30',e:'17:30'},4:{s:'12:30',e:'17:30'},5:{s:'08:30',e:'15:00'}},archived:false,hourlyRate:8.00,paidHoursPerWeek:30,actualHoursPerWeek:24,annualLeaveHours:168,startDate:'2025-09-01',isApprentice:true,collegeStartDate:'2026-07-06'},
 ];
 
-// Staff timesheet entries — [staffId][dateKey] = { type: 'worked'|'annual'|'sick'|'unpaid'|'bank'|'offthejob', hours: number, note: '' }
+// Canonical schedules from contracts — used to repair saved data if a device holds
+// an out-of-date rota (which makes leave/bank-holiday auto-hours wrong). Editing a
+// person in Admin still overrides these going forward.
+const CORRECT_SCHEDULES = {
+  sussie:   {1:{s:'07:30',e:'17:30'},2:{s:'07:30',e:'17:30'},3:{s:'07:30',e:'17:30'},4:{s:'07:30',e:'17:30'},5:{s:'07:30',e:'17:30'}},
+  claire:   {1:{s:'07:45',e:'17:00'},3:{s:'08:00',e:'16:15'},4:{s:'08:00',e:'16:15'}},
+  courtney: {2:{s:'07:30',e:'17:00'},3:{s:'07:30',e:'17:00'},4:{s:'07:30',e:'17:00'},5:{s:'08:00',e:'16:30'}},
+  alexandra:{1:{s:'07:30',e:'16:30'},4:{s:'07:30',e:'12:30'},5:{s:'07:30',e:'17:30'}},
+  chloe:    {1:{s:'07:45',e:'17:15'},2:{s:'07:45',e:'17:15'},3:{s:'07:30',e:'12:30'}},
+  leah:     {2:{s:'08:30',e:'16:00'},3:{s:'12:30',e:'17:30'},4:{s:'12:30',e:'17:30'},5:{s:'08:30',e:'15:00'}}
+};
+function resetSchedulesFromContracts(){
+  let n=0;
+  STAFF.forEach(s=>{ if(CORRECT_SCHEDULES[s.id]){ s.sch = JSON.parse(JSON.stringify(CORRECT_SCHEDULES[s.id])); n++; } });
+  markDirty();
+  if(detailStaffId) openStaffDetail(detailStaffId); else renderPayroll();
+  if(odConnected) syncWithOneDrive();
+  const st=document.getElementById('bankHolStatus');
+  if(st) st.textContent = `✓ Reset ${n} staff schedules to contracted times. Now tap the Fix leave button to correct recorded hours.`;
+}
 let timesheet = {};
 
 // ════════════════════════════════════════════════
