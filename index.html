@@ -447,6 +447,7 @@
       <div class="set-title">🎌 Bank holidays</div>
       <div class="sec-sub" style="margin-bottom:8px">The setting is closed on bank holidays. This records each bank holiday as paid annual leave (off entitlement) for everyone scheduled to work that day. Safe to run more than once, it will not double up.</div>
       <button onclick="recordBankHolidays()" style="width:100%;padding:11px;background:var(--forest);color:var(--gold-light);border:none;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer">Record this year's bank holidays as leave</button>
+      <button onclick="tidyOutOfEmployment()" style="width:100%;padding:10px;margin-top:6px;background:var(--burgundy,#A13A2A);color:#fff;border:none;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer">🧹 Remove leave recorded before a start / after a leaving date</button>
       <div id="bankHolStatus" style="font-size:11px;margin-top:8px;color:var(--forest)"></div>
     </div>
 
@@ -547,7 +548,7 @@
     </div>
   </div>
 </div>
-<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 27Aug-g</div>
+<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 27Aug-h</div>
 
 <!-- PAY WORKBOOK EXPORT PREVIEW OVERLAY -->
 <div class="overlay" id="payPreviewOv">
@@ -3119,6 +3120,31 @@ function recordClosure(){
   if(st) st.textContent = recorded
     ? `✓ Recorded ${recorded} leave day${recorded!==1?'s':''} across the closure` + (already?` (${already} already in)`:'') + '. Remove anyone who should not be on it from their card.'
     : (already? 'Those days are already recorded as leave.' : 'No staff are scheduled to work in that range.');
+}
+
+function tidyOutOfEmployment(){
+  let removed=0;
+  STAFF.forEach(s=>{
+    if(!timesheet[s.id]) return;
+    Object.keys(timesheet[s.id]).forEach(k=>{
+      const e=timesheet[s.id][k];
+      if(!e || e.deleted) return;
+      // Only auto-recorded leave types get tidied; never touch worked days or sick.
+      if(e.type!=='annual' && e.type!=='bank') return;
+      const d=new Date(k);
+      if(!employedOn(s.id, d)){
+        timesheet[s.id][k] = { deleted:true, at:Date.now() };
+        removed++;
+      }
+    });
+  });
+  markDirty();
+  if(detailStaffId) openStaffDetail(detailStaffId); else renderPayroll();
+  if(odConnected) syncWithOneDrive();
+  const st=document.getElementById('bankHolStatus');
+  if(st) st.textContent = removed
+    ? `✓ Removed ${removed} leave/bank-holiday entr${removed===1?'y':'ies'} recorded outside employment dates`
+    : 'Nothing to tidy — no leave sits outside anyone\u2019s start/end dates.';
 }
 
 function recordBankHolidays(){
