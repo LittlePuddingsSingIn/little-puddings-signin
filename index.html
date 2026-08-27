@@ -817,6 +817,8 @@
     <div id="leaveBalanceInfo" style="background:var(--cream);border-left:4px solid var(--gold);padding:10px 12px;border-radius:8px;margin-bottom:12px;font-size:12px;color:var(--bark)"></div>
     <button class="af-save" onclick="saveLeave()">Save Entry</button>
     <button class="af-archive" id="leaveClearBtn" onclick="clearLeaveEntry()" style="display:none">Clear Entry</button>
+    <button onclick="clearLeaveRange()" style="width:100%;padding:11px;margin-top:6px;background:var(--burgundy,#A13A2A);color:#fff;border:none;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer">🗑 Clear ALL entries in the date range above</button>
+    <div style="font-size:10px;color:var(--moss);margin-top:4px">Removes every leave, sick, closure and override entry for this person between the two dates. Use it to wipe a wrong batch, then re-enter.</div>
     <button class="af-cancel" onclick="closeLeave()">Cancel</button>
   </div>
 </div>
@@ -2940,9 +2942,9 @@ function closeStaffDetail() {
 
 let leaveTarget = null;
 let leaveSelectedType = null;
-// England bank holidays for the 2026-27 leave year (setting is always closed).
-// A bank holiday on a day someone normally works is recorded as paid leave that
-// comes off their entitlement.
+// England bank holidays for the April 2026 to March 2027 leave year (setting is
+// always closed). Confirmed against gov.uk. A bank holiday on a day someone
+// normally works is recorded as paid leave that comes off their entitlement.
 const BANK_HOLIDAYS = [
   '2026-04-03', // Good Friday
   '2026-04-06', // Easter Monday
@@ -2952,7 +2954,8 @@ const BANK_HOLIDAYS = [
   '2026-12-25', // Christmas Day
   '2026-12-28', // Boxing Day (substitute)
   '2027-01-01', // New Year's Day
-  '2027-03-26'  // (placeholder end-of-year; adjust in code if needed)
+  '2027-03-26', // Good Friday
+  '2027-03-29'  // Easter Monday
 ];
 function isBankHoliday(d){ return BANK_HOLIDAYS.includes(dk(d)); }
 
@@ -3111,6 +3114,25 @@ function saveLeave() {
   if (detailStaffId) openStaffDetail(detailStaffId); else renderPayroll();
   if (odConnected) syncWithOneDrive();
 }
+function clearLeaveRange(){
+  if(!leaveTarget) return;
+  const fromV=document.getElementById('leaveDate').value;
+  const toV=document.getElementById('leaveDateTo').value || fromV;
+  if(!fromV){ showFlash('Pick a date (and a "to" date for a range) first'); return; }
+  const from=new Date(fromV), to=new Date(toV);
+  if(to<from){ showFlash('The "to" date is before the start date'); return; }
+  const s=STAFF.find(x=>x.id===leaveTarget);
+  let n=0;
+  eachDay(from,to).forEach(d=>{ if(getTs(leaveTarget,d)){ n++; } });
+  if(!n){ showFlash('No entries to clear in that range'); return; }
+  if(!confirm(`Clear ${n} entr${n===1?'y':'ies'} for ${s.name} between ${fmtUK(from)} and ${fmtUK(to)}? This cannot be undone.`)) return;
+  eachDay(from,to).forEach(d=>{ if(getTs(leaveTarget,d)) clearTs(leaveTarget,d); });
+  showFlash(`Cleared ${n} entr${n===1?'y':'ies'} for ${s.name}`);
+  closeLeave();
+  if(detailStaffId) openStaffDetail(detailStaffId); else renderPayroll();
+  if(odConnected) syncWithOneDrive();
+}
+
 function clearLeaveEntry() {
   const dateVal = document.getElementById('leaveDate').value;
   if (!leaveTarget || !dateVal) return;
