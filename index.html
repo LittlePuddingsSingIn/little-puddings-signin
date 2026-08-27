@@ -547,7 +547,7 @@
     </div>
   </div>
 </div>
-<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 27Aug-a</div>
+<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 27Aug-b</div>
 
 <!-- PAY WORKBOOK EXPORT PREVIEW OVERLAY -->
 <div class="overlay" id="payPreviewOv">
@@ -3022,7 +3022,12 @@ function removeLeaveDay(staffId, dateKey){
   if(!confirm('Remove this leave entry?')) return;
   clearTsByKey(staffId, dateKey);
   markDirty();
+  const sc = document.querySelector('#payrollDetail') ? document.querySelector('#payrollDetail').scrollTop : 0;
+  const pageY = window.scrollY;
   if(detailStaffId) openStaffDetail(detailStaffId); else renderPayroll();
+  // Rebuilding the card scrolls it back to the top; put the view back where it was
+  // so removing several entries in a row doesn't keep jumping.
+  requestAnimationFrame(()=>{ window.scrollTo(0, pageY); const pd=document.querySelector('#payrollDetail'); if(pd) pd.scrollTop=sc; });
   if(odConnected) syncWithOneDrive();
   showFlash('Leave entry removed');
 }
