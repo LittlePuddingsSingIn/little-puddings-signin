@@ -547,7 +547,7 @@
     </div>
   </div>
 </div>
-<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 29Jul-b</div>
+<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 27Aug-a</div>
 
 <!-- PAY WORKBOOK EXPORT PREVIEW OVERLAY -->
 <div class="overlay" id="payPreviewOv">
@@ -2816,9 +2816,9 @@ function openStaffDetail(staffId) {
     const dkk = dk(d);
     const manual = timesheet[staffId] ? timesheet[staffId][dkk] : null;
     const log = staffLog[staffId] ? staffLog[staffId][dkk] : null;
-    if (manual) {
+    if (manual && !manual.deleted) {
       entries.push({date: new Date(d), type: manual.type, hours: manual.hours, note: manual.note});
-    } else if (log && log.clockInTime) {
+    } else if (!manual && log && log.clockInTime) {
       const hrs = calcWorkedHours(staffId, d);
       entries.push({date: new Date(d), type: 'worked', hours: hrs, clockIn: log.clockInTime, clockOut: log.clockOutTime, late: log.lateInMins});
     }
@@ -2918,14 +2918,14 @@ function openStaffDetail(staffId) {
   <div style="background:var(--cream);border-radius:13px;padding:14px;margin-bottom:10px">
     <div style="font-family:'Playfair Display',serif;font-size:13px;color:var(--forest);margin-bottom:10px">${monthName} entries</div>
     ${entries.length ? entries.map(e=>{
-      const lt = LEAVE_TYPES[e.type];
+      const lt = LEAVE_TYPES[e.type] || { color:'#CCCCCC', emoji:'•', label:(e.type||'Entry') };
       return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--parchment);font-size:12px">
         <div style="width:28px;height:28px;border-radius:50%;background:${lt.color};display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0">${lt.emoji}</div>
         <div style="flex:1">
           <div style="font-weight:700;color:var(--forest)">${DAYS[e.date.getDay()].slice(0,3)} ${e.date.getDate()} ${MONTH_SHORT[e.date.getMonth()]} · ${lt.label}</div>
           <div style="font-size:10px;color:var(--moss)">${e.clockIn ? 'In ' + e.clockIn + ' · Out ' + (e.clockOut || 'still in') : ''}${e.note ? ' · ' + e.note : ''}</div>
         </div>
-        <div style="font-weight:700;color:var(--forest)">${e.hours.toFixed(1)}h</div>
+        <div style="font-weight:700;color:var(--forest)">${(e.hours||0).toFixed(1)}h</div>
       </div>`;
     }).join('') : '<div style="color:var(--moss);font-size:12px;padding:8px">No entries yet this month</div>'}
   </div>`;
