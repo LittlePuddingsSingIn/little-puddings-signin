@@ -549,7 +549,7 @@
     </div>
   </div>
 </div>
-<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 27Aug-s</div>
+<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 27Aug-t</div>
 
 <!-- PAY WORKBOOK EXPORT PREVIEW OVERLAY -->
 <div class="overlay" id="payPreviewOv">
@@ -1421,7 +1421,7 @@ const GRACE = { '08:30': 3 };
 const TERM_DATES = [
   [new Date(2026,3,22),new Date(2026,4,22)],
   [new Date(2026,5,1), new Date(2026,6,22)],
-  [new Date(2026,8,1), new Date(2026,10,22)],
+  [new Date(2026,8,3), new Date(2026,10,22)],
   [new Date(2026,10,30),new Date(2026,11,18)],
   [new Date(2027,0,5), new Date(2027,1,12)],
   [new Date(2027,1,22),new Date(2027,2,28)],
@@ -1844,6 +1844,9 @@ function staffScheduledToday(s,d){
   const ov=getSOv(d)[s.id];
   if(ov && ov.action==='add') return true;      // added for this day only (e.g. cover)
   if(ov && ov.action==='remove') return false;  // taken off this day only
+  const k=dk(d);
+  if(s.startDate && k < s.startDate) return false;  // not started yet
+  if(s.endDate   && k > s.endDate)   return false;  // left — don't show after leaving date
   return !!s.sch[d.getDay()];
 }
 
