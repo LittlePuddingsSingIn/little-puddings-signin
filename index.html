@@ -549,7 +549,7 @@
     </div>
   </div>
 </div>
-<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 27Aug-t</div>
+<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 27Aug-u</div>
 
 <!-- PAY WORKBOOK EXPORT PREVIEW OVERLAY -->
 <div class="overlay" id="payPreviewOv">
@@ -704,6 +704,23 @@
         <div class="af-day" data-day="3" onclick="toggleDay(3)">Wed</div>
         <div class="af-day" data-day="4" onclick="toggleDay(4)">Thu</div>
         <div class="af-day" data-day="5" onclick="toggleDay(5)">Fri</div>
+      </div>
+    </div>
+    <div class="af-group" id="afSchoolRunGroup">
+      <label class="af-label" style="display:flex;align-items:center;gap:8px;cursor:pointer">
+        <input type="checkbox" id="afSchoolRun" onchange="renderAdminForm()" style="width:auto">
+        School-run child (parent may take to / collect from school)
+      </label>
+      <div id="afAfterSchoolWrap" style="display:none;margin-top:8px">
+        <label class="af-label">Collected AFTER school on</label>
+        <div class="af-days" id="afAfterSchoolDays">
+          <div class="af-day" data-aday="1" onclick="toggleAfterDay(1)">Mon</div>
+          <div class="af-day" data-aday="2" onclick="toggleAfterDay(2)">Tue</div>
+          <div class="af-day" data-aday="3" onclick="toggleAfterDay(3)">Wed</div>
+          <div class="af-day" data-aday="4" onclick="toggleAfterDay(4)">Thu</div>
+          <div class="af-day" data-aday="5" onclick="toggleAfterDay(5)">Fri</div>
+        </div>
+        <div style="font-size:10px;color:var(--moss);margin-top:4px">Days not ticked are before-school only. Leave all unticked for before-school only.</div>
       </div>
     </div>
     <div class="af-row">
@@ -1746,6 +1763,7 @@ function mergePins(codeArr, storedArr){
 }
 let adminEditTarget = null; // {type, id} or null for new
 let adminFormDays = [];
+let adminFormAfterDays = [];
 let adminFormEmoji = '🌱';
 
 function isPinDefault(type,id){
@@ -2470,6 +2488,7 @@ function renderAdmin(){
 function openAdminForm(type, id){
   adminEditTarget={type,id};
   adminFormDays=[];
+  adminFormAfterDays=[];
   // Build emoji grid
   const grid=document.getElementById('afEmojiGrid');
   grid.innerHTML=EMOJIS.map(e=>`<div class="af-emoji-btn ${adminFormEmoji===e?'sel':''}" onclick="selectEmoji('${e}')">${e}</div>`).join('');
@@ -2485,6 +2504,8 @@ function openAdminForm(type, id){
       document.getElementById('afEndTime').value=entity.ce;
       document.getElementById('afTermTime').value=entity.ay===true?'false':entity.ay==='holidays'?'holidays':'true';
       adminFormDays=[...entity.days];
+      adminFormAfterDays=entity.afterSchoolDays?[...entity.afterSchoolDays]:[];
+      const srBox=document.getElementById('afSchoolRun'); if(srBox) srBox.checked=!!entity.schoolRun;
     } else {
       document.getElementById('afRole').value=entity.role;
       // Parse staff schedule into days
@@ -2519,6 +2540,12 @@ function renderAdminForm(){
   document.getElementById('afBillingGroup').style.display=type==='staff'?'none':'block';
   document.getElementById('afRoleGroup').style.display=type==='staff'?'block':'none';
   document.getElementById('afTermGroup').style.display=type==='staff'?'none':'block';
+  // School-run toggle only for school children; after-school days only when ticked.
+  const srGroup=document.getElementById('afSchoolRunGroup');
+  if(srGroup) srGroup.style.display=(type==='school')?'block':'none';
+  const srOn=document.getElementById('afSchoolRun') && document.getElementById('afSchoolRun').checked;
+  const asWrap=document.getElementById('afAfterSchoolWrap');
+  if(asWrap) asWrap.style.display=(type==='school' && srOn)?'block':'none';
 }
 function closeAdminForm(){ document.getElementById('adminFormOv').classList.remove('vis'); adminEditTarget=null; }
 function toggleDay(d){
@@ -2526,10 +2553,19 @@ function toggleDay(d){
   if(idx>=0)adminFormDays.splice(idx,1); else adminFormDays.push(d);
   updateDayButtons();
 }
+function toggleAfterDay(d){
+  const idx=adminFormAfterDays.indexOf(d);
+  if(idx>=0)adminFormAfterDays.splice(idx,1); else adminFormAfterDays.push(d);
+  updateDayButtons();
+}
 function updateDayButtons(){
-  document.querySelectorAll('.af-day').forEach(btn=>{
+  document.querySelectorAll('.af-day[data-day]').forEach(btn=>{
     const d=parseInt(btn.dataset.day);
     btn.classList.toggle('sel',adminFormDays.includes(d));
+  });
+  document.querySelectorAll('.af-day[data-aday]').forEach(btn=>{
+    const d=parseInt(btn.dataset.aday);
+    btn.classList.toggle('sel',adminFormAfterDays.includes(d));
   });
 }
 function selectEmoji(e){
@@ -2575,12 +2611,17 @@ function saveAdminForm(){
       c.cs=cs;c.ce=ce;c.billing=billing;c.ay=ay;c.notes=notes;
       c.startDate=document.getElementById('afStartDate').value||null;
       c.endDate=document.getElementById('afEndDate').value||null;
+      const srBox=document.getElementById('afSchoolRun');
+      c.schoolRun=(type==='school' && srBox && srBox.checked);
+      c.afterSchoolDays=c.schoolRun?[...adminFormAfterDays]:[];
       showFlash(`✓ ${name} updated`);
     } else {
       const maxAo=CHILDREN.filter(c=>c.type===type).reduce((m,c)=>Math.max(m,c.ao),0);
       CHILDREN.push({id:'child_'+Date.now(),name,emoji:adminFormEmoji,type,ao:maxAo+1,
         color:AC[CHILDREN.length%AC.length],pin:'0000',days:adminFormDays,
         cs,ce,billing,ay,hb:billing==='funded'?null:billing,notes,
+        schoolRun:(type==='school' && document.getElementById('afSchoolRun') && document.getElementById('afSchoolRun').checked),
+        afterSchoolDays:(type==='school' && document.getElementById('afSchoolRun') && document.getElementById('afSchoolRun').checked)?[...adminFormAfterDays]:[],
         startDate:document.getElementById('afStartDate').value||null,
         endDate:document.getElementById('afEndDate').value||null,archived:false});
       showFlash(`✓ ${name} added`);
