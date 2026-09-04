@@ -549,7 +549,7 @@
     </div>
   </div>
 </div>
-<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 27Aug-u</div>
+<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 27Aug-v</div>
 
 <!-- PAY WORKBOOK EXPORT PREVIEW OVERLAY -->
 <div class="overlay" id="payPreviewOv">
@@ -927,9 +927,10 @@ let odConnected = false;
 
 async function initMSAL() {
   try {
-    // Wait for MSAL library to be available
+    // Wait for the Microsoft library to load. Give it longer (up to ~15s) so a slow
+    // tablet/phone connection still works rather than showing "Auth not ready".
     let attempts = 0;
-    while (typeof msal === 'undefined' && attempts < 50) {
+    while (typeof msal === 'undefined' && attempts < 150) {
       await new Promise(r => setTimeout(r, 100));
       attempts++;
     }
@@ -964,7 +965,7 @@ async function initMSAL() {
 
 async function initiateODAuth() {
   closeOD();
-  if (!msalInstance) { showFlash('Auth not ready — please refresh'); return; }
+  if (!msalInstance) { showFlash('Connecting… loading Microsoft sign-in, tap again in a moment'); initMSAL(); return; }
   try {
     await msalInstance.loginRedirect({ scopes: GRAPH_SCOPES });
     // Page will redirect to Microsoft and back — token handled in initMSAL
