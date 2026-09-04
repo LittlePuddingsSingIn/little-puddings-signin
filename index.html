@@ -9,7 +9,26 @@
 <title>Little Puddings — Sign In & Out</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Lato:wght@300;400;700;900&display=swap" rel="stylesheet">
 <!-- Microsoft Authentication Library -->
-<script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.0/lib/msal-browser.min.js"></script>
+<script>
+// Fallback loaders in case the first CDN is blocked on this network. alcdn.msauth.net
+// is blocked on the setting's wifi, so jsdelivr is primary; unpkg is a second backup.
+(function(){
+  function need(){ return typeof msal === 'undefined'; }
+  function add(src, next){
+    if(!need()) return;
+    var s=document.createElement('script');
+    s.src=src; s.onload=function(){}; s.onerror=function(){ if(next) next(); };
+    document.head.appendChild(s);
+  }
+  // If jsdelivr didn't load msal, try unpkg, then the original as a last resort.
+  setTimeout(function(){
+    if(need()) add('https://unpkg.com/@azure/msal-browser@2.38.0/lib/msal-browser.min.js', function(){
+      add('https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js');
+    });
+  }, 1500);
+})();
+</script>
 <!-- Export libraries: SheetJS (Excel) + jsPDF + AutoTable (PDF registers) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -549,7 +568,7 @@
     </div>
   </div>
 </div>
-<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 27Aug-v</div>
+<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 27Aug-w</div>
 
 <!-- PAY WORKBOOK EXPORT PREVIEW OVERLAY -->
 <div class="overlay" id="payPreviewOv">
