@@ -568,7 +568,7 @@
     </div>
   </div>
 </div>
-<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 13Sep-b</div>
+<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 13Sep-c</div>
 
 <!-- PAY WORKBOOK EXPORT PREVIEW OVERLAY -->
 <div class="overlay" id="payPreviewOv">
@@ -3750,8 +3750,10 @@ function openAction(type,id){
     if(!isIn){
       // Private late notice, shown only to the person clocking in (never on the
       // cards other staff and parents can see), so the time sheet is no surprise.
+      // Not shown for Sussie — she works flexibly (own overtime rules), so a late
+      // clock-in is never a fault to flag.
       const dow=viewDate.getDay(), sched=e.sch[dow];
-      if(sched && nowMins > pm(sched.s) && !isAuthLate(e.id, viewDate)){
+      if(e.id!=='sussie' && sched && nowMins > pm(sched.s) && !isAuthLate(e.id, viewDate)){
         const late = nowMins - pm(sched.s);
         warn.style.display='block';
         document.getElementById('actWarnTitle').textContent=`Clocking in ${fmins(late)} after your start time`;
@@ -4028,6 +4030,7 @@ function scheduledHours(staffId, d){
 
 function staffLateEarly(staffId, d){
   const s = STAFF.find(x=>x.id===staffId);
+  if(staffId==='sussie') return {late:0, early:0, authLate:false, authEarly:false, authLateMins:0, authEarlyMins:0};  // flexible hours — never flagged
   const sched = s && s.sch[d.getDay()];
   const log = staffLog[staffId] && staffLog[staffId][dk(d)];
   const man = getTs(staffId, d);
