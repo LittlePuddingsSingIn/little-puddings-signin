@@ -568,7 +568,7 @@
     </div>
   </div>
 </div>
-<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 27Aug-w</div>
+<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 13Sep-b</div>
 
 <!-- PAY WORKBOOK EXPORT PREVIEW OVERLAY -->
 <div class="overlay" id="payPreviewOv">
@@ -723,6 +723,8 @@
         <div class="af-day" data-day="3" onclick="toggleDay(3)">Wed</div>
         <div class="af-day" data-day="4" onclick="toggleDay(4)">Thu</div>
         <div class="af-day" data-day="5" onclick="toggleDay(5)">Fri</div>
+        <div class="af-day" data-day="6" onclick="toggleDay(6)">Sat</div>
+        <div class="af-day" data-day="0" onclick="toggleDay(0)">Sun</div>
       </div>
     </div>
     <div class="af-group" id="afSchoolRunGroup">
@@ -1047,7 +1049,8 @@ async function syncWithOneDrive() {
           Object.keys(remoteData.staffLog[sid]).forEach(dkk => {
             const remote = remoteData.staffLog[sid][dkk];
             const local = staffLog[sid][dkk];
-            if (!local || (remote.clockInTime && !local.clockInTime) || (remote.clockOutTime && !local.clockOutTime)) {
+            const rSess = (remote.sessions&&remote.sessions.length)||0, lSess=(local&&local.sessions&&local.sessions.length)||0;
+            if (!local || (remote.clockInTime && !local.clockInTime) || (remote.clockOutTime && !local.clockOutTime) || rSess>lSess) {
               staffLog[sid][dkk] = remote;
             }
           });
@@ -1549,7 +1552,7 @@ let STAFF = [
 // an out-of-date rota (which makes leave/bank-holiday auto-hours wrong). Editing a
 // person in Admin still overrides these going forward.
 const CORRECT_SCHEDULES = {
-  sussie:   {1:{s:'07:30',e:'17:30'},2:{s:'07:30',e:'17:30'},3:{s:'07:30',e:'17:30'},4:{s:'07:30',e:'17:30'},5:{s:'07:30',e:'17:30'}},
+  sussie:   {0:{s:'06:00',e:'23:59'},1:{s:'06:00',e:'23:59'},2:{s:'06:00',e:'23:59'},3:{s:'06:00',e:'23:59'},4:{s:'06:00',e:'23:59'},5:{s:'06:00',e:'23:59'},6:{s:'06:00',e:'23:59'}},
   claire:   {1:{s:'07:45',e:'17:00'},3:{s:'08:00',e:'16:15'},4:{s:'08:00',e:'16:15'}},
   courtney: {2:{s:'07:30',e:'17:00'},3:{s:'07:30',e:'17:00'},4:{s:'07:30',e:'17:00'},5:{s:'08:00',e:'16:30'}},
   alexandra:{1:{s:'07:30',e:'16:30'},4:{s:'07:30',e:'12:30'},5:{s:'07:30',e:'17:30'}},
@@ -2160,7 +2163,7 @@ function renderStaff(){
       <div class="staff-info">
         <div class="staff-name">${s.name}</div>
         <div class="staff-role">${s.role}</div>
-        ${elevated()&&log.clockInTime?`<div class="staff-clock">In ${log.clockInTime}${log.clockOutTime?' · Out '+log.clockOutTime:''}</div>`:''}
+        ${elevated()&&log.clockInTime?`<div class="staff-clock">${sessionsString(s.id,viewDate)}${calcWorkedHours(s.id,viewDate)>0?' · '+calcWorkedHours(s.id,viewDate).toFixed(2)+'h':''}</div>`:''}
       </div>
       <div class="staff-sbadge ${log.clockedIn?'sb-in':(managerMode&&isLate)?'sb-late':'sb-out'}">${log.clockedIn?'● In':(managerMode&&isLate)?'⚠ Late':'○ Out'}</div>
     </div>`;
@@ -2710,10 +2713,26 @@ const LATE_EARLY_GRACE = 10;
 
 function calcWorkedHours(staffId, d) {
   const log = getSLog(staffId, d);
+  // Sum every completed session (supports leaving and returning during the day).
+  if (Array.isArray(log.sessions) && log.sessions.length) {
+    let mins = 0;
+    log.sessions.forEach(s => { if (s.in && s.out) mins += pm(s.out) - pm(s.in); });
+    if (mins > 0) return mins / 60;
+  }
+  // Fall back to the single in/out pair (older days, or a session still open).
   if (log.clockInTime && log.clockOutTime) {
     return (pm(log.clockOutTime) - pm(log.clockInTime)) / 60;
   }
   return 0;
+}
+// Session in/out times for a day, as a readable string like "08:00–12:00, 13:00–17:00".
+function sessionsString(staffId, d){
+  const log = getSLog(staffId, d);
+  if (Array.isArray(log.sessions) && log.sessions.length){
+    return log.sessions.filter(s=>s.in).map(s=>s.in+'–'+(s.out||'…')).join(', ');
+  }
+  if (log.clockInTime) return log.clockInTime+'–'+(log.clockOutTime||'…');
+  return '';
 }
 
 // ════════════════════════════════════════════════
@@ -2754,7 +2773,7 @@ function computeLieu(staffId, refDate){
       else { isLeaveDay = true; if (man.type === 'lieu') takenMin += (man.hours || 0) * 60; }
     } else {
       const log = (staffLog[staffId] && staffLog[staffId][k]) ? staffLog[staffId][k] : null;
-      if (log && log.clockInTime && log.clockOutTime) workedHrs = (pm(log.clockOutTime) - pm(log.clockInTime)) / 60;
+      if (log && log.clockInTime && log.clockOutTime) workedHrs = calcWorkedHours(staffId, cur);
     }
     if (!isLeaveDay) lateMin += staffLateEarly(staffId, cur).late; // lateness reduces lieu
     if (!isLeaveDay && workedHrs >= LIEU_FULL_DAY_HOURS) fullDays++;
@@ -3763,8 +3782,16 @@ function confirmAction(isIn){
   } else {
     const s=STAFF.find(x=>x.id===id),log=getSLog(id,viewDate);
     const dow=viewDate.getDay(),sched=s.sch[dow];
-    if(isIn){log.clockedIn=true;log.clockInTime=t;log.lateInMins=0;}
-    else{log.clockedIn=false;log.clockOutTime=t;log.earlyOutMins=0;}
+    if(!Array.isArray(log.sessions)) log.sessions=[];
+    if(isIn){
+      log.sessions.push({in:t, out:null});           // start a new session
+      log.clockedIn=true; log.clockInTime=log.sessions[0].in; log.lateInMins=0;
+    } else {
+      // close the most recent open session; if none open, record a bare out
+      const open=[...log.sessions].reverse().find(x=>x.in && !x.out);
+      if(open) open.out=t; else log.sessions.push({in:log.clockInTime||t, out:t});
+      log.clockedIn=false; log.clockOutTime=t; log.earlyOutMins=0;
+    }
     getLog(viewDate).unshift({name:s.name,type:'staff',action:isIn?'in':'out',time:t,extra:0,verified:true});
     showFlash(`${s.name} clocked ${isIn?'IN':'OUT'} at ${t}`);
     markDirty();
@@ -4256,6 +4283,42 @@ function overtimeFor(staffId, from, to){
   const candidates=[], approved=[]; let approvedHours=0;
   if(!s) return {candidates, approved, approvedHours};
   const excluded = OT_EXCLUDE.includes(staffId);
+  // Sussie's own rule: she doesn't pay herself for all her hours yet, so recognise
+  // extra time as overtime — ALL weekend work, and weekday hours above 11.
+  if(staffId==='sussie'){
+    eachDay(from,to).forEach(d=>{
+      const k=dk(d);
+      let man = timesheet[staffId] && timesheet[staffId][k];
+      if (man && man.deleted) man = null;
+      if(man && man.type!=='worked') return;               // a leave/sick day
+      const worked = calcWorkedHours(staffId, d);           // sums all sessions
+      if(worked<=0) return;
+      const dow = d.getDay();
+      const isWeekend = (dow===0 || dow===6);
+      let extra = 0;
+      if(isWeekend) extra = worked;                         // all weekend time is overtime
+      else if(worked > 11) extra = worked - 11;             // weekday time above 11h
+      if(extra <= 0) return;
+      const rec = getOT(staffId, d);
+      if(rec && rec.status==='dismissed') return;
+      if(rec && rec.status==='approved'){
+        approved.push({date:d, hours:rec.hours, note:rec.note||(isWeekend?'Weekend work':'Over 11h'), extraMins:rec.hours*60, sched:!isWeekend});
+        approvedHours += rec.hours; return;
+      }
+      candidates.push({date:d, hours:round15(extra*60/60), extraMins:extra*60, sched:!isWeekend,
+                       note:isWeekend?'Weekend work':'Over 11h', workedMins:worked*60,
+                       in:sessionsString(staffId,d), out:''});
+    });
+    // Also include any overtime she added by hand.
+    eachDay(from,to).forEach(d=>{
+      const rec = getOT(staffId, d);
+      if(rec && rec.status==='approved' && !approved.find(a=>dk(a.date)===dk(d))){
+        approved.push({date:d, hours:rec.hours, note:rec.note||'', extraMins:rec.hours*60, sched:true});
+        approvedHours += rec.hours;
+      }
+    });
+    return {candidates, approved, approvedHours};
+  }
   if(excluded){
     // No auto-detection for excluded staff (e.g. Sussie), but any overtime added
     // by hand still counts and reaches payroll.
