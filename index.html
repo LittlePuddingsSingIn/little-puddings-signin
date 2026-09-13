@@ -568,7 +568,7 @@
     </div>
   </div>
 </div>
-<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 13Sep-c</div>
+<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 13Sep-d</div>
 
 <!-- PAY WORKBOOK EXPORT PREVIEW OVERLAY -->
 <div class="overlay" id="payPreviewOv">
@@ -2979,7 +2979,7 @@ function openStaffDetail(staffId) {
       entries.push({date: new Date(d), type: manual.type, hours: manual.hours, note: manual.note});
     } else if (!manual && log && log.clockInTime) {
       const hrs = calcWorkedHours(staffId, d);
-      entries.push({date: new Date(d), type: 'worked', hours: hrs, clockIn: log.clockInTime, clockOut: log.clockOutTime, late: log.lateInMins});
+      entries.push({date: new Date(d), type: 'worked', hours: hrs, clockIn: log.clockInTime, clockOut: log.clockOutTime, late: log.lateInMins, sessionsStr: sessionsString(staffId, d)});
     }
   }
   entries.sort((a,b)=>b.date - a.date);
@@ -3094,7 +3094,7 @@ function openStaffDetail(staffId) {
         <div style="width:28px;height:28px;border-radius:50%;background:${lt.color};display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0">${lt.emoji}</div>
         <div style="flex:1">
           <div style="font-weight:700;color:var(--forest)">${DAYS[e.date.getDay()].slice(0,3)} ${e.date.getDate()} ${MONTH_SHORT[e.date.getMonth()]} · ${lt.label}</div>
-          <div style="font-size:10px;color:var(--moss)">${e.clockIn ? 'In ' + e.clockIn + ' · Out ' + (e.clockOut || 'still in') : ''}${e.note ? ' · ' + e.note : ''}</div>
+          <div style="font-size:10px;color:var(--moss)">${e.sessionsStr ? e.sessionsStr : (e.clockIn ? 'In ' + e.clockIn + ' · Out ' + (e.clockOut || 'still in') : '')}${e.note ? ' · ' + e.note : ''}</div>
         </div>
         <div style="font-weight:700;color:var(--forest)">${(e.hours||0).toFixed(1)}h</div>
       </div>`;
