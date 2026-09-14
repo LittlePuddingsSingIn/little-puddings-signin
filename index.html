@@ -568,7 +568,7 @@
     </div>
   </div>
 </div>
-<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 13Sep-d</div>
+<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 13Sep-e</div>
 
 <!-- PAY WORKBOOK EXPORT PREVIEW OVERLAY -->
 <div class="overlay" id="payPreviewOv">
@@ -2735,6 +2735,58 @@ function sessionsString(staffId, d){
   return '';
 }
 
+// Edit a staff member's clock sessions for a day — change any session's in/out,
+// add a session you forgot to log, or remove one. Times as HH:MM (24h).
+function editSessions(staffId, dateKey){
+  const s = STAFF.find(x=>x.id===staffId);
+  const d = new Date(dateKey);
+  const log = getSLog(staffId, d);
+  // Normalise to a sessions array so we can edit uniformly.
+  if(!Array.isArray(log.sessions) || !log.sessions.length){
+    log.sessions = log.clockInTime ? [{in:log.clockInTime, out:log.clockOutTime||null}] : [];
+  }
+  const list = log.sessions.map((x,i)=>`${i+1}. ${x.in||'?'}–${x.out||'(still in)'}`).join('\n');
+  const choice = prompt(
+    `${s.name} — ${fmtUK(d)}\nSessions:\n${list||'(none yet)'}\n\n`+
+    `Type a session NUMBER to edit it, "add" to add one, or "del N" to remove session N. Cancel to close.`,
+    log.sessions.length?'1':'add'
+  );
+  if(choice===null) return;
+  const c = choice.trim().toLowerCase();
+
+  if(c==='add'){
+    const inT = prompt('Clock IN time (HH:MM, 24h):','09:00'); if(inT===null) return;
+    if(!/^\d{1,2}:\d{2}$/.test(inT.trim())){ showFlash('Time must be HH:MM'); return; }
+    const outT = prompt('Clock OUT time (HH:MM, 24h) — leave blank if still in:',''); if(outT===null) return;
+    if(outT.trim() && !/^\d{1,2}:\d{2}$/.test(outT.trim())){ showFlash('Time must be HH:MM'); return; }
+    log.sessions.push({in:inT.trim(), out:outT.trim()||null});
+  } else if(c.startsWith('del')){
+    const n = parseInt(c.replace('del','').trim());
+    if(!n || n<1 || n>log.sessions.length){ showFlash('No session '+n); return; }
+    log.sessions.splice(n-1,1);
+  } else {
+    const n = parseInt(c);
+    if(!n || n<1 || n>log.sessions.length){ showFlash('No session '+n); return; }
+    const cur = log.sessions[n-1];
+    const inT = prompt('Clock IN time (HH:MM):', cur.in||'09:00'); if(inT===null) return;
+    if(!/^\d{1,2}:\d{2}$/.test(inT.trim())){ showFlash('Time must be HH:MM'); return; }
+    const outT = prompt('Clock OUT time (HH:MM) — blank if still in:', cur.out||''); if(outT===null) return;
+    if(outT.trim() && !/^\d{1,2}:\d{2}$/.test(outT.trim())){ showFlash('Time must be HH:MM'); return; }
+    log.sessions[n-1] = {in:inT.trim(), out:outT.trim()||null};
+  }
+  // Keep the single in/out fields in step (first in, last out) for anything that reads them.
+  log.sessions.sort((a,b)=> pm(a.in) - pm(b.in));
+  const withIn = log.sessions.filter(x=>x.in);
+  log.clockInTime = withIn.length ? withIn[0].in : null;
+  const withOut = log.sessions.filter(x=>x.out);
+  log.clockOutTime = withOut.length ? withOut[withOut.length-1].out : null;
+  log.clockedIn = log.sessions.some(x=>x.in && !x.out);
+  markDirty();
+  if(detailStaffId) openStaffDetail(detailStaffId); else renderPayroll();
+  if(odConnected) syncWithOneDrive();
+  showFlash(`${s.name} — times updated`);
+}
+
 // ════════════════════════════════════════════════
 // TIME OFF IN LIEU (TOIL)
 // No lunch is taken off site, so staff are paid arrival-to-leaving (already the case),
@@ -3094,7 +3146,7 @@ function openStaffDetail(staffId) {
         <div style="width:28px;height:28px;border-radius:50%;background:${lt.color};display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0">${lt.emoji}</div>
         <div style="flex:1">
           <div style="font-weight:700;color:var(--forest)">${DAYS[e.date.getDay()].slice(0,3)} ${e.date.getDate()} ${MONTH_SHORT[e.date.getMonth()]} · ${lt.label}</div>
-          <div style="font-size:10px;color:var(--moss)">${e.sessionsStr ? e.sessionsStr : (e.clockIn ? 'In ' + e.clockIn + ' · Out ' + (e.clockOut || 'still in') : '')}${e.note ? ' · ' + e.note : ''}</div>
+          <div style="font-size:10px;color:var(--moss)">${e.sessionsStr ? e.sessionsStr : (e.clockIn ? 'In ' + e.clockIn + ' · Out ' + (e.clockOut || 'still in') : '')}${e.note ? ' · ' + e.note : ''}${e.type==='worked' && elevated() ? ` <span onclick="editSessions('${staffId}','${dk(e.date)}')" style="color:var(--forest);text-decoration:underline;cursor:pointer;margin-left:6px">edit times</span>` : ''}</div>
         </div>
         <div style="font-weight:700;color:var(--forest)">${(e.hours||0).toFixed(1)}h</div>
       </div>`;
