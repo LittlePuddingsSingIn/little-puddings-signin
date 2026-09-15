@@ -568,7 +568,7 @@
     </div>
   </div>
 </div>
-<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 15Sep-i</div>
+<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 15Sep-k</div>
 
 <!-- PAY WORKBOOK EXPORT PREVIEW OVERLAY -->
 <div class="overlay" id="payPreviewOv">
@@ -4248,10 +4248,10 @@ function downloadLeaveSummaryPDF(staffId){
   // Plain-English summary line, so it's easy to follow (first job for the apprentices).
   const remWord = remaining >= 0
     ? `That leaves you ${remaining.toFixed(1)} hours still to book.`
-    : `That is ${Math.abs(remaining).toFixed(1)} hours MORE than your allowance — you have booked over what you have. Let's talk about this at supervision.`;
+    : `That is ${Math.abs(remaining).toFixed(1)} hours MORE than your allowance — you have booked over what you have.`;
   doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(60,60,60);
   const plain = doc.splitTextToSize(
-    `You get ${allowance.toFixed(1)} hours of paid leave this year (that is your annual leave, plus bank holidays and any days we close). `+
+    `Your total paid leave for the year is ${allowance.toFixed(1)} hours. This already includes bank holidays and any days the setting closes — they are not extra on top. `+
     `So far you have taken ${usedHrs.toFixed(1)} hours, and you have ${upcomingAB.toFixed(1)} hours already booked for later in the year. `+
     remWord,
     doc.internal.pageSize.getWidth()-24
@@ -4263,7 +4263,7 @@ function downloadLeaveSummaryPDF(staffId){
   doc.autoTable({
     startY:afterPlain,
     body:[
-      ['Annual leave allowance', `${allowance.toFixed(1)} h`],
+      ['Total paid leave allowance (includes bank holidays & closures)', `${allowance.toFixed(1)} h`],
       ['Taken so far (annual + bank + closures)', `${usedHrs.toFixed(1)} h`],
       ['Upcoming booked (annual + bank + closures)', `${upcomingAB.toFixed(1)} h`],
       ['Remaining (after taken and booked)', `${remaining.toFixed(1)} h`],
