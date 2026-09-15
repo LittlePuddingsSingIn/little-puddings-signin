@@ -568,7 +568,7 @@
     </div>
   </div>
 </div>
-<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 15Sep-f</div>
+<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 15Sep-h</div>
 
 <!-- PAY WORKBOOK EXPORT PREVIEW OVERLAY -->
 <div class="overlay" id="payPreviewOv">
@@ -4203,9 +4203,7 @@ function downloadLeaveSummaryPDF(staffId){
   const ref = viewDate;
   const today = new Date(); today.setHours(0,0,0,0);
   const allowance = allowanceFor(s.id, ref);
-  const year = getYearTotals(s.id, ref);   // annual, bank, sick, unpaid totals this leave year
-  const usedHrs = year.annual + year.bank; // annual + bank + closures (closures are stored as annual)
-  const remaining = allowance - usedHrs;
+  const year = getYearTotals(s.id, ref);   // (kept for unpaid total etc.)
 
   // Gather every leave entry this leave year, split used vs upcoming, one row per date
   // with a column per type (annual, bank/closure, unpaid, sick).
@@ -4236,6 +4234,10 @@ function downloadLeaveSummaryPDF(staffId){
     });
   }
   used.sort((a,b)=>a.d-b.d); upcoming.sort((a,b)=>a.d-b.d);
+  // "Used so far" = annual + bank/closure already TAKEN (past), so it matches the table.
+  const usedHrs = used.reduce((t,r)=>t+r.annual+r.bank, 0);
+  const upcomingAB = upcoming.reduce((t,r)=>t+r.annual+r.bank, 0);
+  const remaining = allowance - usedHrs - upcomingAB;   // what's left after taken AND booked
   const h = v => v ? v.toFixed(1) : '';   // blank instead of 0.0 in the columns
   const rowCells = r => [fmtUK(r.d), h(r.annual), h(r.bank), h(r.unpaid), h(r.sick)];
 
@@ -4248,8 +4250,9 @@ function downloadLeaveSummaryPDF(staffId){
     startY:46,
     body:[
       ['Annual leave allowance', `${allowance.toFixed(1)} h`],
-      ['Used so far (annual + bank + closures)', `${usedHrs.toFixed(1)} h`],
-      ['Remaining', `${remaining.toFixed(1)} h`],
+      ['Taken so far (annual + bank + closures)', `${usedHrs.toFixed(1)} h`],
+      ['Upcoming booked (annual + bank + closures)', `${upcomingAB.toFixed(1)} h`],
+      ['Remaining (after taken and booked)', `${remaining.toFixed(1)} h`],
       ['Unpaid leave taken (separate — not off allowance)', `${(year.unpaid||0).toFixed(1)} h`],
       ['Sick leave taken (separate — not off allowance)', `${totSick.toFixed(1)} h`],
     ],
@@ -4259,42 +4262,52 @@ function downloadLeaveSummaryPDF(staffId){
     margin:{left:12,right:12}
   });
 
-  // Used list
-  let y = doc.lastAutoTable.finalY + 8;
+  // One combined list: taken first, then upcoming (tinted gold so they stand out).
+  // A single total row covers everything. Compact rows so it fits on one page.
+  let y = doc.lastAutoTable.finalY + 6;
   doc.setFont('times','bold'); doc.setFontSize(11); doc.setTextColor(26,122,74);
-  doc.text('Leave already taken', 12, y);
+  doc.text('Leave taken & upcoming', 12, y);
+  doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(160,120,20);
+  doc.text('Rows shaded gold are upcoming / planned', 12, y+4);
+
+  const all = used.map(r=>({r, up:false})).concat(upcoming.map(r=>({r, up:true})));
+  const allBody = all.length ? all.map(x=>rowCells(x.r)) : [['—','','','','']];
+  const tot = arr => ({
+    annual: arr.reduce((t,r)=>t+r.annual,0), bank: arr.reduce((t,r)=>t+r.bank,0),
+    unpaid: arr.reduce((t,r)=>t+r.unpaid,0), sick: arr.reduce((t,r)=>t+r.sick,0)
+  });
+  const gt = tot(used.concat(upcoming));
   doc.autoTable({
-    startY:y+3,
+    startY:y+7,
     head:[['Date','Annual','Bank/Closure','Unpaid','Sick']],
-    body: used.length ? used.map(rowCells) : [['—','','','','']],
-    foot: used.length ? [[
-      {content:'Total', styles:{halign:'left'}},
-      {content:h(used.reduce((t,r)=>t+r.annual,0)), styles:{halign:'center'}},
-      {content:h(used.reduce((t,r)=>t+r.bank,0)), styles:{halign:'center'}},
-      {content:h(used.reduce((t,r)=>t+r.unpaid,0)), styles:{halign:'center'}},
-      {content:h(used.reduce((t,r)=>t+r.sick,0)), styles:{halign:'center'}}
-    ]] : undefined,
-    styles:{fontSize:8.5,cellPadding:1.4,minCellHeight:0},
-    footStyles:{fillColor:[232,241,236],textColor:[26,122,74],fontStyle:'bold'},
+    body: allBody,
+    foot: all.length ? [
+      [
+        {content:'Taken so far (annual + bank/closure)', styles:{halign:'left'}},
+        {content:(used.reduce((t,r)=>t+r.annual+r.bank,0)).toFixed(1)+' h', colSpan:2, styles:{halign:'center'}},
+        {content:'', styles:{}},
+        {content:'', styles:{}}
+      ],
+      [
+        {content:'Total (taken + upcoming)', styles:{halign:'left'}},
+        {content:h(gt.annual), styles:{halign:'center'}},
+        {content:h(gt.bank), styles:{halign:'center'}},
+        {content:h(gt.unpaid), styles:{halign:'center'}},
+        {content:h(gt.sick), styles:{halign:'center'}}
+      ]
+    ] : undefined,
+    styles:{fontSize:8, cellPadding:1.1, minCellHeight:0},
     headStyles:{fillColor:[26,122,74],textColor:[255,255,255],halign:'center'},
+    footStyles:{fillColor:[232,241,236],textColor:[26,122,74],fontStyle:'bold'},
     columnStyles:{0:{cellWidth:38,halign:'left'},1:{cellWidth:30,halign:'center'},2:{cellWidth:38,halign:'center'},3:{cellWidth:30,halign:'center'},4:{cellWidth:30,halign:'center'}},
     alternateRowStyles:{fillColor:[247,243,236]},
-    margin:{left:12,right:12}
-  });
-
-  // Upcoming list
-  y = doc.lastAutoTable.finalY + 8;
-  if(y > doc.internal.pageSize.getHeight()-40){ doc.addPage(); y=20; }
-  doc.setFont('times','bold'); doc.setFontSize(11); doc.setTextColor(26,122,74);
-  doc.text('Upcoming leave & closures', 12, y);
-  doc.autoTable({
-    startY:y+3,
-    head:[['Date','Annual','Bank/Closure','Unpaid','Sick']],
-    body: upcoming.length ? upcoming.map(rowCells) : [['—','','','','']],
-    styles:{fontSize:8.5,cellPadding:1.4,minCellHeight:0},
-    headStyles:{fillColor:[212,160,23],textColor:[255,255,255],halign:'center'},
-    columnStyles:{0:{cellWidth:38,halign:'left'},1:{cellWidth:30,halign:'center'},2:{cellWidth:38,halign:'center'},3:{cellWidth:30,halign:'center'},4:{cellWidth:30,halign:'center'}},
-    alternateRowStyles:{fillColor:[251,243,220]},
+    // Tint upcoming rows gold.
+    didParseCell:function(data){
+      if(data.section==='body' && all[data.row.index] && all[data.row.index].up){
+        data.cell.styles.fillColor=[251,240,205];
+        data.cell.styles.textColor=[140,100,10];
+      }
+    },
     margin:{left:12,right:12},
     didDrawPage:()=>pdfFooter(doc)
   });
