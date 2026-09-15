@@ -568,7 +568,7 @@
     </div>
   </div>
 </div>
-<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 15Sep-c</div>
+<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 15Sep-e</div>
 
 <!-- PAY WORKBOOK EXPORT PREVIEW OVERLAY -->
 <div class="overlay" id="payPreviewOv">
@@ -3300,9 +3300,17 @@ function tidyOutOfEmployment(){
     Object.keys(timesheet[s.id]).forEach(k=>{
       const e=timesheet[s.id][k];
       if(!e || e.deleted) return;
+      const d=new Date(k);
+      // Any leave recorded on a bank-holiday date should be a paid bank holiday
+      // (the setting is always closed then), not unpaid or annual.
+      if((e.type==='unpaid' || e.type==='annual') && isBankHoliday(d) && employedOn(s.id,d)){
+        const rota = scheduledHours(s.id, d) || e.hours || 0;
+        timesheet[s.id][k] = { type:'bank', hours:rota, note:'Bank holiday', at:Date.now() };
+        corrected++;
+        return;
+      }
       // Only auto-recorded leave types get tidied; never touch worked days or sick.
       if(e.type!=='annual' && e.type!=='bank') return;
-      const d=new Date(k);
       if(!employedOn(s.id, d)){
         timesheet[s.id][k] = { deleted:true, at:Date.now() };
         removed++;
@@ -4263,9 +4271,9 @@ function downloadLeaveSummaryPDF(staffId){
       h(used.reduce((t,r)=>t+r.annual,0)), h(used.reduce((t,r)=>t+r.bank,0)),
       h(used.reduce((t,r)=>t+r.unpaid,0)), h(used.reduce((t,r)=>t+r.sick,0))]] : undefined,
     styles:{fontSize:9,cellPadding:2.5},
-    headStyles:{fillColor:[26,122,74],textColor:[255,255,255]},
     footStyles:{fillColor:[232,241,236],textColor:[26,122,74],fontStyle:'bold'},
-    columnStyles:{0:{cellWidth:34},1:{halign:'right'},2:{halign:'right'},3:{halign:'right'},4:{halign:'right'}},
+    headStyles:{fillColor:[26,122,74],textColor:[255,255,255],halign:'center'},
+    columnStyles:{0:{cellWidth:38,halign:'left'},1:{cellWidth:30,halign:'center'},2:{cellWidth:38,halign:'center'},3:{cellWidth:30,halign:'center'},4:{cellWidth:30,halign:'center'}},
     alternateRowStyles:{fillColor:[247,243,236]},
     margin:{left:12,right:12}
   });
@@ -4280,8 +4288,8 @@ function downloadLeaveSummaryPDF(staffId){
     head:[['Date','Annual','Bank/Closure','Unpaid','Sick']],
     body: upcoming.length ? upcoming.map(rowCells) : [['—','','','','']],
     styles:{fontSize:9,cellPadding:2.5},
-    headStyles:{fillColor:[212,160,23],textColor:[255,255,255]},
-    columnStyles:{0:{cellWidth:34},1:{halign:'right'},2:{halign:'right'},3:{halign:'right'},4:{halign:'right'}},
+    headStyles:{fillColor:[212,160,23],textColor:[255,255,255],halign:'center'},
+    columnStyles:{0:{cellWidth:38,halign:'left'},1:{cellWidth:30,halign:'center'},2:{cellWidth:38,halign:'center'},3:{cellWidth:30,halign:'center'},4:{cellWidth:30,halign:'center'}},
     alternateRowStyles:{fillColor:[251,243,220]},
     margin:{left:12,right:12},
     didDrawPage:()=>pdfFooter(doc)
