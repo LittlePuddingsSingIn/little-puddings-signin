@@ -568,7 +568,7 @@
     </div>
   </div>
 </div>
-<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 15Sep-h</div>
+<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 15Sep-i</div>
 
 <!-- PAY WORKBOOK EXPORT PREVIEW OVERLAY -->
 <div class="overlay" id="payPreviewOv">
@@ -4245,9 +4245,23 @@ function downloadLeaveSummaryPDF(staffId){
   const doc = new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
   pdfHeader(doc, 'Annual Leave Summary', `${s.name} · Leave year ${fmtUK(fyStart)} to ${fmtUK(fyEnd)}`);
 
+  // Plain-English summary line, so it's easy to follow (first job for the apprentices).
+  const remWord = remaining >= 0
+    ? `That leaves you ${remaining.toFixed(1)} hours still to book.`
+    : `That is ${Math.abs(remaining).toFixed(1)} hours MORE than your allowance — you have booked over what you have. Let's talk about this at supervision.`;
+  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(60,60,60);
+  const plain = doc.splitTextToSize(
+    `You get ${allowance.toFixed(1)} hours of paid leave this year (that is your annual leave, plus bank holidays and any days we close). `+
+    `So far you have taken ${usedHrs.toFixed(1)} hours, and you have ${upcomingAB.toFixed(1)} hours already booked for later in the year. `+
+    remWord,
+    doc.internal.pageSize.getWidth()-24
+  );
+  doc.text(plain, 12, 46);
+  const afterPlain = 46 + plain.length*4.5 + 2;
+
   // Top figures
   doc.autoTable({
-    startY:46,
+    startY:afterPlain,
     body:[
       ['Annual leave allowance', `${allowance.toFixed(1)} h`],
       ['Taken so far (annual + bank + closures)', `${usedHrs.toFixed(1)} h`],
@@ -4259,6 +4273,15 @@ function downloadLeaveSummaryPDF(staffId){
     styles:{fontSize:10,cellPadding:3,lineColor:[204,204,204],lineWidth:0.1},
     columnStyles:{0:{cellWidth:120},1:{halign:'right',fontStyle:'bold'}},
     alternateRowStyles:{fillColor:[232,241,236]},
+    // Make the Remaining row stand out (green if OK, rose if over allowance).
+    didParseCell:function(data){
+      if(data.section==='body' && data.row.index===3){
+        const over = remaining < 0;
+        data.cell.styles.fillColor = over ? [244,222,218] : [26,122,74];
+        data.cell.styles.textColor = over ? [161,58,42] : [255,255,255];
+        data.cell.styles.fontStyle = 'bold';
+      }
+    },
     margin:{left:12,right:12}
   });
 
@@ -4281,21 +4304,13 @@ function downloadLeaveSummaryPDF(staffId){
     startY:y+7,
     head:[['Date','Annual','Bank/Closure','Unpaid','Sick']],
     body: allBody,
-    foot: all.length ? [
-      [
-        {content:'Taken so far (annual + bank/closure)', styles:{halign:'left'}},
-        {content:(used.reduce((t,r)=>t+r.annual+r.bank,0)).toFixed(1)+' h', colSpan:2, styles:{halign:'center'}},
-        {content:'', styles:{}},
-        {content:'', styles:{}}
-      ],
-      [
-        {content:'Total (taken + upcoming)', styles:{halign:'left'}},
-        {content:h(gt.annual), styles:{halign:'center'}},
-        {content:h(gt.bank), styles:{halign:'center'}},
-        {content:h(gt.unpaid), styles:{halign:'center'}},
-        {content:h(gt.sick), styles:{halign:'center'}}
-      ]
-    ] : undefined,
+    foot: all.length ? [[
+      {content:'Total hours (all of the above)', styles:{halign:'left'}},
+      {content:h(gt.annual), styles:{halign:'center'}},
+      {content:h(gt.bank), styles:{halign:'center'}},
+      {content:h(gt.unpaid), styles:{halign:'center'}},
+      {content:h(gt.sick), styles:{halign:'center'}}
+    ]] : undefined,
     styles:{fontSize:8, cellPadding:1.1, minCellHeight:0},
     headStyles:{fillColor:[26,122,74],textColor:[255,255,255],halign:'center'},
     footStyles:{fillColor:[232,241,236],textColor:[26,122,74],fontStyle:'bold'},
