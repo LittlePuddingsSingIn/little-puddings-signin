@@ -296,7 +296,7 @@
   .empty{color:rgba(255,255,255,0.3);font-size:13px;text-align:center;padding:24px 0}
   .coming-soon{background:rgba(44,74,62,0.9);border-radius:9px;padding:10px 14px;color:var(--gold-light);font-size:11px;text-align:center;border:1px solid rgba(201,168,76,0.25);margin-top:8px}
   .save-indicator{font-size:10px;color:var(--ok);font-weight:700;margin-left:8px}
-  .footer-note{text-align:center;color:rgba(255,255,255,0.15);font-size:9px;letter-spacing:1px;padding:8px 0 18px;text-transform:uppercase}
+  .footer-note{text-align:center;color:rgba(255,255,255,0.7);font-size:10px;letter-spacing:1px;padding:8px 0 18px;text-transform:uppercase}
 </style>
 </head>
 <body>
@@ -568,7 +568,7 @@
     </div>
   </div>
 </div>
-<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 13Sep-e</div>
+<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 15Sep-a</div>
 
 <!-- PAY WORKBOOK EXPORT PREVIEW OVERLAY -->
 <div class="overlay" id="payPreviewOv">
@@ -3116,6 +3116,7 @@ function openStaffDetail(staffId) {
   
   <!-- Add entry button -->
   <button onclick="openLeaveEntry('${staffId}')" style="width:100%;padding:13px;background:var(--forest);color:var(--gold-light);border:none;border-radius:11px;font-weight:700;cursor:pointer;margin-bottom:14px">＋ Record Leave / Sick / Override Day</button>
+  <button onclick="downloadLeaveSummaryPDF('${staffId}')" style="width:100%;padding:11px;background:var(--gold);color:var(--forest);border:none;border-radius:11px;font-weight:700;cursor:pointer;margin-bottom:14px">📄 Leave summary for supervision</button>
 
   ${(function(){
     const L=leaverSummary(staffId);
@@ -4185,6 +4186,97 @@ function buildStaffTimesheetWB(staffId,from,to){
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,'Time Sheet');
   return wb;
+}
+
+function downloadLeaveSummaryPDF(staffId){
+  if(!window.jspdf){ alert('PDF library not loaded. Check the internet connection and refresh (Ctrl+F5).'); return; }
+  const s = STAFF.find(x=>x.id===staffId);
+  if(!s){ return; }
+  const ref = viewDate;
+  const today = new Date(); today.setHours(0,0,0,0);
+  const allowance = allowanceFor(s.id, ref);
+  const year = getYearTotals(s.id, ref);   // annual, bank, sick, unpaid totals this leave year
+  const usedHrs = year.annual + year.bank; // annual + bank + closures (closures are stored as annual)
+  const remaining = allowance - usedHrs;
+
+  // Gather every annual/bank leave entry this leave year, split used vs upcoming.
+  const fyStart = getFinancialYearStart(ref), fyEnd = getFinancialYearEnd(ref);
+  const used = [], upcoming = [];
+  if(timesheet[s.id]){
+    Object.keys(timesheet[s.id]).forEach(k=>{
+      const e = timesheet[s.id][k];
+      if(!e || e.deleted) return;
+      if(e.type!=='annual' && e.type!=='bank') return;
+      const d = new Date(k); if(d<fyStart || d>fyEnd) return;
+      const label = e.type==='bank' ? 'Bank holiday' : (e.note && /closed/i.test(e.note) ? 'Setting closed' : 'Annual leave');
+      const row = { d, hours:e.hours||0, label };
+      if(d <= today) used.push(row); else upcoming.push(row);
+    });
+  }
+  used.sort((a,b)=>a.d-b.d); upcoming.sort((a,b)=>a.d-b.d);
+
+  const {jsPDF} = window.jspdf;
+  const doc = new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+  pdfHeader(doc, 'Annual Leave Summary', `${s.name} · Leave year ${fmtUK(fyStart)} to ${fmtUK(fyEnd)}`);
+
+  // Top figures
+  doc.autoTable({
+    startY:46,
+    body:[
+      ['Annual leave allowance', `${allowance.toFixed(1)} h`],
+      ['Used so far (annual + bank + closures)', `${usedHrs.toFixed(1)} h`],
+      ['Remaining', `${remaining.toFixed(1)} h`],
+    ],
+    styles:{fontSize:10,cellPadding:3,lineColor:[204,204,204],lineWidth:0.1},
+    columnStyles:{0:{cellWidth:120},1:{halign:'right',fontStyle:'bold'}},
+    alternateRowStyles:{fillColor:[232,241,236]},
+    margin:{left:12,right:12}
+  });
+
+  // Used list
+  let y = doc.lastAutoTable.finalY + 8;
+  doc.setFont('times','bold'); doc.setFontSize(11); doc.setTextColor(26,122,74);
+  doc.text('Leave already taken', 12, y);
+  doc.autoTable({
+    startY:y+3,
+    head:[['Date','Type','Hours']],
+    body: used.length ? used.map(r=>[fmtUK(r.d), r.label, r.hours.toFixed(1)+'h']) : [['—','No leave taken yet','']],
+    styles:{fontSize:9,cellPadding:2.5},
+    headStyles:{fillColor:[26,122,74],textColor:[255,255,255]},
+    columnStyles:{0:{cellWidth:40},2:{halign:'right',cellWidth:25}},
+    alternateRowStyles:{fillColor:[247,243,236]},
+    margin:{left:12,right:12}
+  });
+
+  // Upcoming list
+  y = doc.lastAutoTable.finalY + 8;
+  if(y > doc.internal.pageSize.getHeight()-40){ doc.addPage(); y=20; }
+  doc.setFont('times','bold'); doc.setFontSize(11); doc.setTextColor(26,122,74);
+  doc.text('Upcoming leave & closures', 12, y);
+  doc.autoTable({
+    startY:y+3,
+    head:[['Date','Type','Hours']],
+    body: upcoming.length ? upcoming.map(r=>[fmtUK(r.d), r.label, r.hours.toFixed(1)+'h']) : [['—','Nothing booked','']],
+    styles:{fontSize:9,cellPadding:2.5},
+    headStyles:{fillColor:[212,160,23],textColor:[255,255,255]},
+    columnStyles:{0:{cellWidth:40},2:{halign:'right',cellWidth:25}},
+    alternateRowStyles:{fillColor:[251,243,220]},
+    margin:{left:12,right:12},
+    didDrawPage:()=>pdfFooter(doc)
+  });
+
+  // Supervision sign-off line
+  y = doc.lastAutoTable.finalY + 14;
+  if(y > doc.internal.pageSize.getHeight()-30){ doc.addPage(); y=20; }
+  doc.setDrawColor(150,150,150); doc.setLineWidth(0.2);
+  doc.line(16,y,90,y); doc.line(115,y,185,y);
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(107,100,96);
+  doc.text('Staff signature', 16, y+4); doc.text('Date', 115, y+4);
+  doc.text('Discussed at supervision', 16, y+12);
+
+  pdfFooter(doc);
+  doc.save(`${s.name} Leave Summary ${dk(today)}.pdf`);
+  showFlash('📄 Leave summary PDF generated');
 }
 
 function downloadLeaverPDF(staffId){
