@@ -568,7 +568,7 @@
     </div>
   </div>
 </div>
-<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 15Sep-e</div>
+<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 15Sep-f</div>
 
 <!-- PAY WORKBOOK EXPORT PREVIEW OVERLAY -->
 <div class="overlay" id="payPreviewOv">
@@ -4267,10 +4267,14 @@ function downloadLeaveSummaryPDF(staffId){
     startY:y+3,
     head:[['Date','Annual','Bank/Closure','Unpaid','Sick']],
     body: used.length ? used.map(rowCells) : [['—','','','','']],
-    foot: used.length ? [['Total',
-      h(used.reduce((t,r)=>t+r.annual,0)), h(used.reduce((t,r)=>t+r.bank,0)),
-      h(used.reduce((t,r)=>t+r.unpaid,0)), h(used.reduce((t,r)=>t+r.sick,0))]] : undefined,
-    styles:{fontSize:9,cellPadding:2.5},
+    foot: used.length ? [[
+      {content:'Total', styles:{halign:'left'}},
+      {content:h(used.reduce((t,r)=>t+r.annual,0)), styles:{halign:'center'}},
+      {content:h(used.reduce((t,r)=>t+r.bank,0)), styles:{halign:'center'}},
+      {content:h(used.reduce((t,r)=>t+r.unpaid,0)), styles:{halign:'center'}},
+      {content:h(used.reduce((t,r)=>t+r.sick,0)), styles:{halign:'center'}}
+    ]] : undefined,
+    styles:{fontSize:8.5,cellPadding:1.4,minCellHeight:0},
     footStyles:{fillColor:[232,241,236],textColor:[26,122,74],fontStyle:'bold'},
     headStyles:{fillColor:[26,122,74],textColor:[255,255,255],halign:'center'},
     columnStyles:{0:{cellWidth:38,halign:'left'},1:{cellWidth:30,halign:'center'},2:{cellWidth:38,halign:'center'},3:{cellWidth:30,halign:'center'},4:{cellWidth:30,halign:'center'}},
@@ -4287,7 +4291,7 @@ function downloadLeaveSummaryPDF(staffId){
     startY:y+3,
     head:[['Date','Annual','Bank/Closure','Unpaid','Sick']],
     body: upcoming.length ? upcoming.map(rowCells) : [['—','','','','']],
-    styles:{fontSize:9,cellPadding:2.5},
+    styles:{fontSize:8.5,cellPadding:1.4,minCellHeight:0},
     headStyles:{fillColor:[212,160,23],textColor:[255,255,255],halign:'center'},
     columnStyles:{0:{cellWidth:38,halign:'left'},1:{cellWidth:30,halign:'center'},2:{cellWidth:38,halign:'center'},3:{cellWidth:30,halign:'center'},4:{cellWidth:30,halign:'center'}},
     alternateRowStyles:{fillColor:[251,243,220]},
