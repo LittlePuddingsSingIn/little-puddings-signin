@@ -568,7 +568,7 @@
     </div>
   </div>
 </div>
-<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 15Sep-l</div>
+<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 21Sep-a</div>
 
 <!-- PAY WORKBOOK EXPORT PREVIEW OVERLAY -->
 <div class="overlay" id="payPreviewOv">
@@ -3534,7 +3534,9 @@ function renderOverrideGrid(){
         ? 'Recorded today: '+ss.map(s=>`${s.in||'—'} to ${s.out||'still in'}`).join(' &nbsp;·&nbsp; ')+'<br><span style="color:rgba(255,255,255,0.4)">The boxes below edit the last one.</span>'
         : (ss.length ? '' : '<span style="color:rgba(255,255,255,0.4)">Nothing recorded today.</span>');
       const btn=document.getElementById('addSessionBtn');
-      btn.style.display = (att.signInTime && att.signOutTime) ? 'block' : 'none';
+      // Available whenever there's at least a sign-in — it will ask for the out time
+      // if needed, then start a fresh session (e.g. back from a midday appointment).
+      btn.style.display = att.signInTime ? 'block' : 'none';
     } else if(overrideSelectedChild.startsWith('staff_')){
       const sid=overrideSelectedChild.slice(6);
       const s=STAFF.find(x=>x.id===sid),log=getSLog(sid,viewDate);
@@ -3661,12 +3663,28 @@ function addAnotherSession(){
   if(!overrideSelectedChild || !overrideSelectedChild.startsWith('child_')) return;
   const cid=overrideSelectedChild.slice(6);
   const c=CHILDREN.find(x=>x.id===cid), att=getAtt(cid,viewDate);
-  if(!att.signInTime || !att.signOutTime){ alert('Finish the current session first: it needs both a sign in and a sign out time.'); return; }
-  attStartNewSession(att);              // keep what's there, start a fresh session
+  // First save whatever is currently in the boxes so it isn't lost.
+  const inVal=document.getElementById('overrideTimeIn').value;
+  const outVal=document.getElementById('overrideTimeOut').value;
+  if(inVal) att.signInTime=inVal;
+  if(outVal) att.signOutTime=outVal;
+  // A session needs at least a sign-in to archive. If there's an in but no out yet,
+  // ask for the out time so the first session is complete before starting the next.
+  if(att.signInTime && !att.signOutTime){
+    const o=prompt(`${c.name} — what time did this session END (sign out, hh:mm 24hr)?`, '');
+    if(o===null) return;
+    if(!/^\d{1,2}:\d{2}$/.test(o.trim())){ alert('Time must be hh:mm, e.g. 12:30'); return; }
+    att.signOutTime=o.trim();
+  }
+  if(!att.signInTime){ alert('Enter the first session\u2019s sign-in time in the box, then add another.'); return; }
+  attStartNewSession(att);              // archive the completed session, start a fresh one
+  att.signedIn=true;                    // the new session is open until you set its out time
+  document.getElementById('overrideTimeIn').value='';
+  document.getElementById('overrideTimeOut').value='';
   markDirty();
   if(currentTab==='override')renderOverride(); else renderSettings();
   renderChildren(); updateStatusBar();
-  showFlash(`Now enter ${c.name}'s next times, then tap Apply`);
+  showFlash(`Now enter ${c.name}'s next session times, then tap Apply`);
 }
 
 function clearOverrideTimes(){
