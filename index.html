@@ -568,7 +568,7 @@
     </div>
   </div>
 </div>
-<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 15Sep-k</div>
+<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 15Sep-l</div>
 
 <!-- PAY WORKBOOK EXPORT PREVIEW OVERLAY -->
 <div class="overlay" id="payPreviewOv">
@@ -1037,7 +1037,18 @@ async function syncWithOneDrive() {
           Object.keys(remoteData.attendance[cid]).forEach(dkk => {
             const remote = remoteData.attendance[cid][dkk];
             const local = attendance[cid][dkk];
-            if (!local || (remote.signInTime && !local.signInTime) || (remote.signOutTime && !local.signOutTime)) {
+            if (!local) { attendance[cid][dkk] = remote; return; }
+            // Count total sessions each side has (archived sessions + the current open
+            // one) so a child re-signed-in after a midday appointment (which archives
+            // the morning session and opens a new one) is NOT overwritten by the older
+            // remote record that still shows them signed out.
+            const totalSessions = a => ((a.sessions&&a.sessions.length)||0) + (a.signInTime?1:0);
+            const rTot = totalSessions(remote), lTot = totalSessions(local);
+            if (rTot > lTot) { attendance[cid][dkk] = remote; return; }   // remote has more activity
+            if (rTot < lTot) { return; }                                  // local has more — keep local
+            // Same number of sessions: fill in a missing in/out from remote, but don't
+            // clobber a fresh local session.
+            if ((remote.signInTime && !local.signInTime) || (remote.signOutTime && !local.signOutTime)) {
               attendance[cid][dkk] = remote;
             }
           });
