@@ -576,7 +576,7 @@
     </div>
   </div>
 </div>
-<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 25Sep-a</div>
+<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 25Sep-c</div>
 
 <!-- PAY WORKBOOK EXPORT PREVIEW OVERLAY -->
 <div class="overlay" id="payPreviewOv">
@@ -1354,17 +1354,25 @@ async function catchUpInvoice(){
   const c=CHILDREN.find(x=>x.id===sel.value); if(!c) return;
   const days = attendance[c.id] ? Object.keys(attendance[c.id]) : [];
   if(!days.length){ if(st)st.textContent=`No recorded attendance for ${c.name} to write.`; return; }
-  if(st) st.textContent=`Writing ${days.length} day${days.length!==1?'s':''} for ${c.name}…`;
-  let done=0, failed=0;
-  for(const k of days.sort()){
+  const toWrite = days.sort().filter(k=>{
     const att=attendance[c.id][k];
-    // Skip empty days (no sign-in at all, no archived sessions).
-    const hasData = att && (att.signInTime || (att.sessions&&att.sessions.length));
-    if(!hasData) continue;
-    try{ await writeToExcel(c, new Date(k), att); done++; }
-    catch(e){ failed++; }
+    return att && (att.signInTime || (att.sessions&&att.sessions.length));
+  });
+  let done=0, failed=0;
+  const wait = ms => new Promise(r=>setTimeout(r,ms));
+  for(let i=0;i<toWrite.length;i++){
+    const k=toWrite[i];
+    if(st) st.textContent=`Writing ${c.name}… day ${i+1} of ${toWrite.length}`;
+    let ok=false;
+    // Try up to 3 times, backing off, so Microsoft's rate limit doesn't drop later days.
+    for(let attemptN=0; attemptN<3 && !ok; attemptN++){
+      try{ await writeToExcel(c, new Date(k), attendance[c.id][k]); ok=true; }
+      catch(e){ await wait(1200*(attemptN+1)); }
+    }
+    if(ok) done++; else failed++;
+    await wait(350);   // gentle pace between days so Graph doesn't rate-limit
   }
-  if(st) st.textContent = `✓ Wrote ${done} day${done!==1?'s':''} to ${c.name}'s invoice`+(failed?` (${failed} failed — check the file name matches)`:'')+'.';
+  if(st) st.textContent = `✓ Wrote ${done} day${done!==1?'s':''} to ${c.name}'s invoice`+(failed?` — ${failed} still failed, tap again to finish the rest`:'. All done.');
 }
 
 async function writeToExcel(child, date, att) {
@@ -4063,7 +4071,7 @@ function toggleCollectedFromSchool(cid) {
   const c=CHILDREN.find(x=>x.id===cid);
   showFlash(collected[cid]?`${c.emoji} ${c.name} — collected from school today`:`${c.emoji} ${c.name} — will return at 15:25`);
   markDirty();
-  if(odConnected) syncWithOneDrive();
+  if(odConnected){ writeToExcel(c, viewDate, getAtt(cid, viewDate)); syncWithOneDrive(); }
   renderSettings();
 }
 
@@ -4075,7 +4083,7 @@ function toggleDroppedOffAtSchool(cid) {
   const c=CHILDREN.find(x=>x.id===cid);
   showFlash(dropped[cid]?`${c.emoji} ${c.name} — parent dropping off at school today`:`${c.emoji} ${c.name} — will be signed out at 08:55`);
   markDirty();
-  if(odConnected) syncWithOneDrive();
+  if(odConnected){ writeToExcel(c, viewDate, getAtt(cid, viewDate)); syncWithOneDrive(); }
   renderSettings();
 }
 
