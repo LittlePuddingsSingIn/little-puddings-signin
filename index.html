@@ -576,7 +576,7 @@
     </div>
   </div>
 </div>
-<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 21Sep-b</div>
+<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 25Sep-a</div>
 
 <!-- PAY WORKBOOK EXPORT PREVIEW OVERLAY -->
 <div class="overlay" id="payPreviewOv">
@@ -688,9 +688,15 @@
 <div class="overlay" id="adminFormOv">
   <div class="admin-modal" id="adminModal">
     <div class="af-title" id="afTitle">Add Child</div>
-    <div class="af-group">
-      <label class="af-label">Name</label>
-      <input class="af-input" id="afName" type="text" placeholder="First name">
+    <div class="af-row">
+      <div class="af-group">
+        <label class="af-label">First name (shown on the sign-in screen)</label>
+        <input class="af-input" id="afName" type="text" placeholder="e.g. Thea">
+      </div>
+      <div class="af-group">
+        <label class="af-label">Surname (for the invoice & register only)</label>
+        <input class="af-input" id="afSurname" type="text" placeholder="e.g. Rose">
+      </div>
     </div>
     <div class="af-row">
       <div class="af-group">
@@ -2571,6 +2577,7 @@ function openAdminForm(type, id){
     const entity=type==='child'?CHILDREN.find(x=>x.id===id):STAFF.find(x=>x.id===id);
     document.getElementById('afTitle').textContent=`Edit — ${entity.name}`;
     document.getElementById('afName').value=entity.name;
+    { const sn=document.getElementById('afSurname'); if(sn) sn.value=entity.surname||''; }
     document.getElementById('afType').value=type==='staff'?'staff':entity.type;
     if(type==='child'){
       document.getElementById('afBilling').value=entity.billing;
@@ -2599,6 +2606,7 @@ function openAdminForm(type, id){
   } else {
     document.getElementById('afTitle').textContent=type==='staff'?'Add Staff Member':'Add Child';
     document.getElementById('afName').value='';
+    { const sn=document.getElementById('afSurname'); if(sn) sn.value=''; }
     document.getElementById('afStartDate').value='';
     document.getElementById('afEndDate').value='';
     document.getElementById('afNotes').value='';
@@ -2649,6 +2657,7 @@ function selectEmoji(e){
 function saveAdminForm(){
   const type=document.getElementById('afType').value;
   const name=document.getElementById('afName').value.trim();
+  const surname=(document.getElementById('afSurname')?document.getElementById('afSurname').value.trim():'');
   if(!name){showFlash('Please enter a name');return;}
   if(adminFormDays.length===0){showFlash('Please select at least one day');return;}
 
@@ -2681,7 +2690,7 @@ function saveAdminForm(){
 
     if(adminEditTarget&&adminEditTarget.id){
       const c=CHILDREN.find(x=>x.id===adminEditTarget.id);
-      c.name=name;c.emoji=adminFormEmoji;c.type=type;c.days=adminFormDays;
+      c.name=name;c.surname=surname;c.emoji=adminFormEmoji;c.type=type;c.days=adminFormDays;
       c.cs=cs;c.ce=ce;c.billing=billing;c.ay=ay;c.notes=notes;
       c.startDate=document.getElementById('afStartDate').value||null;
       c.endDate=document.getElementById('afEndDate').value||null;
@@ -2691,7 +2700,7 @@ function saveAdminForm(){
       showFlash(`✓ ${name} updated`);
     } else {
       const maxAo=CHILDREN.filter(c=>c.type===type).reduce((m,c)=>Math.max(m,c.ao),0);
-      CHILDREN.push({id:'child_'+Date.now(),name,emoji:adminFormEmoji,type,ao:maxAo+1,
+      CHILDREN.push({id:'child_'+Date.now(),name,surname,emoji:adminFormEmoji,type,ao:maxAo+1,
         color:AC[CHILDREN.length%AC.length],pin:'0000',days:adminFormDays,
         cs,ce,billing,ay,hb:billing==='funded'?null:billing,notes,
         schoolRun:(type==='school' && document.getElementById('afSchoolRun') && document.getElementById('afSchoolRun').checked),
