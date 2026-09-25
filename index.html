@@ -398,6 +398,14 @@
     <div class="sec-sub">Auto-calculated from attendance</div>
     <div id="invoiceList"></div>
     <div class="coming-soon">💡 Connected to OneDrive — each sign in/out writes directly to each child's Excel workbook automatically</div>
+
+    <div class="set-section" style="margin-top:14px">
+      <div class="set-title">🗓 Catch up an invoice</div>
+      <div class="sec-sub" style="margin-bottom:8px">If a child's invoice file was added late, their earlier attendance is still stored here but was never written to the file. Pick the child and re-write all their recorded days into the file now. Safe to run more than once, it just overwrites the same cells.</div>
+      <select id="catchupChild" class="af-select" style="width:100%;margin-bottom:8px"></select>
+      <button onclick="catchUpInvoice()" style="width:100%;padding:11px;background:var(--forest);color:var(--gold-light);border:none;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer">Write all recorded days to this child's invoice</button>
+      <div id="catchupStatus" style="font-size:11px;margin-top:8px;color:var(--forest)"></div>
+    </div>
   </div>
 
   <!-- DAY CHANGES -->
@@ -568,7 +576,7 @@
     </div>
   </div>
 </div>
-<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 21Sep-a</div>
+<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 21Sep-b</div>
 
 <!-- PAY WORKBOOK EXPORT PREVIEW OVERLAY -->
 <div class="overlay" id="payPreviewOv">
@@ -1322,6 +1330,37 @@ function startSync() {
 // ════════════════════════════════════════════════
 // GRAPH API — Write to Excel
 // ════════════════════════════════════════════════
+// Populate the catch-up child dropdown (called when the invoice panel renders).
+function populateCatchupChildren(){
+  const sel=document.getElementById('catchupChild'); if(!sel) return;
+  const cur=sel.value;
+  sel.innerHTML = CHILDREN.filter(c=>!c.archived)
+    .map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+  if(cur) sel.value=cur;
+}
+
+// Re-write every attendance day the app has stored for a child into their invoice
+// file. Use when the file was added after some days were already recorded.
+async function catchUpInvoice(){
+  const st=document.getElementById('catchupStatus');
+  if(!odConnected || !odAccessToken){ if(st)st.textContent='Connect OneDrive first.'; return; }
+  const sel=document.getElementById('catchupChild'); if(!sel||!sel.value){ if(st)st.textContent='Pick a child.'; return; }
+  const c=CHILDREN.find(x=>x.id===sel.value); if(!c) return;
+  const days = attendance[c.id] ? Object.keys(attendance[c.id]) : [];
+  if(!days.length){ if(st)st.textContent=`No recorded attendance for ${c.name} to write.`; return; }
+  if(st) st.textContent=`Writing ${days.length} day${days.length!==1?'s':''} for ${c.name}…`;
+  let done=0, failed=0;
+  for(const k of days.sort()){
+    const att=attendance[c.id][k];
+    // Skip empty days (no sign-in at all, no archived sessions).
+    const hasData = att && (att.signInTime || (att.sessions&&att.sessions.length));
+    if(!hasData) continue;
+    try{ await writeToExcel(c, new Date(k), att); done++; }
+    catch(e){ failed++; }
+  }
+  if(st) st.textContent = `✓ Wrote ${done} day${done!==1?'s':''} to ${c.name}'s invoice`+(failed?` (${failed} failed — check the file name matches)`:'')+'.';
+}
+
 async function writeToExcel(child, date, att) {
   if (!odConnected || !odAccessToken) return;
   try {
@@ -2204,6 +2243,7 @@ function renderLog(){
 // RENDER INVOICE
 // ════════════════════════════════════════════════
 function renderInvoice(){
+  populateCatchupChildren();
   const el=document.getElementById('invoiceList');
   const attended=CHILDREN.filter(c=>getAtt(c.id,viewDate).signInTime);
   if(!attended.length){el.innerHTML='<div class="empty" style="background:rgba(255,255,255,0.04);border-radius:12px;padding:24px">No children signed in yet</div>';return;}
