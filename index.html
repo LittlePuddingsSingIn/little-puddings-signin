@@ -576,7 +576,7 @@
     </div>
   </div>
 </div>
-<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 29Sep-f</div>
+<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 29Sep-i</div>
 
 <!-- PAY WORKBOOK EXPORT PREVIEW OVERLAY -->
 <div class="overlay" id="payPreviewOv">
@@ -3078,6 +3078,7 @@ function getMonthTotals(staffId, refDate) {
 function renderPayroll() {
   const refDate = viewDate;
   try { renderOvertimeSection(); } catch(e) { console.warn('overtime section:', e); }
+  try { renderStaffPaySheetCards(); } catch(e) { console.warn('paysheet cards:', e); }
   const monthName = MONTH_SHORT[refDate.getMonth()];
   const fyStart = getFinancialYearStart(refDate);
   const fyLabel = `${fyStart.getFullYear()}–${fyStart.getFullYear()+1}`;
@@ -4547,6 +4548,23 @@ function downloadStaffTimesheet(staffId){
   XLSX.writeFile(buildStaffTimesheetWB(staffId,from,to), `${s.name} Time Sheet ${dk(from)}_to_${dk(to)}.xlsx`);
 }
 
+// Always show the per-staff cards (timesheet + pay sheet buttons) on the Payroll tab,
+// so the pay sheet button is visible without tapping the bulk-download button first.
+function renderStaffPaySheetCards(){
+  const box=document.getElementById('staffTimesheetLinks');
+  if(!box) return;
+  box.innerHTML=STAFF.filter(s=>!s.archived).map(s=>
+    `<div style="background:var(--cream);border:1px solid rgba(26,122,74,0.2);border-radius:11px;padding:10px 12px">
+       <div style="font-size:13px;color:var(--forest);font-weight:700;margin-bottom:7px">${s.name}</div>
+       <div style="display:flex;gap:8px;margin-bottom:6px">
+         <button onclick="downloadStaffTimesheet('${s.id}')" style="flex:1;padding:9px;background:var(--sage);color:var(--forest-dark);border:none;border-radius:8px;font-weight:700;font-size:12px;cursor:pointer">⬇ Excel</button>
+         <button onclick="downloadStaffTimesheetPDF('${s.id}')" style="flex:1;padding:9px;background:var(--forest);color:var(--gold-light);border:none;border-radius:8px;font-weight:700;font-size:12px;cursor:pointer">📄 Timesheet</button>
+       </div>
+       <button onclick="downloadPaySheetPDF('${s.id}')" style="width:100%;padding:9px;background:var(--gold);color:var(--forest);border:none;border-radius:8px;font-weight:700;font-size:12px;cursor:pointer">💷 Pay sheet PDF</button>
+     </div>`
+  ).join('');
+}
+
 function downloadPaySheetPDF(staffId){
   if(!window.jspdf){ alert('PDF library not loaded. Check the internet connection and refresh (Ctrl+F5).'); return; }
   const s=STAFF.find(x=>x.id===staffId); if(!s) return;
@@ -4554,13 +4572,25 @@ function downloadPaySheetPDF(staffId){
   const rate=s.hourlyRate||0, paidHrsWk=s.paidHoursPerWeek||0;
   const monthly=Math.round(rate*paidHrsWk*52/12*100)/100;   // fixed monthly salary
 
-  // Days worked this period, total hours per day (from sessions).
-  const dayRows=[];
+  // Each scheduled working day: In, or the reason they were not (sick, unpaid, holiday,
+  // closure, bank holiday). No hours — pay comes from the fixed salary, not hours worked.
+  const REASON_LABEL={sick:'Sick',unpaid:'Unpaid leave',annual:'Annual leave',bank:'Bank holiday',lieu:'Lieu taken',offthejob:'Off-the-job'};
+  const dayRows=[]; let daysIn=0, daysOut=0;
   eachDay(from,to).forEach(d=>{
-    const w=calcWorkedHours(s.id,d);
-    if(w>0) dayRows.push([fmtUK(d), DAYS[d.getDay()].slice(0,3), w.toFixed(2)]);
+    if(!employedOn(s.id,d)) return;
+    const scheduled = !!(s.sch && s.sch[d.getDay()]);
+    const man = getTs(s.id, d);
+    if(man && man.type && man.type!=='worked'){
+      let label = REASON_LABEL[man.type] || 'Off';
+      if(man.note && /closed/i.test(man.note)) label='Setting closed';
+      dayRows.push([fmtUK(d), DAYS[d.getDay()].slice(0,3), label]);
+      daysOut++;
+    } else if(scheduled){
+      const w=calcWorkedHours(s.id,d);
+      dayRows.push([fmtUK(d), DAYS[d.getDay()].slice(0,3), w>0?'In':'—']);
+      if(w>0) daysIn++;
+    }
   });
-  const totalWorked=dayRows.reduce((t,r)=>t+parseFloat(r[2]),0);
 
   // Deductions (sick + unpaid), each at that day's contracted hours × rate.
   const deductions=[];
@@ -4593,20 +4623,20 @@ function downloadPaySheetPDF(staffId){
   // Hours worked table
   doc.autoTable({
     startY:50,
-    head:[['Date','Day','Hours']],
-    body: dayRows.length?dayRows:[['—','No worked days','']],
-    foot:[[{content:'Total hours worked',colSpan:2,styles:{halign:'left'}},{content:totalWorked.toFixed(2),styles:{halign:'right'}}]],
+    head:[['Date','Day','In / Reason']],
+    body: dayRows.length?dayRows:[['—','No scheduled days','']],
+    foot:[[{content:`Days in: ${daysIn}   ·   Days out: ${daysOut}`,colSpan:3,styles:{halign:'left'}}]],
     styles:{fontSize:8,cellPadding:1.6},
     headStyles:{fillColor:[26,122,74],textColor:[255,255,255]},
     footStyles:{fillColor:[232,241,236],textColor:[26,122,74],fontStyle:'bold'},
-    columnStyles:{0:{cellWidth:34},1:{cellWidth:20},2:{halign:'right',cellWidth:24}},
+    columnStyles:{0:{cellWidth:34},1:{cellWidth:20},2:{cellWidth:40}},
     alternateRowStyles:{fillColor:[247,243,236]}, margin:{left:12,right:12}
   });
   let yy=doc.lastAutoTable.finalY+2;
   doc.setFont('helvetica','italic'); doc.setFontSize(7.5); doc.setTextColor(107,100,96);
   doc.text(isSelf
-    ? 'Hours are for the record only. Susanne is paid a fixed monthly salary based on 16 h/week, not on actual hours worked.'
-    : 'Hours worked are for the record. Pay is the fixed monthly salary below, adjusted for deductions and overtime.', 12, yy+3);
+    ? 'Attendance is for the record only. Susanne is paid a fixed monthly salary based on 16 h/week.'
+    : 'Attendance is for the record. Pay is the fixed monthly salary below, adjusted for deductions and overtime.', 12, yy+3);
 
   // Deductions table (if any)
   if(deductions.length){
@@ -4618,7 +4648,7 @@ function downloadPaySheetPDF(staffId){
       styles:{fontSize:8,cellPadding:1.6},
       headStyles:{fillColor:[161,58,42],textColor:[255,255,255]},
       footStyles:{fillColor:[244,222,218],textColor:[161,58,42],fontStyle:'bold'},
-      columnStyles:{2:{halign:'right'},3:{halign:'right'}},
+      columnStyles:{0:{cellWidth:34,halign:'left'},1:{cellWidth:46,halign:'left'},2:{cellWidth:34,halign:'right'},3:{cellWidth:30,halign:'right'}},
       alternateRowStyles:{fillColor:[244,222,218]}, margin:{left:12,right:12}
     });
     yy=doc.lastAutoTable.finalY;
@@ -4634,7 +4664,7 @@ function downloadPaySheetPDF(staffId){
       styles:{fontSize:8,cellPadding:1.6},
       headStyles:{fillColor:[212,160,23],textColor:[26,122,74]},
       footStyles:{fillColor:[251,243,220],textColor:[26,122,74],fontStyle:'bold'},
-      columnStyles:{1:{halign:'right'},2:{halign:'right'}},
+      columnStyles:{0:{cellWidth:50,halign:'left'},1:{cellWidth:34,halign:'right'},2:{cellWidth:30,halign:'right'}},
       alternateRowStyles:{fillColor:[251,243,220]}, margin:{left:12,right:12}
     });
     yy=doc.lastAutoTable.finalY;
