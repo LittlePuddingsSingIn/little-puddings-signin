@@ -467,6 +467,7 @@
       </div>
       <button onclick="previewPayWorkbook()" style="width:100%;padding:11px;background:var(--forest);color:#fff;border:none;border-radius:9px;font-weight:700;font-size:12px;cursor:pointer;margin-bottom:8px">1 · Export month to PAY workbook (preview first)</button>
       <button onclick="downloadAllStaffTimesheets()" style="width:100%;padding:11px;background:var(--moss);color:#fff;border:none;border-radius:9px;font-weight:700;font-size:12px;cursor:pointer;margin-bottom:10px">2 · Download individual staff time sheets (Excel)</button>
+      <button onclick="downloadAllPaySheets()" style="width:100%;padding:11px;margin-bottom:10px;background:var(--gold);color:var(--forest);border:none;border-radius:9px;font-weight:700;font-size:12px;cursor:pointer">💷 Download ALL pay sheets in one PDF</button>
       <div id="staffTimesheetLinks" class="timesheet-grid"></div>
     </div>
 
@@ -576,7 +577,7 @@
     </div>
   </div>
 </div>
-<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 29Sep-j</div>
+<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 29Sep-k</div>
 
 <!-- PAY WORKBOOK EXPORT PREVIEW OVERLAY -->
 <div class="overlay" id="payPreviewOv">
@@ -4568,6 +4569,34 @@ function renderStaffPaySheetCards(){
 function downloadPaySheetPDF(staffId){
   if(!window.jspdf){ alert('PDF library not loaded. Check the internet connection and refresh (Ctrl+F5).'); return; }
   const s=STAFF.find(x=>x.id===staffId); if(!s) return;
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+  drawPaySheet(doc, staffId);
+  pdfFooter(doc);
+  const {to}=exportPeriod();
+  doc.save(`${s.name} Pay Sheet ${dk(to)}.pdf`);
+  showFlash('📄 Pay sheet PDF generated');
+}
+
+// Download every staff member's pay sheet in one PDF, one per page.
+function downloadAllPaySheets(){
+  if(!window.jspdf){ alert('PDF library not loaded. Check the internet connection and refresh (Ctrl+F5).'); return; }
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+  const staff=STAFF.filter(x=>!x.archived);
+  staff.forEach((s,i)=>{
+    if(i>0) doc.addPage();
+    drawPaySheet(doc, s.id);
+    pdfFooter(doc);
+  });
+  const {to}=exportPeriod();
+  doc.save(`All Pay Sheets ${dk(to)}.pdf`);
+  showFlash(`📄 ${staff.length} pay sheets generated`);
+}
+
+// Draw one person's pay sheet onto the current page of an existing doc.
+function drawPaySheet(doc, staffId){
+  const s=STAFF.find(x=>x.id===staffId); if(!s) return;
   const {from,to,y,m}=exportPeriod();
   const rate=s.hourlyRate||0, paidHrsWk=s.paidHoursPerWeek||0;
   const monthly=Math.round(rate*paidHrsWk*52/12*100)/100;   // fixed monthly salary
@@ -4614,19 +4643,17 @@ function downloadPaySheetPDF(staffId){
   const totalPay=Math.round((monthly - dedTotal + otTotal)*100)/100;
   const isSelf=(s.id==='sussie');
 
-  const {jsPDF}=window.jspdf;
-  const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
   pdfHeader(doc, 'Pay Sheet', `${s.name} · ${s.role} · £${rate.toFixed(2)}/hr`);
-  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(107,100,96);
-  doc.text(`Pay period ${fmtUK(from)} to ${fmtUK(to)}`, 12, 46);
+  doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(107,100,96);
+  doc.text(`Pay period ${fmtUK(from)} to ${fmtUK(to)}`, 12, 45);
 
-  // Hours worked table
+  // Attendance table
   doc.autoTable({
-    startY:50,
+    startY:48,
     head:[['Date','Day','In / Reason']],
     body: dayRows.length?dayRows:[['—','No scheduled days','']],
     foot:[[{content:`Days in: ${daysIn}   ·   Days out: ${daysOut}`,colSpan:3,styles:{halign:'left'}}]],
-    styles:{fontSize:8,cellPadding:1.6},
+    styles:{fontSize:8,cellPadding:1.0},
     headStyles:{fillColor:[26,122,74],textColor:[255,255,255]},
     footStyles:{fillColor:[232,241,236],textColor:[26,122,74],fontStyle:'bold'},
     columnStyles:{0:{cellWidth:34},1:{cellWidth:20},2:{cellWidth:40}},
@@ -4641,18 +4668,18 @@ function downloadPaySheetPDF(staffId){
   // Deductions table (if any)
   if(deductions.length){
     doc.autoTable({
-      startY:yy+7,
+      startY:yy+5,
       head:[[{content:'Deduction date',styles:{halign:'left'}},{content:'Type',styles:{halign:'left'}},{content:'Contracted hrs',styles:{halign:'right'}},{content:'£ off',styles:{halign:'right'}}]],
       body: deductions.map(x=>[fmtUK(x.d), x.type, x.hrs.toFixed(2), '£'+(x.hrs*rate).toFixed(2)]),
       foot:[[{content:'Total deducted',colSpan:3,styles:{halign:'left'}},{content:'£'+dedTotal.toFixed(2),styles:{halign:'right'}}]],
-      styles:{fontSize:8,cellPadding:1.6},
+      styles:{fontSize:8,cellPadding:1.0},
       headStyles:{fillColor:[161,58,42],textColor:[255,255,255]},
       footStyles:{fillColor:[244,222,218],textColor:[161,58,42],fontStyle:'bold'},
       columnStyles:{0:{cellWidth:34,halign:'left'},1:{cellWidth:46,halign:'left'},2:{cellWidth:34,halign:'right'},3:{cellWidth:30,halign:'right'}},
       alternateRowStyles:{fillColor:[244,222,218]}, margin:{left:12,right:12}
     });
     yy=doc.lastAutoTable.finalY;
-  } else { yy=yy+7; }
+  } else { yy=yy+5; }
 
   // Overtime table (if any)
   if(otRows.length){
@@ -4661,7 +4688,7 @@ function downloadPaySheetPDF(staffId){
       head:[[{content:'Overtime date',styles:{halign:'left'}},{content:'Hours',styles:{halign:'right'}},{content:'£ added',styles:{halign:'right'}}]],
       body: otRows.map(x=>[fmtUK(x.d), x.hrs.toFixed(2), '£'+(x.hrs*rate).toFixed(2)]),
       foot:[[{content:'Total overtime',styles:{halign:'left'}},{content:otTotalHrs.toFixed(2),styles:{halign:'right'}},{content:'£'+otTotal.toFixed(2),styles:{halign:'right'}}]],
-      styles:{fontSize:8,cellPadding:1.6},
+      styles:{fontSize:8,cellPadding:1.0},
       headStyles:{fillColor:[212,160,23],textColor:[26,122,74]},
       footStyles:{fillColor:[251,243,220],textColor:[26,122,74],fontStyle:'bold'},
       columnStyles:{0:{cellWidth:50,halign:'left'},1:{cellWidth:34,halign:'right'},2:{cellWidth:30,halign:'right'}},
@@ -4681,7 +4708,7 @@ function downloadPaySheetPDF(staffId){
   if(otTotal) calc.push(['Plus overtime (see above)', '+ £'+otTotal.toFixed(2)]);
   calc.push(['Total before Tax, NI, pension & SSP', '£'+totalPay.toFixed(2)]);
   doc.autoTable({
-    startY:yy+6,
+    startY:yy+4,
     body:calc,
     styles:{fontSize:9.5,cellPadding:2.5},
     columnStyles:{0:{cellWidth:118},1:{halign:'right',fontStyle:'bold'}},
@@ -4692,7 +4719,7 @@ function downloadPaySheetPDF(staffId){
     margin:{left:12,right:12},
     didDrawPage:()=>pdfFooter(doc)
   });
-  yy=doc.lastAutoTable.finalY+8;
+  yy=doc.lastAutoTable.finalY+5;
 
   // SSP section — list the sick days for Jamie to work out SSP. No amount is added to
   // the total above; SSP is calculated and applied separately by payroll.
@@ -4706,7 +4733,7 @@ function downloadPaySheetPDF(staffId){
       head:[[{content:'Sick day',styles:{halign:'left'}},{content:'Day',styles:{halign:'left'}},{content:'Contracted hrs',styles:{halign:'right'}}]],
       body: sickDays.map(x=>[fmtUK(x.d), DAYS[x.d.getDay()].slice(0,3), x.hrs.toFixed(2)]),
       foot:[[{content:`${sickDays.length} sick day${sickDays.length!==1?'s':''} this period`,colSpan:2,styles:{halign:'left'}},{content:sickDays.reduce((t,x)=>t+x.hrs,0).toFixed(2),styles:{halign:'right'}}]],
-      styles:{fontSize:8,cellPadding:1.6},
+      styles:{fontSize:8,cellPadding:1.0},
       headStyles:{fillColor:[107,100,96],textColor:[255,255,255]},
       footStyles:{fillColor:[240,238,236],textColor:[80,74,70],fontStyle:'bold'},
       columnStyles:{0:{cellWidth:40,halign:'left'},1:{cellWidth:24,halign:'left'},2:{cellWidth:40,halign:'right'}},
@@ -4724,10 +4751,6 @@ function downloadPaySheetPDF(staffId){
     ? 'A sick or unpaid day is deducted at that day\u2019s contracted hours × rate. The total is before Tax, NI, pension and SSP. Apprentice pay covers 30 h/week (24 in setting + 6 off-the-job).'
     : 'A sick or unpaid day is deducted at that day\u2019s contracted hours × rate. The total is before Tax, NI, pension and SSP.';
   doc.text(doc.splitTextToSize(foot, doc.internal.pageSize.getWidth()-24), 12, yy);
-
-  pdfFooter(doc);
-  doc.save(`${s.name} Pay Sheet ${dk(to)}.pdf`);
-  showFlash('📄 Pay sheet PDF generated');
 }
 
 function downloadStaffTimesheetPDF(staffId){
