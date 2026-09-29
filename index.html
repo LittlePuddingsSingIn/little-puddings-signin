@@ -576,7 +576,7 @@
     </div>
   </div>
 </div>
-<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 29Sep-c</div>
+<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 29Sep-d</div>
 
 <!-- PAY WORKBOOK EXPORT PREVIEW OVERLAY -->
 <div class="overlay" id="payPreviewOv">
@@ -727,6 +727,16 @@
           <option value="Level 3 Educator">Level 3 Educator</option>
           <option value="Early Years Apprentice">Early Years Apprentice</option>
         </select>
+      </div>
+    </div>
+    <div class="af-row" id="afPayGroup" style="display:none">
+      <div class="af-group">
+        <label class="af-label">Hourly rate (£)</label>
+        <input class="af-input" id="afHourlyRate" type="number" step="0.01" placeholder="e.g. 13.00">
+      </div>
+      <div class="af-group">
+        <label class="af-label">Paid hours per week</label>
+        <input class="af-input" id="afPaidHours" type="number" step="0.5" placeholder="e.g. 37">
       </div>
     </div>
     <div class="af-group">
@@ -2597,6 +2607,7 @@ function openAdminForm(type, id){
       const srBox=document.getElementById('afSchoolRun'); if(srBox) srBox.checked=!!entity.schoolRun;
     } else {
       document.getElementById('afRole').value=entity.role;
+      { const hr=document.getElementById('afHourlyRate'); if(hr) hr.value=entity.hourlyRate!=null?entity.hourlyRate:''; const ph=document.getElementById('afPaidHours'); if(ph) ph.value=entity.paidHoursPerWeek!=null?entity.paidHoursPerWeek:''; }
       // Parse staff schedule into days
       adminFormDays=Object.keys(entity.sch).map(Number);
       const firstDay=adminFormDays[0];
@@ -2629,6 +2640,7 @@ function renderAdminForm(){
   const type=document.getElementById('afType').value;
   document.getElementById('afBillingGroup').style.display=type==='staff'?'none':'block';
   document.getElementById('afRoleGroup').style.display=type==='staff'?'block':'none';
+  { const pg=document.getElementById('afPayGroup'); if(pg) pg.style.display=type==='staff'?'flex':'none'; }
   document.getElementById('afTermGroup').style.display=type==='staff'?'none':'block';
   // School-run toggle only for school children; after-school days only when ticked.
   const srGroup=document.getElementById('afSchoolRunGroup');
@@ -2673,17 +2685,23 @@ function saveAdminForm(){
     const role=document.getElementById('afRole').value;
     const st=document.getElementById('afStartTime').value;
     const et=document.getElementById('afEndTime').value;
+    const rateEl=document.getElementById('afHourlyRate'), phEl=document.getElementById('afPaidHours');
+    const rateVal=rateEl&&rateEl.value!==''?parseFloat(rateEl.value):null;
+    const phVal=phEl&&phEl.value!==''?parseFloat(phEl.value):null;
     const sch={};
     adminFormDays.forEach(d=>sch[d]={s:st,e:et});
 
     if(adminEditTarget&&adminEditTarget.id){
       const s=STAFF.find(x=>x.id===adminEditTarget.id);
       s.name=name;s.role=role;s.sch=sch;
+      if(rateVal!=null) s.hourlyRate=rateVal;
+      if(phVal!=null) s.paidHoursPerWeek=phVal;
       s.startDate=document.getElementById('afStartDate').value||null;
       s.endDate=document.getElementById('afEndDate').value||null;
       showFlash(`✓ ${name} updated`);
     } else {
       STAFF.push({id:'staff_'+Date.now(),name,role,color:AC[STAFF.length%AC.length],pin:'0000',sch,archived:false,
+        hourlyRate:rateVal!=null?rateVal:0, paidHoursPerWeek:phVal!=null?phVal:0,
         startDate:document.getElementById('afStartDate').value||null,
         endDate:document.getElementById('afEndDate').value||null});
       showFlash(`✓ ${name} added`);
