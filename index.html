@@ -576,7 +576,7 @@
     </div>
   </div>
 </div>
-<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 29Sep-b</div>
+<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 29Sep-c</div>
 
 <!-- PAY WORKBOOK EXPORT PREVIEW OVERLAY -->
 <div class="overlay" id="payPreviewOv">
@@ -4785,7 +4785,7 @@ function buildPayPreview(){
     // shifts when rows are inserted; leave it to be set by hand if wanted.)
     const sickHrs = sick.reduce((t,x)=>t+(x.hrs||0),0);
     ups.push({address:col+'19', value:Number((unpaidHrs+sickHrs).toFixed(2)), label:'Deduction hours (sick + unpaid)'});
-    ups.push({address:col+'16', value:Number(otData.approvedHours.toFixed(2)), label:'Overtime hours (approved)'});
+    let overtimeTopRef = null;   // set to a formula like "=E52" when overtime is written
     const fill=(arr,range,lbl)=>{ arr.forEach((d,i)=>{ const r=range[0]+i; if(r<=range[1]) ups.push({address:col+r,value:fmtUK(d),label:lbl,isDate:true}); }); if(arr.length>(range[1]-range[0]+1)) warnings.push(`${s.name}: ${arr.length} ${lbl.toLowerCase()} entries but only ${range[1]-range[0]+1} rows (${range[0]}–${range[1]}). Extra ones are not written.`); };
     // SSP: date in the left column, hours lost in the pay column, side by side
     const dateCol = colLeft(col);
@@ -4815,11 +4815,25 @@ function buildPayPreview(){
     });
     if(deductions.length>(dedLastAllowed-dedFirst+1)) warnings.push(`${s.name}: ${deductions.length} deduction days but only rows ${dedFirst}–${dedLastAllowed} available before the SUM. Extra ones are not written.`);
     // Overtime: date in the left column, hours in the pay column, side by side
-    otData.approved.sort((a,b)=>a.date-b.date).forEach((a,i)=>{ const r=PAY_ROWS.overtime[0]+i; if(r<=PAY_ROWS.overtime[1]){
+    // Overtime: write one row per approved day starting at the first overtime row and
+    // growing down as many rows as needed (month-dependent). Then put a SUM formula on
+    // the row just below the last entry, and point the top total (row 16) at that cell.
+    const otList = otData.approved.slice().sort((a,b)=>a.date-b.date);
+    const otFirst = PAY_ROWS.overtime[0];
+    otList.forEach((a,i)=>{
+      const r=otFirst+i;
       ups.push({address:dateCol+r, value:fmtUK(a.date), label:'Overtime date', isDate:true});
       ups.push({address:col+r, value:Number(a.hours), label:'Overtime hours'});
-    }});
-    if(otData.approved.length>(PAY_ROWS.overtime[1]-PAY_ROWS.overtime[0]+1)) warnings.push(`${s.name}: more overtime days than the ${PAY_ROWS.overtime[1]-PAY_ROWS.overtime[0]+1} rows allow. Extra ones are not written.`);
+    });
+    if(otList.length){
+      const lastRow = otFirst + otList.length - 1;
+      const sumRow = lastRow + 1;                       // SUM sits just under the entries
+      ups.push({address:col+sumRow, value:`=SUM(${col}${otFirst}:${col}${lastRow})`, label:'Overtime total (formula)'});
+      // Top overtime field references the sum cell, so it updates if you edit entries.
+      overtimeTopRef = `=${col}${sumRow}`;
+    }
+    // Top overtime field (row 16): a formula pointing at the sum, or 0 if no overtime.
+    ups.push({address:col+'16', value: overtimeTopRef || 0, label:'Overtime total (top field)'});
     // (Annual leave dates are no longer written to the workbook — removed at Sussie's request.)
     payPreviewUpdates.push(...ups);
     html+=`<div style="margin:8px 0;padding:8px 10px;background:var(--parchment);border-radius:8px">
