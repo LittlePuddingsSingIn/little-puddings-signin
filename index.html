@@ -577,7 +577,7 @@
     </div>
   </div>
 </div>
-<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 29Sep-l</div>
+<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 29Sep-m</div>
 
 <!-- PAY WORKBOOK EXPORT PREVIEW OVERLAY -->
 <div class="overlay" id="payPreviewOv">
@@ -4584,14 +4584,50 @@ function downloadAllPaySheets(){
   const {jsPDF}=window.jspdf;
   const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
   const staff=STAFF.filter(x=>!x.archived);
-  staff.forEach((s,i)=>{
-    if(i>0) doc.addPage();
+  const {from,to}=exportPeriod();
+
+  // --- Summary page (front): everyone's rate, hours, weekly/annual/monthly, plus this
+  // period's deductions, overtime and total, so Jamie sees the whole team at a glance.
+  pdfHeader(doc, 'Payroll Summary', `All staff · Pay period ${fmtUK(from)} to ${fmtUK(to)}`);
+  const head=[['Staff','Rate','Hrs/wk','Per week','Per year','Per month','Deductions','Overtime','Total*']];
+  const body=staff.map(s=>{
+    const rate=s.hourlyRate||0, ph=s.paidHoursPerWeek||0;
+    const perWk=rate*ph, perYr=rate*ph*52, perMo=Math.round(perYr/12*100)/100;
+    // deductions this period
+    let dedHrs=0;
+    if(timesheet[s.id]) Object.keys(timesheet[s.id]).forEach(k=>{
+      const d=parseDInput(k); if(!d||d<from||d>to) return; const e=timesheet[s.id][k]; if(!e||e.deleted) return;
+      if(e.type==='sick'||e.type==='unpaid') dedHrs+=scheduledHours(s.id,d);
+    });
+    const ded=dedHrs*rate;
+    const ot=overtimeFor(s.id, from, to);
+    const otHrs=ot.approved.reduce((t,a)=>t+a.hours,0), otAmt=otHrs*rate;
+    const total=Math.round((perMo-ded+otAmt)*100)/100;
+    return [s.name, '£'+rate.toFixed(2), String(ph), '£'+perWk.toFixed(2),
+            '£'+perYr.toFixed(0), '£'+perMo.toFixed(2),
+            ded?'– £'+ded.toFixed(2):'—', otAmt?'+ £'+otAmt.toFixed(2):'—', '£'+total.toFixed(2)];
+  });
+  doc.autoTable({
+    startY:48, head, body,
+    styles:{fontSize:8,cellPadding:1.6},
+    headStyles:{fillColor:[26,122,74],textColor:[255,255,255],halign:'right'},
+    columnStyles:{0:{halign:'left',cellWidth:24},1:{halign:'right'},2:{halign:'right'},3:{halign:'right'},4:{halign:'right'},5:{halign:'right'},6:{halign:'right'},7:{halign:'right'},8:{halign:'right',fontStyle:'bold'}},
+    alternateRowStyles:{fillColor:[232,241,236]}, margin:{left:12,right:12},
+    didParseCell:function(data){ if(data.column.index===0) data.cell.styles.halign='left'; }
+  });
+  let sy=doc.lastAutoTable.finalY+5;
+  doc.setFont('helvetica','italic'); doc.setFontSize(8); doc.setTextColor(107,100,96);
+  doc.text('* Total is the fixed monthly salary, less deductions, plus overtime — before Tax, NI, pension and SSP. Full breakdown for each person on the following pages.', 12, sy, {maxWidth:doc.internal.pageSize.getWidth()-24});
+  pdfFooterNoSign(doc);
+
+  // --- Each person's full pay sheet behind ---
+  staff.forEach(s=>{
+    doc.addPage();
     drawPaySheet(doc, s.id);
     pdfFooterNoSign(doc);
   });
-  const {to}=exportPeriod();
   doc.save(`All Pay Sheets ${dk(to)}.pdf`);
-  showFlash(`📄 ${staff.length} pay sheets generated`);
+  showFlash(`📄 Summary + ${staff.length} pay sheets generated`);
 }
 
 // Draw one person's pay sheet onto the current page of an existing doc.
