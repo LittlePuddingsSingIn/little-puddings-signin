@@ -576,7 +576,7 @@
     </div>
   </div>
 </div>
-<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 29Sep-i</div>
+<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 29Sep-j</div>
 
 <!-- PAY WORKBOOK EXPORT PREVIEW OVERLAY -->
 <div class="overlay" id="payPreviewOv">
@@ -4642,7 +4642,7 @@ function downloadPaySheetPDF(staffId){
   if(deductions.length){
     doc.autoTable({
       startY:yy+7,
-      head:[['Deduction date','Type','Contracted hrs','£ off']],
+      head:[[{content:'Deduction date',styles:{halign:'left'}},{content:'Type',styles:{halign:'left'}},{content:'Contracted hrs',styles:{halign:'right'}},{content:'£ off',styles:{halign:'right'}}]],
       body: deductions.map(x=>[fmtUK(x.d), x.type, x.hrs.toFixed(2), '£'+(x.hrs*rate).toFixed(2)]),
       foot:[[{content:'Total deducted',colSpan:3,styles:{halign:'left'}},{content:'£'+dedTotal.toFixed(2),styles:{halign:'right'}}]],
       styles:{fontSize:8,cellPadding:1.6},
@@ -4658,7 +4658,7 @@ function downloadPaySheetPDF(staffId){
   if(otRows.length){
     doc.autoTable({
       startY:yy+4,
-      head:[['Overtime date','Hours','£ added']],
+      head:[[{content:'Overtime date',styles:{halign:'left'}},{content:'Hours',styles:{halign:'right'}},{content:'£ added',styles:{halign:'right'}}]],
       body: otRows.map(x=>[fmtUK(x.d), x.hrs.toFixed(2), '£'+(x.hrs*rate).toFixed(2)]),
       foot:[[{content:'Total overtime',styles:{halign:'left'}},{content:otTotalHrs.toFixed(2),styles:{halign:'right'}},{content:'£'+otTotal.toFixed(2),styles:{halign:'right'}}]],
       styles:{fontSize:8,cellPadding:1.6},
@@ -4679,7 +4679,7 @@ function downloadPaySheetPDF(staffId){
   const calc=[[basisNote, '£'+monthly.toFixed(2)]];
   if(dedTotal) calc.push(['Less deductions (unpaid & sick, see above)', '– £'+dedTotal.toFixed(2)]);
   if(otTotal) calc.push(['Plus overtime (see above)', '+ £'+otTotal.toFixed(2)]);
-  calc.push(['Total pay before NI & Tax', '£'+totalPay.toFixed(2)]);
+  calc.push(['Total before Tax, NI, pension & SSP', '£'+totalPay.toFixed(2)]);
   doc.autoTable({
     startY:yy+6,
     body:calc,
@@ -4692,11 +4692,37 @@ function downloadPaySheetPDF(staffId){
     margin:{left:12,right:12},
     didDrawPage:()=>pdfFooter(doc)
   });
-  yy=doc.lastAutoTable.finalY+6;
+  yy=doc.lastAutoTable.finalY+8;
+
+  // SSP section — list the sick days for Jamie to work out SSP. No amount is added to
+  // the total above; SSP is calculated and applied separately by payroll.
+  const sickDays = deductions.filter(x=>x.type==='Sick day');
+  if(sickDays.length){
+    if(yy > doc.internal.pageSize.getHeight()-50){ doc.addPage(); yy=20; }
+    doc.setFont('times','bold'); doc.setFontSize(11); doc.setTextColor(26,122,74);
+    doc.text('Statutory Sick Pay (SSP) — for payroll to calculate', 12, yy);
+    doc.autoTable({
+      startY:yy+3,
+      head:[[{content:'Sick day',styles:{halign:'left'}},{content:'Day',styles:{halign:'left'}},{content:'Contracted hrs',styles:{halign:'right'}}]],
+      body: sickDays.map(x=>[fmtUK(x.d), DAYS[x.d.getDay()].slice(0,3), x.hrs.toFixed(2)]),
+      foot:[[{content:`${sickDays.length} sick day${sickDays.length!==1?'s':''} this period`,colSpan:2,styles:{halign:'left'}},{content:sickDays.reduce((t,x)=>t+x.hrs,0).toFixed(2),styles:{halign:'right'}}]],
+      styles:{fontSize:8,cellPadding:1.6},
+      headStyles:{fillColor:[107,100,96],textColor:[255,255,255]},
+      footStyles:{fillColor:[240,238,236],textColor:[80,74,70],fontStyle:'bold'},
+      columnStyles:{0:{cellWidth:40,halign:'left'},1:{cellWidth:24,halign:'left'},2:{cellWidth:40,halign:'right'}},
+      alternateRowStyles:{fillColor:[247,245,243]}, margin:{left:12,right:12},
+      didDrawPage:()=>pdfFooter(doc)
+    });
+    yy=doc.lastAutoTable.finalY+2;
+    doc.setFont('helvetica','italic'); doc.setFontSize(7.5); doc.setTextColor(107,100,96);
+    doc.text('SSP is not included in the total above. Payroll calculates SSP for these days and adds it separately.', 12, yy+3);
+    yy+=8;
+  }
+
   doc.setFont('helvetica','italic'); doc.setFontSize(7.5); doc.setTextColor(107,100,96);
   const foot = s.isApprentice
-    ? 'A sick or unpaid day is deducted at that day\u2019s contracted hours × rate. SSP is added separately by payroll for sick days. Apprentice pay covers 30 h/week (24 in setting + 6 off-the-job).'
-    : 'A sick or unpaid day is deducted at that day\u2019s contracted hours × rate. SSP is added separately by payroll for sick days.';
+    ? 'A sick or unpaid day is deducted at that day\u2019s contracted hours × rate. The total is before Tax, NI, pension and SSP. Apprentice pay covers 30 h/week (24 in setting + 6 off-the-job).'
+    : 'A sick or unpaid day is deducted at that day\u2019s contracted hours × rate. The total is before Tax, NI, pension and SSP.';
   doc.text(doc.splitTextToSize(foot, doc.internal.pageSize.getWidth()-24), 12, yy);
 
   pdfFooter(doc);
