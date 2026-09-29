@@ -577,7 +577,7 @@
     </div>
   </div>
 </div>
-<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 29Sep-m</div>
+<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 29Sep-o</div>
 
 <!-- PAY WORKBOOK EXPORT PREVIEW OVERLAY -->
 <div class="overlay" id="payPreviewOv">
@@ -4582,47 +4582,60 @@ function downloadPaySheetPDF(staffId){
 function downloadAllPaySheets(){
   if(!window.jspdf){ alert('PDF library not loaded. Check the internet connection and refresh (Ctrl+F5).'); return; }
   const {jsPDF}=window.jspdf;
-  const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+  // Summary page is LANDSCAPE (wide overview); each person's detail page is portrait.
+  const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
   const staff=STAFF.filter(x=>!x.archived);
   const {from,to}=exportPeriod();
 
   // --- Summary page (front): everyone's rate, hours, weekly/annual/monthly, plus this
   // period's deductions, overtime and total, so Jamie sees the whole team at a glance.
   pdfHeader(doc, 'Payroll Summary', `All staff · Pay period ${fmtUK(from)} to ${fmtUK(to)}`);
-  const head=[['Staff','Rate','Hrs/wk','Per week','Per year','Per month','Deductions','Overtime','Total*']];
-  const body=staff.map(s=>{
+  const head=[['Staff','Rate','Hrs/wk','Per week','Per year','Per month','Deductions','Overtime','Sick (SSP)','Total*']];
+  const sickRows=[];   // track which body rows have sick days, to highlight
+  const body=staff.map((s,idx)=>{
     const rate=s.hourlyRate||0, ph=s.paidHoursPerWeek||0;
-    const perWk=rate*ph, perYr=rate*ph*52, perMo=Math.round(perYr/12*100)/100;
-    // deductions this period
-    let dedHrs=0;
+    const perYr=rate*ph*52, perMo=Math.round(perYr/12*100)/100;
+    // deductions + sick-day count this period
+    let dedHrs=0, sickCount=0;
     if(timesheet[s.id]) Object.keys(timesheet[s.id]).forEach(k=>{
       const d=parseDInput(k); if(!d||d<from||d>to) return; const e=timesheet[s.id][k]; if(!e||e.deleted) return;
-      if(e.type==='sick'||e.type==='unpaid') dedHrs+=scheduledHours(s.id,d);
+      if(e.type==='sick'){ dedHrs+=scheduledHours(s.id,d); sickCount++; }
+      else if(e.type==='unpaid') dedHrs+=scheduledHours(s.id,d);
     });
+    if(sickCount) sickRows.push(idx);
     const ded=dedHrs*rate;
     const ot=overtimeFor(s.id, from, to);
     const otHrs=ot.approved.reduce((t,a)=>t+a.hours,0), otAmt=otHrs*rate;
     const total=Math.round((perMo-ded+otAmt)*100)/100;
-    return [s.name, '£'+rate.toFixed(2), String(ph), '£'+perWk.toFixed(2),
-            '£'+perYr.toFixed(0), '£'+perMo.toFixed(2),
-            ded?'– £'+ded.toFixed(2):'—', otAmt?'+ £'+otAmt.toFixed(2):'—', '£'+total.toFixed(2)];
+    const perWk=rate*ph;
+    return [s.name, '£'+rate.toFixed(2), String(ph), '£'+perWk.toFixed(2), '£'+perYr.toFixed(0), '£'+perMo.toFixed(2),
+            ded?'– £'+ded.toFixed(2):'—', otAmt?'+ £'+otAmt.toFixed(2):'—',
+            sickCount?`${sickCount} day${sickCount!==1?'s':''} — SSP due`:'—', '£'+total.toFixed(2)];
   });
   doc.autoTable({
     startY:48, head, body,
-    styles:{fontSize:8,cellPadding:1.6},
+    styles:{fontSize:9,cellPadding:2.2},
     headStyles:{fillColor:[26,122,74],textColor:[255,255,255],halign:'right'},
-    columnStyles:{0:{halign:'left',cellWidth:24},1:{halign:'right'},2:{halign:'right'},3:{halign:'right'},4:{halign:'right'},5:{halign:'right'},6:{halign:'right'},7:{halign:'right'},8:{halign:'right',fontStyle:'bold'}},
+    columnStyles:{0:{halign:'left',cellWidth:32},1:{halign:'right'},2:{halign:'right'},3:{halign:'right'},4:{halign:'right'},5:{halign:'right'},6:{halign:'right'},7:{halign:'right'},8:{halign:'center'},9:{halign:'right',fontStyle:'bold'}},
     alternateRowStyles:{fillColor:[232,241,236]}, margin:{left:12,right:12},
-    didParseCell:function(data){ if(data.column.index===0) data.cell.styles.halign='left'; }
+    didParseCell:function(data){
+      if(data.column.index===0) data.cell.styles.halign='left';
+      // Highlight the Sick (SSP) cell for anyone with sick days, so it isn't missed.
+      if(data.section==='body' && data.column.index===8 && sickRows.includes(data.row.index)){
+        data.cell.styles.fillColor=[244,222,218]; data.cell.styles.textColor=[161,58,42]; data.cell.styles.fontStyle='bold';
+      }
+    }
   });
   let sy=doc.lastAutoTable.finalY+5;
+  doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(161,58,42);
+  if(sickRows.length) doc.text('⚠ SSP due for '+sickRows.length+' staff this period — see the highlighted rows and each person\u2019s SSP section.', 12, sy);
   doc.setFont('helvetica','italic'); doc.setFontSize(8); doc.setTextColor(107,100,96);
-  doc.text('* Total is the fixed monthly salary, less deductions, plus overtime — before Tax, NI, pension and SSP. Full breakdown for each person on the following pages.', 12, sy, {maxWidth:doc.internal.pageSize.getWidth()-24});
+  doc.text('* Total is the fixed monthly salary, less deductions, plus overtime — before Tax, NI, pension and SSP. Full breakdown for each person on the following pages.', 12, sy+(sickRows.length?5:0), {maxWidth:doc.internal.pageSize.getWidth()-24});
   pdfFooterNoSign(doc);
 
-  // --- Each person's full pay sheet behind ---
+  // --- Each person's full pay sheet behind (portrait) ---
   staff.forEach(s=>{
-    doc.addPage();
+    doc.addPage('a4','portrait');
     drawPaySheet(doc, s.id);
     pdfFooterNoSign(doc);
   });
