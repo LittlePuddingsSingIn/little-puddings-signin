@@ -577,7 +577,7 @@
     </div>
   </div>
 </div>
-<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 29Sep-k</div>
+<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 29Sep-l</div>
 
 <!-- PAY WORKBOOK EXPORT PREVIEW OVERLAY -->
 <div class="overlay" id="payPreviewOv">
@@ -4572,7 +4572,7 @@ function downloadPaySheetPDF(staffId){
   const {jsPDF}=window.jspdf;
   const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
   drawPaySheet(doc, staffId);
-  pdfFooter(doc);
+  pdfFooterNoSign(doc);
   const {to}=exportPeriod();
   doc.save(`${s.name} Pay Sheet ${dk(to)}.pdf`);
   showFlash('📄 Pay sheet PDF generated');
@@ -4587,7 +4587,7 @@ function downloadAllPaySheets(){
   staff.forEach((s,i)=>{
     if(i>0) doc.addPage();
     drawPaySheet(doc, s.id);
-    pdfFooter(doc);
+    pdfFooterNoSign(doc);
   });
   const {to}=exportPeriod();
   doc.save(`All Pay Sheets ${dk(to)}.pdf`);
@@ -4717,7 +4717,7 @@ function drawPaySheet(doc, staffId){
       if(data.row.index===calc.length-1){ data.cell.styles.fillColor=[26,122,74]; data.cell.styles.textColor=[255,255,255]; data.cell.styles.fontStyle='bold'; data.cell.styles.fontSize=10.5; }
     },
     margin:{left:12,right:12},
-    didDrawPage:()=>pdfFooter(doc)
+    didDrawPage:()=>pdfFooterNoSign(doc)
   });
   yy=doc.lastAutoTable.finalY+5;
 
@@ -4738,7 +4738,7 @@ function drawPaySheet(doc, staffId){
       footStyles:{fillColor:[240,238,236],textColor:[80,74,70],fontStyle:'bold'},
       columnStyles:{0:{cellWidth:40,halign:'left'},1:{cellWidth:24,halign:'left'},2:{cellWidth:40,halign:'right'}},
       alternateRowStyles:{fillColor:[247,245,243]}, margin:{left:12,right:12},
-      didDrawPage:()=>pdfFooter(doc)
+      didDrawPage:()=>pdfFooterNoSign(doc)
     });
     yy=doc.lastAutoTable.finalY+2;
     doc.setFont('helvetica','italic'); doc.setFontSize(7.5); doc.setTextColor(107,100,96);
@@ -5167,6 +5167,13 @@ function pdfFooter(doc){
   doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(107,100,96);
   doc.text('Generated '+fmtUK(new Date())+' '+ts(new Date()), 12, h-8);
   doc.text('Signed (childminder): ______________________     Page '+doc.internal.getNumberOfPages(), w-12, h-8, {align:'right'});
+}
+// Footer without the signature line (used for pay sheets, which are not printed/signed).
+function pdfFooterNoSign(doc){
+  const w=doc.internal.pageSize.getWidth(), h=doc.internal.pageSize.getHeight();
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(107,100,96);
+  doc.text('Generated '+fmtUK(new Date())+' '+ts(new Date()), 12, h-8);
+  doc.text('Page '+doc.internal.getNumberOfPages(), w-12, h-8, {align:'right'});
 }
 
 // ════════════════════════════════════════════════
