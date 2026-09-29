@@ -576,7 +576,7 @@
     </div>
   </div>
 </div>
-<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 29Sep-e</div>
+<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 29Sep-f</div>
 
 <!-- PAY WORKBOOK EXPORT PREVIEW OVERLAY -->
 <div class="overlay" id="payPreviewOv">
@@ -4547,6 +4547,133 @@ function downloadStaffTimesheet(staffId){
   XLSX.writeFile(buildStaffTimesheetWB(staffId,from,to), `${s.name} Time Sheet ${dk(from)}_to_${dk(to)}.xlsx`);
 }
 
+function downloadPaySheetPDF(staffId){
+  if(!window.jspdf){ alert('PDF library not loaded. Check the internet connection and refresh (Ctrl+F5).'); return; }
+  const s=STAFF.find(x=>x.id===staffId); if(!s) return;
+  const {from,to,y,m}=exportPeriod();
+  const rate=s.hourlyRate||0, paidHrsWk=s.paidHoursPerWeek||0;
+  const monthly=Math.round(rate*paidHrsWk*52/12*100)/100;   // fixed monthly salary
+
+  // Days worked this period, total hours per day (from sessions).
+  const dayRows=[];
+  eachDay(from,to).forEach(d=>{
+    const w=calcWorkedHours(s.id,d);
+    if(w>0) dayRows.push([fmtUK(d), DAYS[d.getDay()].slice(0,3), w.toFixed(2)]);
+  });
+  const totalWorked=dayRows.reduce((t,r)=>t+parseFloat(r[2]),0);
+
+  // Deductions (sick + unpaid), each at that day's contracted hours × rate.
+  const deductions=[];
+  if(timesheet[s.id]){
+    Object.keys(timesheet[s.id]).forEach(k=>{
+      const d=parseDInput(k); if(!d||d<from||d>to) return;
+      const e=timesheet[s.id][k]; if(!e||e.deleted) return;
+      if(e.type==='sick') deductions.push({d, type:'Sick day', hrs: scheduledHours(s.id,d)});
+      else if(e.type==='unpaid') deductions.push({d, type:'Unpaid leave', hrs: scheduledHours(s.id,d)});
+    });
+  }
+  deductions.sort((a,b)=>a.d-b.d);
+  const dedTotal=deductions.reduce((t,x)=>t+x.hrs*rate,0);
+
+  // Overtime (approved) this period.
+  const ot=overtimeFor(s.id, from, to);
+  const otRows=ot.approved.slice().sort((a,b)=>a.date-b.date).map(a=>({d:a.date, hrs:a.hours}));
+  const otTotalHrs=otRows.reduce((t,x)=>t+x.hrs,0);
+  const otTotal=otTotalHrs*rate;
+
+  const totalPay=Math.round((monthly - dedTotal + otTotal)*100)/100;
+  const isSelf=(s.id==='sussie');
+
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+  pdfHeader(doc, 'Pay Sheet', `${s.name} · ${s.role} · £${rate.toFixed(2)}/hr`);
+  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(107,100,96);
+  doc.text(`Pay period ${fmtUK(from)} to ${fmtUK(to)}`, 12, 46);
+
+  // Hours worked table
+  doc.autoTable({
+    startY:50,
+    head:[['Date','Day','Hours']],
+    body: dayRows.length?dayRows:[['—','No worked days','']],
+    foot:[[{content:'Total hours worked',colSpan:2,styles:{halign:'left'}},{content:totalWorked.toFixed(2),styles:{halign:'right'}}]],
+    styles:{fontSize:8,cellPadding:1.6},
+    headStyles:{fillColor:[26,122,74],textColor:[255,255,255]},
+    footStyles:{fillColor:[232,241,236],textColor:[26,122,74],fontStyle:'bold'},
+    columnStyles:{0:{cellWidth:34},1:{cellWidth:20},2:{halign:'right',cellWidth:24}},
+    alternateRowStyles:{fillColor:[247,243,236]}, margin:{left:12,right:12}
+  });
+  let yy=doc.lastAutoTable.finalY+2;
+  doc.setFont('helvetica','italic'); doc.setFontSize(7.5); doc.setTextColor(107,100,96);
+  doc.text(isSelf
+    ? 'Hours are for the record only. Susanne is paid a fixed monthly salary based on 16 h/week, not on actual hours worked.'
+    : 'Hours worked are for the record. Pay is the fixed monthly salary below, adjusted for deductions and overtime.', 12, yy+3);
+
+  // Deductions table (if any)
+  if(deductions.length){
+    doc.autoTable({
+      startY:yy+7,
+      head:[['Deduction date','Type','Contracted hrs','£ off']],
+      body: deductions.map(x=>[fmtUK(x.d), x.type, x.hrs.toFixed(2), '£'+(x.hrs*rate).toFixed(2)]),
+      foot:[[{content:'Total deducted',colSpan:3,styles:{halign:'left'}},{content:'£'+dedTotal.toFixed(2),styles:{halign:'right'}}]],
+      styles:{fontSize:8,cellPadding:1.6},
+      headStyles:{fillColor:[161,58,42],textColor:[255,255,255]},
+      footStyles:{fillColor:[244,222,218],textColor:[161,58,42],fontStyle:'bold'},
+      columnStyles:{2:{halign:'right'},3:{halign:'right'}},
+      alternateRowStyles:{fillColor:[244,222,218]}, margin:{left:12,right:12}
+    });
+    yy=doc.lastAutoTable.finalY;
+  } else { yy=yy+7; }
+
+  // Overtime table (if any)
+  if(otRows.length){
+    doc.autoTable({
+      startY:yy+4,
+      head:[['Overtime date','Hours','£ added']],
+      body: otRows.map(x=>[fmtUK(x.d), x.hrs.toFixed(2), '£'+(x.hrs*rate).toFixed(2)]),
+      foot:[[{content:'Total overtime',styles:{halign:'left'}},{content:otTotalHrs.toFixed(2),styles:{halign:'right'}},{content:'£'+otTotal.toFixed(2),styles:{halign:'right'}}]],
+      styles:{fontSize:8,cellPadding:1.6},
+      headStyles:{fillColor:[212,160,23],textColor:[26,122,74]},
+      footStyles:{fillColor:[251,243,220],textColor:[26,122,74],fontStyle:'bold'},
+      columnStyles:{1:{halign:'right'},2:{halign:'right'}},
+      alternateRowStyles:{fillColor:[251,243,220]}, margin:{left:12,right:12}
+    });
+    yy=doc.lastAutoTable.finalY;
+  }
+
+  // Pay calculation
+  const basisNote = isSelf
+    ? `Monthly salary (£${rate.toFixed(2)} × 16h × 52 ÷ 12) — paid for 16h/week`
+    : (s.isApprentice
+      ? `Monthly salary (£${rate.toFixed(2)} × ${paidHrsWk}h × 52 ÷ 12) — apprentice, includes 6h off-the-job`
+      : `Monthly salary (£${rate.toFixed(2)} × ${paidHrsWk}h × 52 ÷ 12)`);
+  const calc=[[basisNote, '£'+monthly.toFixed(2)]];
+  if(dedTotal) calc.push(['Less deductions (unpaid & sick, see above)', '– £'+dedTotal.toFixed(2)]);
+  if(otTotal) calc.push(['Plus overtime (see above)', '+ £'+otTotal.toFixed(2)]);
+  calc.push(['Total pay before NI & Tax', '£'+totalPay.toFixed(2)]);
+  doc.autoTable({
+    startY:yy+6,
+    body:calc,
+    styles:{fontSize:9.5,cellPadding:2.5},
+    columnStyles:{0:{cellWidth:118},1:{halign:'right',fontStyle:'bold'}},
+    alternateRowStyles:{fillColor:[232,241,236]},
+    didParseCell:function(data){
+      if(data.row.index===calc.length-1){ data.cell.styles.fillColor=[26,122,74]; data.cell.styles.textColor=[255,255,255]; data.cell.styles.fontStyle='bold'; data.cell.styles.fontSize=10.5; }
+    },
+    margin:{left:12,right:12},
+    didDrawPage:()=>pdfFooter(doc)
+  });
+  yy=doc.lastAutoTable.finalY+6;
+  doc.setFont('helvetica','italic'); doc.setFontSize(7.5); doc.setTextColor(107,100,96);
+  const foot = s.isApprentice
+    ? 'A sick or unpaid day is deducted at that day\u2019s contracted hours × rate. SSP is added separately by payroll for sick days. Apprentice pay covers 30 h/week (24 in setting + 6 off-the-job).'
+    : 'A sick or unpaid day is deducted at that day\u2019s contracted hours × rate. SSP is added separately by payroll for sick days.';
+  doc.text(doc.splitTextToSize(foot, doc.internal.pageSize.getWidth()-24), 12, yy);
+
+  pdfFooter(doc);
+  doc.save(`${s.name} Pay Sheet ${dk(to)}.pdf`);
+  showFlash('📄 Pay sheet PDF generated');
+}
+
 function downloadStaffTimesheetPDF(staffId){
   if(!window.jspdf){ alert('PDF library not loaded. Check the internet connection and refresh (Ctrl+F5).'); return; }
   const {from,to}=exportPeriod();
@@ -4614,10 +4741,11 @@ function downloadAllStaffTimesheets(){
   box.innerHTML=STAFF.filter(s=>!s.archived).map(s=>
     `<div style="background:var(--cream);border:1px solid rgba(26,122,74,0.2);border-radius:11px;padding:10px 12px">
        <div style="font-size:13px;color:var(--forest);font-weight:700;margin-bottom:7px">${s.name}</div>
-       <div style="display:flex;gap:8px">
+       <div style="display:flex;gap:8px;margin-bottom:6px">
          <button onclick="downloadStaffTimesheet('${s.id}')" style="flex:1;padding:9px;background:var(--sage);color:var(--forest-dark);border:none;border-radius:8px;font-weight:700;font-size:12px;cursor:pointer">⬇ Excel</button>
-         <button onclick="downloadStaffTimesheetPDF('${s.id}')" style="flex:1;padding:9px;background:var(--forest);color:var(--gold-light);border:none;border-radius:8px;font-weight:700;font-size:12px;cursor:pointer">📄 PDF</button>
+         <button onclick="downloadStaffTimesheetPDF('${s.id}')" style="flex:1;padding:9px;background:var(--forest);color:var(--gold-light);border:none;border-radius:8px;font-weight:700;font-size:12px;cursor:pointer">📄 Timesheet</button>
        </div>
+       <button onclick="downloadPaySheetPDF('${s.id}')" style="width:100%;padding:9px;background:var(--gold);color:var(--forest);border:none;border-radius:8px;font-weight:700;font-size:12px;cursor:pointer">💷 Pay sheet PDF</button>
      </div>`
   ).join('');
   showFlash('Tap each name to download their '+MONTH_SHORT[from.getMonth()]+' time sheet');
