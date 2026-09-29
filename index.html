@@ -576,7 +576,7 @@
     </div>
   </div>
 </div>
-<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 29Sep-d</div>
+<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 29Sep-e</div>
 
 <!-- PAY WORKBOOK EXPORT PREVIEW OVERLAY -->
 <div class="overlay" id="payPreviewOv">
@@ -777,6 +777,14 @@
         <label class="af-label">End time</label>
         <input class="af-input" id="afEndTime" type="time" value="17:00">
       </div>
+    </div>
+    <div class="af-group" id="afPerDayGroup" style="display:none">
+      <label class="af-label" style="display:flex;align-items:center;gap:8px;cursor:pointer">
+        <input type="checkbox" id="afPerDay" onchange="renderPerDayTimes()" style="width:auto">
+        Different times on different days
+      </label>
+      <div id="afPerDayTimes" style="display:none;margin-top:8px"></div>
+      <div style="font-size:10px;color:var(--moss);margin-top:4px">Tick to set each working day's own start and end. Leave unticked to use the same times above for every day.</div>
     </div>
     <div class="af-row">
       <div class="af-group">
@@ -1861,6 +1869,7 @@ function mergePins(codeArr, storedArr){
 let adminEditTarget = null; // {type, id} or null for new
 let adminFormDays = [];
 let adminFormAfterDays = [];
+let adminFormPerDay = null;   // {dow:{s,e}} when a staff member has different times per day
 let adminFormEmoji = '🌱';
 
 function isPinDefault(type,id){
@@ -2587,6 +2596,7 @@ function openAdminForm(type, id){
   adminEditTarget={type,id};
   adminFormDays=[];
   adminFormAfterDays=[];
+  adminFormPerDay=null;
   // Build emoji grid
   const grid=document.getElementById('afEmojiGrid');
   grid.innerHTML=EMOJIS.map(e=>`<div class="af-emoji-btn ${adminFormEmoji===e?'sel':''}" onclick="selectEmoji('${e}')">${e}</div>`).join('');
@@ -2608,6 +2618,10 @@ function openAdminForm(type, id){
     } else {
       document.getElementById('afRole').value=entity.role;
       { const hr=document.getElementById('afHourlyRate'); if(hr) hr.value=entity.hourlyRate!=null?entity.hourlyRate:''; const ph=document.getElementById('afPaidHours'); if(ph) ph.value=entity.paidHoursPerWeek!=null?entity.paidHoursPerWeek:''; }
+      // Detect per-day times: if the schedule's days don't all share the same s/e, load them.
+      { const sd=entity.sch||{}; const ks=Object.keys(sd); adminFormPerDay={}; ks.forEach(d=>adminFormPerDay[d]={s:sd[d].s,e:sd[d].e});
+        const first=ks.length?sd[ks[0]]:null; const varied=first&&ks.some(d=>sd[d].s!==first.s||sd[d].e!==first.e);
+        const pd=document.getElementById('afPerDay'); if(pd) pd.checked=!!varied; if(!varied) adminFormPerDay=null; }
       // Parse staff schedule into days
       adminFormDays=Object.keys(entity.sch).map(Number);
       const firstDay=adminFormDays[0];
@@ -2641,6 +2655,7 @@ function renderAdminForm(){
   document.getElementById('afBillingGroup').style.display=type==='staff'?'none':'block';
   document.getElementById('afRoleGroup').style.display=type==='staff'?'block':'none';
   { const pg=document.getElementById('afPayGroup'); if(pg) pg.style.display=type==='staff'?'flex':'none'; }
+  { const pdg=document.getElementById('afPerDayGroup'); if(pdg) pdg.style.display=type==='staff'?'block':'none'; if(type==='staff') renderPerDayTimes(); }
   document.getElementById('afTermGroup').style.display=type==='staff'?'none':'block';
   // School-run toggle only for school children; after-school days only when ticked.
   const srGroup=document.getElementById('afSchoolRunGroup');
@@ -2654,6 +2669,34 @@ function toggleDay(d){
   const idx=adminFormDays.indexOf(d);
   if(idx>=0)adminFormDays.splice(idx,1); else adminFormDays.push(d);
   updateDayButtons();
+  renderPerDayTimes();   // keep the per-day time rows in step with the ticked days
+}
+const DAY_LABELS_SHORT={0:'Sun',1:'Mon',2:'Tue',3:'Wed',4:'Thu',5:'Fri',6:'Sat'};
+// Build a start/end time row for each ticked working day, pre-filled from the
+// person's current schedule (or the default times) so any day can differ.
+function renderPerDayTimes(){
+  const wrap=document.getElementById('afPerDayTimes');
+  const box=document.getElementById('afPerDay');
+  if(!wrap||!box) return;
+  wrap.style.display = box.checked ? 'block' : 'none';
+  if(!box.checked){ wrap.innerHTML=''; return; }
+  const defS=document.getElementById('afStartTime').value||'08:00';
+  const defE=document.getElementById('afEndTime').value||'17:00';
+  const order=[1,2,3,4,5,6,0].filter(d=>adminFormDays.includes(d));
+  wrap.innerHTML = order.map(d=>{
+    const cur = (adminFormPerDay && adminFormPerDay[d]) ? adminFormPerDay[d] : {s:defS,e:defE};
+    return `<div class="af-row" style="align-items:center;gap:6px;margin-bottom:4px">
+      <div style="width:34px;font-size:11px;color:var(--bark);font-weight:700">${DAY_LABELS_SHORT[d]}</div>
+      <input class="af-input" type="time" value="${cur.s}" onchange="setPerDay(${d},'s',this.value)" style="flex:1">
+      <span style="color:var(--bark)">to</span>
+      <input class="af-input" type="time" value="${cur.e}" onchange="setPerDay(${d},'e',this.value)" style="flex:1">
+    </div>`;
+  }).join('');
+}
+function setPerDay(d, which, val){
+  if(!adminFormPerDay) adminFormPerDay={};
+  if(!adminFormPerDay[d]) adminFormPerDay[d]={s:document.getElementById('afStartTime').value,e:document.getElementById('afEndTime').value};
+  adminFormPerDay[d][which]=val;
 }
 function toggleAfterDay(d){
   const idx=adminFormAfterDays.indexOf(d);
@@ -2688,8 +2731,12 @@ function saveAdminForm(){
     const rateEl=document.getElementById('afHourlyRate'), phEl=document.getElementById('afPaidHours');
     const rateVal=rateEl&&rateEl.value!==''?parseFloat(rateEl.value):null;
     const phVal=phEl&&phEl.value!==''?parseFloat(phEl.value):null;
+    const perDayOn=document.getElementById('afPerDay') && document.getElementById('afPerDay').checked;
     const sch={};
-    adminFormDays.forEach(d=>sch[d]={s:st,e:et});
+    adminFormDays.forEach(d=>{
+      if(perDayOn && adminFormPerDay && adminFormPerDay[d]) sch[d]={s:adminFormPerDay[d].s, e:adminFormPerDay[d].e};
+      else sch[d]={s:st,e:et};
+    });
 
     if(adminEditTarget&&adminEditTarget.id){
       const s=STAFF.find(x=>x.id===adminEditTarget.id);
