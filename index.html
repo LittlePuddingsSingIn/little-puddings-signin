@@ -555,7 +555,15 @@
   <!-- SETTINGS -->
   <div id="panel-settings" style="display:none">
     <div class="sec-head"><div class="sec-label">Settings</div><div class="sec-line"></div></div>
-    <div class="sec-sub">Reset PINs · School run · Term dates</div>
+    <div class="sec-sub">Backup · Reset PINs · School run · Term dates</div>
+    <div class="set-section" style="border-left:4px solid var(--gold);background:rgba(212,160,23,0.08)">
+      <div class="set-title">💾 Backup &amp; restore all data</div>
+      <div class="sec-sub" style="margin-bottom:10px">Download one file holding everyone and every record (people, PINs, attendance, payroll, leave, lieu, overtime, term dates). Keep it safe. <b>Restore</b> reloads a backup over everything, which is how you bring the real names and records back after stripping them out of the code. Take a fresh backup before any big change or new version.</div>
+      <button onclick="downloadFullBackup()" style="width:100%;padding:11px;background:var(--forest);color:#fff;border:none;border-radius:9px;font-weight:700;font-size:12px;cursor:pointer;margin-bottom:8px">⬇ Download full backup (.json)</button>
+      <button onclick="document.getElementById('restoreFileInput').click()" style="width:100%;padding:11px;background:var(--gold);color:var(--forest);border:none;border-radius:9px;font-weight:700;font-size:12px;cursor:pointer">⬆ Restore from a backup file…</button>
+      <input type="file" id="restoreFileInput" accept="application/json,.json" style="display:none" onchange="restoreBackupFile(this)">
+      <div id="backupStatus" style="font-size:11px;margin-top:10px;color:var(--forest);line-height:1.6"></div>
+    </div>
     <div class="set-section">
       <div class="set-title">📅 Term dates</div>
       <div class="sec-sub" style="margin-bottom:8px">Anything outside these dates counts as a school holiday: no 08:55 sign-out, no 15:25 sign-in, and school children are in for full days.</div>
@@ -577,7 +585,7 @@
     </div>
   </div>
 </div>
-<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 29Sep-o</div>
+<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 11Oct-b</div>
 
 <!-- PAY WORKBOOK EXPORT PREVIEW OVERLAY -->
 <div class="overlay" id="payPreviewOv">
@@ -1294,6 +1302,116 @@ function loadLocal(){
     dataDirty = !!d.pendingSync;
     console.log('Restored on-device data from', d.savedAt, '· pendingSync:', dataDirty);
   } catch(e){ console.warn('On-device load failed:', e); }
+}
+
+// ════════════════════════════════════════════════
+// FULL BACKUP + RESTORE
+// A single JSON file holding EVERYTHING the app stores (people, PINs,
+// attendance, payroll, leave, lieu, overtime, term dates, settings).
+// Download one before any big change; Restore reloads it wholesale — this
+// is what puts the real names and all records back after they are stripped
+// out of the code, so nothing is lost.
+// ════════════════════════════════════════════════
+
+// Every piece of state the app persists (same set it syncs to OneDrive).
+function collectAllState(){
+  return {
+    appName: 'Little Puddings sign-in',
+    backupFormat: 1,
+    dataVersion: DATA_VERSION,
+    CHILDREN, STAFF, attendance, staffLog, eventLog, overrides, absences,
+    collectedFromSchool, droppedOffAtSchool, visitors, soleCharge, staffOverrides,
+    overtime, authorised, archivedState, carriedOver, pinCustomised, termDates, timesheet,
+    exportedAt: new Date().toISOString()
+  };
+}
+
+function downloadFullBackup(){
+  try {
+    const data = collectAllState();
+    const json = JSON.stringify(data, null, 2);
+    const blob = new Blob([json], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const now = new Date();
+    const pad = n => String(n).padStart(2,'0');
+    const stamp = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}`;
+    const a = document.createElement('a');
+    a.href = url; a.download = `little-puddings-backup-${stamp}.json`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(url), 2000);
+    const nC = (CHILDREN||[]).length, nS = (STAFF||[]).length;
+    const st = document.getElementById('backupStatus');
+    if(st) st.innerHTML = `✓ Backup downloaded — <b>little-puddings-backup-${stamp}.json</b><br>${nC} children · ${nS} staff · plus all attendance, payroll, leave and settings. Keep it somewhere safe (OneDrive).`;
+  } catch(e){
+    const st = document.getElementById('backupStatus');
+    if(st) st.innerHTML = `⚠ Backup failed: ${e.message}. Try again, or use a desktop browser.`;
+    console.error('Backup failed:', e);
+  }
+}
+
+// File picker handler — reads the chosen .json and loads it over everything.
+function restoreBackupFile(input){
+  const file = input.files && input.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    let d;
+    try { d = JSON.parse(reader.result); }
+    catch(e){ alert('That file is not a valid backup (could not read the JSON).'); input.value=''; return; }
+    // Basic shape check — a real backup has at least a CHILDREN or STAFF array.
+    if(!d || (!Array.isArray(d.CHILDREN) && !Array.isArray(d.STAFF))){
+      alert('That file does not look like a Little Puddings backup (no people found).');
+      input.value=''; return;
+    }
+    const nC = Array.isArray(d.CHILDREN)?d.CHILDREN.length:0;
+    const nS = Array.isArray(d.STAFF)?d.STAFF.length:0;
+    const when = d.exportedAt ? new Date(d.exportedAt).toLocaleString('en-GB') : 'unknown date';
+    if(!confirm(`Restore this backup?\n\nFrom: ${when}\nContains: ${nC} children, ${nS} staff, plus attendance, payroll, leave and settings.\n\nThis REPLACES everything currently on this device with the backup. Only do this on a fresh copy, or when you are sure.`)) {
+      input.value=''; return;
+    }
+    applyRestoredState(d);
+    input.value='';
+  };
+  reader.onerror = () => { alert('Could not read that file. Please try again.'); input.value=''; };
+  reader.readAsText(file);
+}
+
+// Load every key from a backup object over the live state. Full replace — this
+// is deliberate so real names/records come back even on a name-free build.
+function applyRestoredState(d){
+  try {
+    if(Array.isArray(d.CHILDREN)) CHILDREN = d.CHILDREN;
+    if(Array.isArray(d.STAFF))    STAFF = d.STAFF;
+    if(d.attendance)            attendance = d.attendance;
+    if(d.staffLog)              staffLog = d.staffLog;
+    if(d.eventLog)              eventLog = d.eventLog;
+    if(d.overrides)             overrides = d.overrides;
+    if(d.absences)              absences = d.absences;
+    if(d.collectedFromSchool)   collectedFromSchool = d.collectedFromSchool;
+    if(d.droppedOffAtSchool)    droppedOffAtSchool = d.droppedOffAtSchool;
+    if(d.visitors)              visitors = d.visitors;
+    if(d.soleCharge)            soleCharge = d.soleCharge;
+    if(d.staffOverrides)        staffOverrides = d.staffOverrides;
+    if(d.overtime)              overtime = d.overtime;
+    if(d.authorised)            authorised = d.authorised;
+    if(d.archivedState)         archivedState = d.archivedState;
+    if(d.carriedOver)           carriedOver = d.carriedOver;
+    if(d.pinCustomised)         pinCustomised = d.pinCustomised;
+    if(Array.isArray(d.termDates)) termDates = d.termDates;
+    if(d.timesheet)             timesheet = d.timesheet;
+    applyArchivedState();
+    // Persist the restored state on the device, then push to OneDrive if connected.
+    dataDirty = true;
+    saveLocal();
+    renderAll();
+    if(odConnected) syncWithOneDrive();
+    const st = document.getElementById('backupStatus');
+    if(st) st.innerHTML = `✓ Backup restored — ${(CHILDREN||[]).length} children, ${(STAFF||[]).length} staff, and all records are back. ${odConnected?'Saving to OneDrive now.':'Connect OneDrive to save it to the cloud.'}`;
+    try{ showFlash('Backup restored'); }catch(e){}
+  } catch(e){
+    alert('Something went wrong applying the backup: '+e.message);
+    console.error('Restore failed:', e);
+  }
 }
 
 function updateConnStatus(){
@@ -2812,6 +2930,7 @@ const LEAVE_TYPES = {
   annual:    { label: 'Annual Leave',   emoji: '🏖️', color: '#7FA99A' },
   sick:      { label: 'Sick (SSP)',     emoji: '🤒', color: '#e67e22' },
   unpaid:    { label: 'Unpaid Leave',   emoji: '⏸',  color: '#6B4F3A' },
+  unauthorised:{ label: 'Unauthorised', emoji: '⚠',  color: '#A13A2A' },
   bank:      { label: 'Bank Holiday',   emoji: '🎉', color: '#C9A84C' },
   offthejob: { label: 'Off-the-Job',    emoji: '📚', color: '#4A7C6A' },
   lieu:      { label: 'Lieu Taken',     emoji: '⏳', color: '#8E7CC3' }
@@ -3006,8 +3125,8 @@ function leaverSummary(staffId){
 function getYearTotals(staffId, refDate) {
   const fyStart = getFinancialYearStart(refDate);
   const fyEnd = getFinancialYearEnd(refDate);
-  let worked = 0, annual = 0, sick = 0, unpaid = 0, bank = 0, offthejob = 0;
-  
+  let worked = 0, annual = 0, sick = 0, unpaid = 0, bank = 0, offthejob = 0, unauthorised = 0;
+
   // Sum from manual timesheet entries
   if (timesheet[staffId]) {
     Object.keys(timesheet[staffId]).forEach(dkk => {
@@ -3018,12 +3137,13 @@ function getYearTotals(staffId, refDate) {
         else if (e.type === 'annual') annual += e.hours;
         else if (e.type === 'sick') sick += e.hours;
         else if (e.type === 'unpaid') unpaid += e.hours;
+        else if (e.type === 'unauthorised') unauthorised += e.hours;
         else if (e.type === 'bank') bank += e.hours;
         else if (e.type === 'offthejob') offthejob += e.hours;
       }
     });
   }
-  
+
   // Sum worked hours from actual clock-in/out logs
   if (staffLog[staffId]) {
     Object.keys(staffLog[staffId]).forEach(dkk => {
@@ -3038,15 +3158,15 @@ function getYearTotals(staffId, refDate) {
     });
   }
   
-  return { worked, annual, sick, unpaid, bank, offthejob };
+  return { worked, annual, sick, unpaid, bank, offthejob, unauthorised };
 }
 
 // Get current month totals
 function getMonthTotals(staffId, refDate) {
   const monthStart = new Date(refDate.getFullYear(), refDate.getMonth(), 1);
   const monthEnd = new Date(refDate.getFullYear(), refDate.getMonth()+1, 0);
-  let worked = 0, annual = 0, sick = 0, unpaid = 0, bank = 0, offthejob = 0;
-  
+  let worked = 0, annual = 0, sick = 0, unpaid = 0, bank = 0, offthejob = 0, unauthorised = 0;
+
   if (timesheet[staffId]) {
     Object.keys(timesheet[staffId]).forEach(dkk => {
       const aDate = new Date(dkk);
@@ -3056,12 +3176,13 @@ function getMonthTotals(staffId, refDate) {
         else if (e.type === 'annual') annual += e.hours;
         else if (e.type === 'sick') sick += e.hours;
         else if (e.type === 'unpaid') unpaid += e.hours;
+        else if (e.type === 'unauthorised') unauthorised += e.hours;
         else if (e.type === 'bank') bank += e.hours;
         else if (e.type === 'offthejob') offthejob += e.hours;
       }
     });
   }
-  
+
   if (staffLog[staffId]) {
     Object.keys(staffLog[staffId]).forEach(dkk => {
       const aDate = new Date(dkk);
@@ -3072,8 +3193,8 @@ function getMonthTotals(staffId, refDate) {
       }
     });
   }
-  
-  return { worked, annual, sick, unpaid, bank, offthejob };
+
+  return { worked, annual, sick, unpaid, bank, offthejob, unauthorised };
 }
 
 function renderPayroll() {
@@ -3370,6 +3491,8 @@ function updateLeaveBalanceInfo() {
     info.innerHTML = `<strong>Sick hours this year:</strong> ${year.sick.toFixed(1)}h. SSP applied by accountant; pay deducted at £${s.hourlyRate}/hr.`;
   } else if (leaveSelectedType === 'unpaid') {
     info.innerHTML = `<strong>Unpaid leave this year:</strong> ${year.unpaid.toFixed(1)}h. Pay deducted at £${s.hourlyRate}/hr.`;
+  } else if (leaveSelectedType === 'unauthorised') {
+    info.innerHTML = `<strong>Unauthorised leave</strong> — shows as “Unauthorised” on the timesheet. Pay deducted at £${s.hourlyRate}/hr for the day's contracted hours (no SSP).`;
   } else if (leaveSelectedType === 'offthejob') {
     info.innerHTML = `<strong>Off-the-job hours this year:</strong> ${year.offthejob.toFixed(1)}h.${s.isApprentice ? ' (Apprenticeship protected training time)' : ''}`;
   } else {
@@ -4421,6 +4544,7 @@ function downloadLeaveSummaryPDF(staffId){
       ['Upcoming booked (annual + bank + closures)', `${upcomingAB.toFixed(1)} h`],
       ['Remaining (after taken and booked)', `${remaining.toFixed(1)} h`],
       ['Unpaid leave taken (separate — not off allowance)', `${(year.unpaid||0).toFixed(1)} h`],
+      ['Unauthorised leave taken (separate — not off allowance)', `${(year.unauthorised||0).toFixed(1)} h`],
       ['Sick leave taken (separate — not off allowance)', `${totSick.toFixed(1)} h`],
     ],
     styles:{fontSize:10,cellPadding:3,lineColor:[204,204,204],lineWidth:0.1},
@@ -4601,6 +4725,7 @@ function downloadAllPaySheets(){
       const d=parseDInput(k); if(!d||d<from||d>to) return; const e=timesheet[s.id][k]; if(!e||e.deleted) return;
       if(e.type==='sick'){ dedHrs+=scheduledHours(s.id,d); sickCount++; }
       else if(e.type==='unpaid') dedHrs+=scheduledHours(s.id,d);
+      else if(e.type==='unauthorised') dedHrs+=scheduledHours(s.id,d);
     });
     if(sickCount) sickRows.push(idx);
     const ded=dedHrs*rate;
@@ -4652,7 +4777,7 @@ function drawPaySheet(doc, staffId){
 
   // Each scheduled working day: In, or the reason they were not (sick, unpaid, holiday,
   // closure, bank holiday). No hours — pay comes from the fixed salary, not hours worked.
-  const REASON_LABEL={sick:'Sick',unpaid:'Unpaid leave',annual:'Annual leave',bank:'Bank holiday',lieu:'Lieu taken',offthejob:'Off-the-job'};
+  const REASON_LABEL={sick:'Sick',unpaid:'Unpaid leave',unauthorised:'Unauthorised leave',annual:'Annual leave',bank:'Bank holiday',lieu:'Lieu taken',offthejob:'Off-the-job'};
   const dayRows=[]; let daysIn=0, daysOut=0;
   eachDay(from,to).forEach(d=>{
     if(!employedOn(s.id,d)) return;
@@ -4678,6 +4803,7 @@ function drawPaySheet(doc, staffId){
       const e=timesheet[s.id][k]; if(!e||e.deleted) return;
       if(e.type==='sick') deductions.push({d, type:'Sick day', hrs: scheduledHours(s.id,d)});
       else if(e.type==='unpaid') deductions.push({d, type:'Unpaid leave', hrs: scheduledHours(s.id,d)});
+      else if(e.type==='unauthorised') deductions.push({d, type:'Unauthorised leave', hrs: scheduledHours(s.id,d)});
     });
   }
   deductions.sort((a,b)=>a.d-b.d);
@@ -4900,7 +5026,7 @@ function overtimeFor(staffId, from, to){
   if(!s) return {candidates, approved, approvedHours};
   const excluded = OT_EXCLUDE.includes(staffId);
   // Sussie's own rule: she doesn't pay herself for all her hours yet, so recognise
-  // extra time as overtime — ALL weekend work, and weekday hours above 11.
+  // extra time as overtime — ALL weekend work, and weekday hours above 10h 15m.
   if(staffId==='sussie'){
     eachDay(from,to).forEach(d=>{
       const k=dk(d);
@@ -4913,16 +5039,16 @@ function overtimeFor(staffId, from, to){
       const isWeekend = (dow===0 || dow===6);
       let extra = 0;
       if(isWeekend) extra = worked;                         // all weekend time is overtime
-      else if(worked > 11) extra = worked - 11;             // weekday time above 11h
+      else if(worked > 10.25) extra = worked - 10.25;       // weekday time above 10h 15m
       if(extra <= 0) return;
       const rec = getOT(staffId, d);
       if(rec && rec.status==='dismissed') return;
       if(rec && rec.status==='approved'){
-        approved.push({date:d, hours:rec.hours, note:rec.note||(isWeekend?'Weekend work':'Over 11h'), extraMins:rec.hours*60, sched:!isWeekend});
+        approved.push({date:d, hours:rec.hours, note:rec.note||(isWeekend?'Weekend work':'Over 10h 15m'), extraMins:rec.hours*60, sched:!isWeekend});
         approvedHours += rec.hours; return;
       }
       candidates.push({date:d, hours:round15(extra*60/60), extraMins:extra*60, sched:!isWeekend,
-                       note:isWeekend?'Weekend work':'Over 11h', workedMins:worked*60,
+                       note:isWeekend?'Weekend work':'Over 10h 15m', workedMins:worked*60,
                        in:sessionsString(staffId,d), out:''});
     });
     // Also include any overtime she added by hand.
@@ -5085,7 +5211,7 @@ function buildPayPreview(){
   STAFF.filter(s=>!s.archived).forEach(s=>{
     const col=PAY_COL[s.id];
     if(!col){ warnings.push(s.name+': no PAY column mapped, skipped. Add them to PAY_COL if needed.'); return; }
-    const sick=[], unpaid=[], annual=[]; let unpaidHrs=0;
+    const sick=[], unpaid=[], unauth=[], annual=[]; let unpaidHrs=0, unauthHrs=0;
     if(timesheet[s.id]){
       Object.keys(timesheet[s.id]).forEach(k=>{
         const d=parseDInput(k); if(!d||d.getFullYear()!==y||d.getMonth()!==m-1) return;
@@ -5093,10 +5219,11 @@ function buildPayPreview(){
         if(e && e.deleted) return;
         if(e.type==='sick') sick.push({d, hrs: scheduledHours(s.id, d)});
         else if(e.type==='unpaid'){ unpaid.push(d); unpaidHrs+=e.hours||0; }
+        else if(e.type==='unauthorised'){ unauth.push(d); unauthHrs+=e.hours||0; }
         else if(e.type==='annual') annual.push(d);
       });
     }
-    sick.sort((a,b)=>a.d-b.d); unpaid.sort((a,b)=>a-b); annual.sort((a,b)=>a-b);
+    sick.sort((a,b)=>a.d-b.d); unpaid.sort((a,b)=>a-b); unauth.sort((a,b)=>a-b); annual.sort((a,b)=>a-b);
     const otData = overtimeFor(s.id, new Date(y,m-1,1), new Date(y,m,0));
     const otDates = otData.approved.map(a=>a.date).sort((a,b)=>a-b);
     const ups=[];
@@ -5105,7 +5232,7 @@ function buildPayPreview(){
     // (Annual leave entitlement figure not written — it's reference only and its row
     // shifts when rows are inserted; leave it to be set by hand if wanted.)
     const sickHrs = sick.reduce((t,x)=>t+(x.hrs||0),0);
-    ups.push({address:col+'19', value:Number((unpaidHrs+sickHrs).toFixed(2)), label:'Deduction hours (sick + unpaid)'});
+    ups.push({address:col+'19', value:Number((unpaidHrs+unauthHrs+sickHrs).toFixed(2)), label:'Deduction hours (sick + unpaid + unauthorised)'});
     let overtimeTopRef = null;   // set to a formula like "=E52" when overtime is written
     const fill=(arr,range,lbl)=>{ arr.forEach((d,i)=>{ const r=range[0]+i; if(r<=range[1]) ups.push({address:col+r,value:fmtUK(d),label:lbl,isDate:true}); }); if(arr.length>(range[1]-range[0]+1)) warnings.push(`${s.name}: ${arr.length} ${lbl.toLowerCase()} entries but only ${range[1]-range[0]+1} rows (${range[0]}–${range[1]}). Extra ones are not written.`); };
     // SSP: date in the left column, hours lost in the pay column, side by side
@@ -5122,7 +5249,8 @@ function buildPayPreview(){
     const labelCol = String.fromCharCode(col.charCodeAt(0)+1);
     const deductions = [
       ...sick.map(x=>({d:x.d, hrs:x.hrs, label:'sick day'})),
-      ...unpaid.map(d=>({d, hrs:scheduledHours(s.id, d), label:'unpaid leave'}))
+      ...unpaid.map(d=>({d, hrs:scheduledHours(s.id, d), label:'unpaid leave'})),
+      ...unauth.map(d=>({d, hrs:scheduledHours(s.id, d), label:'unauthorised leave'}))
     ].sort((a,b)=>a.d-b.d);
     // Individual deduction days start at row 31 and go DOWN, one row per day, for
     // however many there are (no 4-row cap). The workbook's SUM should sit on the row
@@ -5159,7 +5287,7 @@ function buildPayPreview(){
     payPreviewUpdates.push(...ups);
     html+=`<div style="margin:8px 0;padding:8px 10px;background:var(--parchment);border-radius:8px">
       <div style="font-weight:700;color:var(--forest);margin-bottom:3px">${s.name} <span style="font-weight:400;color:var(--bark)">→ column ${col}</span></div>
-      <div style="font-size:11px;color:var(--bark)">Sick/SSP: ${sick.length} · Unpaid: ${unpaid.length} (${unpaidHrs.toFixed(1)}h) · Annual leave: ${annual.length} · Overtime: ${otDates.length} (${otData.approvedHours.toFixed(1)}h approved)</div>
+      <div style="font-size:11px;color:var(--bark)">Sick/SSP: ${sick.length} · Unpaid: ${unpaid.length} (${unpaidHrs.toFixed(1)}h) · Unauthorised: ${unauth.length} (${unauthHrs.toFixed(1)}h) · Annual leave: ${annual.length} · Overtime: ${otDates.length} (${otData.approvedHours.toFixed(1)}h approved)</div>
       <div style="font-size:11px;margin-top:4px;line-height:1.7">${ups.map(u=>`<span style="display:inline-block;margin:0 6px 0 0"><code style="background:#fff;padding:0 3px;border-radius:3px">${u.address}</code>=<b>${u.value}</b></span>`).join('')}</div>
     </div>`;
   });
