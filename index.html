@@ -583,9 +583,16 @@
       <button onclick="resetAllPins()" style="width:100%;padding:10px;background:var(--warn);color:white;border:none;border-radius:9px;font-weight:700;font-size:12px;cursor:pointer;margin-bottom:10px">⚠ Reset ALL PINs (for first-day rollout)</button>
       <div class="pin-reset-grid" id="pinResetGrid"></div>
     </div>
+    <div class="set-section">
+      <div class="set-title">🔐 Manager &amp; deputy PIN</div>
+      <div class="sec-sub" style="margin-bottom:8px">These are NOT stored in the code, so they are not visible to anyone viewing the site. Reset puts the PIN back to its first-use default; whoever logs in next is made to choose a new one straight away. Manager default is 0000, deputy is 1111.</div>
+      <div id="adminPinStatus" style="font-size:11px;margin-bottom:8px;color:var(--forest)"></div>
+      <button onclick="resetManagerPin()" style="width:100%;padding:10px;background:var(--forest);color:var(--gold-light);border:none;border-radius:9px;font-weight:700;font-size:12px;cursor:pointer;margin-bottom:6px">Reset manager PIN (back to 0000)</button>
+      <button onclick="resetDeputyPin()" style="width:100%;padding:10px;background:rgba(26,122,74,0.35);color:var(--gold-light);border:none;border-radius:9px;font-weight:700;font-size:12px;cursor:pointer">Reset deputy PIN (back to 1111)</button>
+    </div>
   </div>
 </div>
-<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 11Oct-b</div>
+<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 11Oct-c</div>
 
 <!-- PAY WORKBOOK EXPORT PREVIEW OVERLAY -->
 <div class="overlay" id="payPreviewOv">
@@ -679,8 +686,8 @@
 <div class="overlay" id="mgrPinOv">
   <div class="pin-modal">
     <div class="pm-av" style="background:var(--forest);color:var(--gold-light);font-size:22px;font-family:'Playfair Display',serif;font-weight:700;width:60px;height:60px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 10px">⚙</div>
-    <div class="pm-name">Manager Access</div>
-    <div class="pm-sub">Enter manager PIN</div>
+    <div class="pm-name" id="mgrPinName">Manager Access</div>
+    <div class="pm-sub" id="mgrPinSub">Enter manager or deputy PIN</div>
     <div class="pin-dots"><div class="pd" id="mpd0"></div><div class="pd" id="mpd1"></div><div class="pd" id="mpd2"></div><div class="pd" id="mpd3"></div></div>
     <div class="pin-err" id="mgrPinErr"></div>
     <div class="keypad">
@@ -1203,13 +1210,16 @@ async function syncWithOneDrive() {
       applyArchivedState();
       if (remoteData.pinCustomised) pinCustomised = { ...remoteData.pinCustomised, ...pinCustomised };
       if (remoteData.termDates && remoteData.termDates.length && !dataDirty) { termDates = remoteData.termDates; termRowsDraft = null; }
+      // Admin PINs: take the remote value unless this device has an unsynced change.
+      if (typeof remoteData.managerPin === 'string' && !dataDirty) managerPin = remoteData.managerPin;
+      if (typeof remoteData.deputyPin === 'string' && !dataDirty) deputyPin = remoteData.deputyPin;
     }
-    
+
     // Push merged state back to OneDrive
     const payload = JSON.stringify({
       dataVersion: DATA_VERSION,
       CHILDREN, STAFF, attendance, staffLog, eventLog, overrides, absences,
-      collectedFromSchool, droppedOffAtSchool, visitors, soleCharge, staffOverrides, overtime, authorised, archivedState, carriedOver, pinCustomised, termDates, timesheet, lastUpdated: new Date().toISOString()
+      collectedFromSchool, droppedOffAtSchool, visitors, soleCharge, staffOverrides, overtime, authorised, archivedState, carriedOver, pinCustomised, termDates, timesheet, managerPin, deputyPin, lastUpdated: new Date().toISOString()
     });
     
     const uploadUrl = `https://graph.microsoft.com/v1.0/me/drive/root:/${SYNC_FOLDER}/${encodeURIComponent(SYNC_FILE)}:/content`;
@@ -1261,7 +1271,7 @@ function saveLocal(){
     localStorage.setItem(LOCAL_KEY, JSON.stringify({
       dataVersion: DATA_VERSION,
       CHILDREN, STAFF, attendance, staffLog, eventLog, overrides, absences,
-      collectedFromSchool, droppedOffAtSchool, visitors, soleCharge, staffOverrides, overtime, authorised, archivedState, carriedOver, pinCustomised, termDates, timesheet,
+      collectedFromSchool, droppedOffAtSchool, visitors, soleCharge, staffOverrides, overtime, authorised, archivedState, carriedOver, pinCustomised, termDates, timesheet, managerPin, deputyPin,
       pendingSync: dataDirty, savedAt: new Date().toISOString()
     }));
   } catch(e){ console.warn('On-device save failed (storage full/unavailable):', e); }
@@ -1284,6 +1294,8 @@ function loadLocal(){
     if(d.staffOverrides) staffOverrides = d.staffOverrides;
     if(d.overtime) overtime = d.overtime;
     if(d.pinCustomised) pinCustomised = d.pinCustomised;
+    if(typeof d.managerPin === 'string') managerPin = d.managerPin;
+    if(typeof d.deputyPin === 'string') deputyPin = d.deputyPin;
     if(d.termDates && d.termDates.length) termDates = d.termDates;
     if(d.authorised) authorised = d.authorised;
     if(d.archivedState) archivedState = d.archivedState;
@@ -1322,6 +1334,7 @@ function collectAllState(){
     CHILDREN, STAFF, attendance, staffLog, eventLog, overrides, absences,
     collectedFromSchool, droppedOffAtSchool, visitors, soleCharge, staffOverrides,
     overtime, authorised, archivedState, carriedOver, pinCustomised, termDates, timesheet,
+    managerPin, deputyPin,
     exportedAt: new Date().toISOString()
   };
 }
@@ -1397,6 +1410,8 @@ function applyRestoredState(d){
     if(d.archivedState)         archivedState = d.archivedState;
     if(d.carriedOver)           carriedOver = d.carriedOver;
     if(d.pinCustomised)         pinCustomised = d.pinCustomised;
+    if(typeof d.managerPin === 'string') managerPin = d.managerPin;
+    if(typeof d.deputyPin === 'string')  deputyPin = d.deputyPin;
     if(Array.isArray(d.termDates)) termDates = d.termDates;
     if(d.timesheet)             timesheet = d.timesheet;
     applyArchivedState();
@@ -1650,8 +1665,15 @@ async function saveRegisterEntry(child, date, att) {
 // ════════════════════════════════════════════════
 // CONSTANTS
 // ════════════════════════════════════════════════
-const MANAGER_PIN = '6927';
-const DEPUTY_PIN = '2468'; // deputy (limited) access; change here if needed
+// Admin PINs are NOT hard-coded any more (the file is public). They live in the
+// saved data and sync via OneDrive. Until a real one is set, these sentinel
+// defaults let you in but FORCE you to choose a new PIN straight away — exactly
+// like a parent/staff 0000. '0000' = manager, '1111' = deputy. Resetting from
+// Settings puts the relevant one back to its sentinel so a new PIN must be set.
+const MANAGER_PIN_DEFAULT = '0000';
+const DEPUTY_PIN_DEFAULT = '1111';
+let managerPin = MANAGER_PIN_DEFAULT;   // real PIN once set; sentinel until then
+let deputyPin  = DEPUTY_PIN_DEFAULT;    // real PIN once set; sentinel until then
 const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 const MONTH_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const MONTH_TABS  = ['','JAN27','FEB27','MAR27','APR26','MAY26','JUN26','JUL26','AUG26','SEP26','OCT26','NOV26','DEC26'];
@@ -2106,18 +2128,90 @@ updateClock(); setInterval(updateClock,1000);
 // ════════════════════════════════════════════════
 // MANAGER MODE
 // ════════════════════════════════════════════════
-function openMgrPinModal(){ mgrPinEntry='';updateMgrDots();document.getElementById('mgrPinErr').textContent='';document.getElementById('mgrPinOv').classList.add('vis'); }
+// Set-a-new-admin-PIN state, used when a sentinel default is entered (first use /
+// after a reset). Reuses this same modal + keypad as a two-step confirm.
+let adminSetMode = false;   // true while choosing a new manager/deputy PIN
+let adminSetRole = null;    // 'manager' | 'deputy'
+let adminSetFirst = '';     // the PIN entered on step 1, awaiting confirmation
+
+function setMgrPinText(name, sub){
+  const n=document.getElementById('mgrPinName'), s=document.getElementById('mgrPinSub');
+  if(n) n.textContent=name; if(s) s.textContent=sub;
+}
+function openMgrPinModal(){
+  adminSetMode=false; adminSetRole=null; adminSetFirst='';
+  mgrPinEntry='';updateMgrDots();
+  document.getElementById('mgrPinErr').textContent='';
+  setMgrPinText('Manager Access','Enter manager or deputy PIN');
+  document.getElementById('mgrPinOv').classList.add('vis');
+}
 function mgrBtnClick(){ if(elevated()){exitMode();return;} openMgrPinModal(); }
 function depBtnClick(){ if(elevated()){exitMode();return;} openMgrPinModal(); }
 function exitMode(){ if(managerMode)exitManager(); else if(deputyMode)exitDeputy(); }
-function closeMgrPin(){ document.getElementById('mgrPinOv').classList.remove('vis');mgrPinEntry='';updateMgrDots(); }
-function mkp(d){ if(mgrPinEntry.length>=4||mgrPinShaking)return;mgrPinEntry+=d;updateMgrDots();if(mgrPinEntry.length===4)setTimeout(checkMgrPin,110); }
+function closeMgrPin(){
+  document.getElementById('mgrPinOv').classList.remove('vis');
+  mgrPinEntry='';updateMgrDots();
+  adminSetMode=false; adminSetRole=null; adminSetFirst='';
+  setMgrPinText('Manager Access','Enter manager or deputy PIN');
+}
+function mkp(d){ if(mgrPinEntry.length>=4||mgrPinShaking)return;mgrPinEntry+=d;updateMgrDots();if(mgrPinEntry.length===4)setTimeout(adminSetMode?checkSetAdminPin:checkMgrPin,110); }
 function mkd(){ mgrPinEntry=mgrPinEntry.slice(0,-1);updateMgrDots();document.getElementById('mgrPinErr').textContent=''; }
 function updateMgrDots(){ for(let i=0;i<4;i++){const el=document.getElementById('mpd'+i);el.classList.toggle('filled',i<mgrPinEntry.length);el.classList.remove('err');} }
+function mgrPinError(msg){
+  mgrPinShaking=true;
+  for(let i=0;i<4;i++)document.getElementById('mpd'+i).classList.add('err');
+  document.getElementById('mgrPinErr').textContent=msg;
+  setTimeout(()=>{mgrPinShaking=false;mgrPinEntry='';updateMgrDots();},450);
+}
 function checkMgrPin(){
-  if(mgrPinEntry===MANAGER_PIN){ closeMgrPin();enterManager(); }
-  else if(mgrPinEntry===DEPUTY_PIN){ closeMgrPin();enterDeputy(); }
-  else{ mgrPinShaking=true;for(let i=0;i<4;i++)document.getElementById('mpd'+i).classList.add('err');document.getElementById('mgrPinErr').textContent='Incorrect PIN';setTimeout(()=>{mgrPinShaking=false;mgrPinEntry='';updateMgrDots();},450); }
+  // A sentinel default still logs in, but sends you straight to choosing a new PIN.
+  if(mgrPinEntry===managerPin){
+    if(managerPin===MANAGER_PIN_DEFAULT){ startAdminPinSet('manager'); }
+    else { closeMgrPin(); enterManager(); }
+  } else if(mgrPinEntry===deputyPin){
+    if(deputyPin===DEPUTY_PIN_DEFAULT){ startAdminPinSet('deputy'); }
+    else { closeMgrPin(); enterDeputy(); }
+  } else {
+    mgrPinError('Incorrect PIN');
+  }
+}
+// Begin choosing a new PIN for this role (modal stays open; keypad now feeds the set flow).
+function startAdminPinSet(role){
+  adminSetMode=true; adminSetRole=role; adminSetFirst='';
+  mgrPinEntry=''; updateMgrDots();
+  document.getElementById('mgrPinErr').textContent='';
+  const who = role==='manager' ? 'manager' : 'deputy';
+  setMgrPinText('Set a new '+who+' PIN', 'First time: choose a new 4-digit PIN');
+}
+function checkSetAdminPin(){
+  if(!adminSetFirst){
+    // Step 1 — reject the sentinels and a blank-ish choice so the public default can't be kept.
+    if(mgrPinEntry===MANAGER_PIN_DEFAULT || mgrPinEntry===DEPUTY_PIN_DEFAULT){
+      document.getElementById('mgrPinErr').textContent='Pick a different PIN';
+      mgrPinError('Pick a different PIN'); return;
+    }
+    // Don't let the two roles end up identical.
+    if((adminSetRole==='manager' && mgrPinEntry===deputyPin && deputyPin!==DEPUTY_PIN_DEFAULT) ||
+       (adminSetRole==='deputy'  && mgrPinEntry===managerPin && managerPin!==MANAGER_PIN_DEFAULT)){
+      mgrPinError('That PIN is already in use'); return;
+    }
+    adminSetFirst=mgrPinEntry; mgrPinEntry=''; updateMgrDots();
+    document.getElementById('mgrPinErr').textContent='';
+    setMgrPinText(document.getElementById('mgrPinName').textContent, 'Enter it again to confirm');
+  } else {
+    if(mgrPinEntry===adminSetFirst){
+      const role=adminSetRole;
+      if(role==='manager') managerPin=adminSetFirst; else deputyPin=adminSetFirst;
+      markDirty(); if(odConnected) syncWithOneDrive();
+      closeMgrPin();
+      try{ showFlash('🔑 '+(role==='manager'?'Manager':'Deputy')+' PIN set'); }catch(e){}
+      if(role==='manager') enterManager(); else enterDeputy();
+    } else {
+      adminSetFirst='';
+      mgrPinError("PINs don't match — start again");
+      setTimeout(()=>{ setMgrPinText(document.getElementById('mgrPinName').textContent,'Choose a new 4-digit PIN'); },460);
+    }
+  }
 }
 function enterManager(){
   deputyMode=false;
@@ -3871,6 +3965,7 @@ function renderSettings(){
       <div class="pr-status ${isDef?'prs-def':'prs-set'}">${isDef?'⚠ Default':'✓ Custom'}</div>
     </div>`;
   }).join('');
+  updateAdminPinStatus();
 }
 function selectOverrideChild(cid){ overrideSelectedChild=overrideSelectedChild===cid?null:cid; if(currentTab==='override')renderOverride(); else renderSettings(); }
 function applyOverrideTime(){
@@ -3948,6 +4043,26 @@ function resetPin(type,id){
   if(odConnected) syncWithOneDrive();
 }
 
+function resetManagerPin(){
+  if(!confirm('Reset the manager PIN?\n\nIt goes back to the default 0000. The next time anyone enters 0000 on the Manager screen, they are made to choose a new manager PIN straight away. Use this to change your PIN, or if you have forgotten it.')) return;
+  managerPin = MANAGER_PIN_DEFAULT;
+  markDirty(); if(odConnected) syncWithOneDrive();
+  updateAdminPinStatus();
+  showFlash('🔐 Manager PIN reset to 0000 — set a new one next time you log in');
+}
+function resetDeputyPin(){
+  if(!confirm('Reset the deputy PIN?\n\nIt goes back to the default 1111. The next time anyone enters 1111 on the Manager screen, they are made to choose a new deputy PIN straight away.')) return;
+  deputyPin = DEPUTY_PIN_DEFAULT;
+  markDirty(); if(odConnected) syncWithOneDrive();
+  updateAdminPinStatus();
+  showFlash('🔐 Deputy PIN reset to 1111 — set a new one next time');
+}
+function updateAdminPinStatus(){
+  const el=document.getElementById('adminPinStatus'); if(!el) return;
+  const m = managerPin===MANAGER_PIN_DEFAULT ? 'Manager PIN: default 0000 (will be changed on next login)' : 'Manager PIN: set ✓';
+  const d = deputyPin===DEPUTY_PIN_DEFAULT ? 'Deputy PIN: default 1111 (will be changed on next login)' : 'Deputy PIN: set ✓';
+  el.innerHTML = m + '<br>' + d;
+}
 function resetAllPins(){
   if(!confirm('Reset ALL parent and staff PINs to 0000? Everyone will be prompted to set a new PIN on next sign-in. Manager PIN is NOT affected.')) return;
   CHILDREN.forEach(c=>{ c.pin='0000'; delete pinCustomised['child_'+c.id]; });
