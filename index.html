@@ -591,7 +591,7 @@
     </div>
   </div>
 </div>
-<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 18Oct-a</div>
+<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 18Oct-b</div>
 
 <!-- PAY WORKBOOK EXPORT PREVIEW OVERLAY -->
 <div class="overlay" id="payPreviewOv">
@@ -2717,19 +2717,28 @@ function effectiveTimes(c, d) {
 function renderAdmin(){
   const childList=document.getElementById('adminChildList');
   const staffList=document.getElementById('adminStaffList');
-  childList.innerHTML=CHILDREN.map(c=>{
-    const today=childScheduledToday(c,viewDate);
-    const badge=c.archived?'ab-archived':c.startDate&&dk(new Date())<c.startDate?'ab-future':'ab-active';
-    const label=c.archived?'Archived':c.startDate&&dk(new Date())<c.startDate?'Future starter':'Active';
-    return`<div class="admin-row ${c.archived?'archived':''}" onclick="openAdminForm('child','${c.id}')">
-      <div class="admin-row-av" style="background:${c.color}">${c.emoji}</div>
-      <div class="admin-row-info">
-        <div class="admin-row-name">${c.name}</div>
-        <div class="admin-row-detail">${c.type==='ey'?'Early Years':'School'} · ${c.notes}</div>
-      </div>
-      <span class="admin-row-badge ${badge}">${label}</span>
+  // Grouped, alphabetical tiles so a child is quick to find: under-5s first, then
+  // school children, then archived in their own group at the bottom.
+  const byName=(a,b)=>(a.name||'').localeCompare(b.name||'');
+  const eyKids  = CHILDREN.filter(c=>!c.archived && c.type==='ey').sort(byName);
+  const schKids = CHILDREN.filter(c=>!c.archived && c.type==='school').sort(byName);
+  const archKids= CHILDREN.filter(c=>c.archived).sort(byName);
+  const tile=c=>{
+    const future=c.startDate && dk(new Date())<c.startDate;
+    const label=c.archived?'Archived':future?'Future':'Active';
+    const bcls=c.archived?'badge-out':(future?'badge-out':'badge-in');
+    return`<div class="child-card" style="cursor:pointer${c.archived?';opacity:0.6':''}" onclick="openAdminForm('child','${c.id}')">
+      <div class="child-avatar" style="background:${c.color}">${c.emoji}</div>
+      <div class="child-name">${c.name}</div>
+      <span class="child-badge ${bcls}">${label}</span>
     </div>`;
-  }).join('');
+  };
+  const section=(list,label)=> list.length
+    ? `<div class="sec-head"><div class="sec-label">${label}</div><div class="sec-line"></div><div class="sec-count">${list.length}</div></div><div class="children-grid">${list.map(tile).join('')}</div>`
+    : '';
+  let chHtml = section(eyKids,'Early Years (under 5s)') + section(schKids,'School children') + section(archKids,'Archived');
+  if(!eyKids.length && !schKids.length && !archKids.length) chHtml='<div class="empty" style="padding:16px 0">No children yet</div>';
+  childList.innerHTML = chHtml;
   staffList.innerHTML=STAFF.map(s=>`
     <div class="admin-row ${s.archived?'archived':''}" onclick="openAdminForm('staff','${s.id}')">
       <div class="admin-row-av" style="background:${s.color};font-family:'Playfair Display',serif;font-size:14px;font-weight:700;color:white">${s.name.charAt(0)}</div>
