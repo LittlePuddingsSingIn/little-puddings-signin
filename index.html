@@ -591,7 +591,7 @@
     </div>
   </div>
 </div>
-<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 18Oct-b</div>
+<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 18Oct-d</div>
 
 <!-- PAY WORKBOOK EXPORT PREVIEW OVERLAY -->
 <div class="overlay" id="payPreviewOv">
@@ -2739,15 +2739,20 @@ function renderAdmin(){
   let chHtml = section(eyKids,'Early Years (under 5s)') + section(schKids,'School children') + section(archKids,'Archived');
   if(!eyKids.length && !schKids.length && !archKids.length) chHtml='<div class="empty" style="padding:16px 0">No children yet</div>';
   childList.innerHTML = chHtml;
-  staffList.innerHTML=STAFF.map(s=>`
-    <div class="admin-row ${s.archived?'archived':''}" onclick="openAdminForm('staff','${s.id}')">
-      <div class="admin-row-av" style="background:${s.color};font-family:'Playfair Display',serif;font-size:14px;font-weight:700;color:white">${s.name.charAt(0)}</div>
-      <div class="admin-row-info">
-        <div class="admin-row-name">${s.name}</div>
-        <div class="admin-row-detail">${s.role}</div>
-      </div>
-      <span class="admin-row-badge ${s.archived?'ab-archived':'ab-active'}">${s.archived?'Archived':'Active'}</span>
-    </div>`).join('');
+  // Staff as tiles too, alphabetical, with archived in their own group.
+  const activeStaff=STAFF.filter(s=>!s.archived).sort(byName);
+  const archStaff  =STAFF.filter(s=>s.archived).sort(byName);
+  const sTile=s=>`<div class="child-card" style="cursor:pointer${s.archived?';opacity:0.6':''}" onclick="openAdminForm('staff','${s.id}')">
+      <div class="child-avatar" style="background:${s.color};font-family:'Playfair Display',serif;font-weight:700;color:#fff">${(s.name||'?').charAt(0)}</div>
+      <div class="child-name">${s.name}</div>
+      <span class="child-badge ${s.archived?'badge-out':'badge-in'}">${s.archived?'Archived':'Active'}</span>
+    </div>`;
+  const sSection=(list,label)=> list.length
+    ? `<div class="sec-head"><div class="sec-label">${label}</div><div class="sec-line"></div><div class="sec-count">${list.length}</div></div><div class="children-grid">${list.map(sTile).join('')}</div>`
+    : '';
+  let stHtml = sSection(activeStaff,'Staff') + sSection(archStaff,'Archived');
+  if(!activeStaff.length && !archStaff.length) stHtml='<div class="empty" style="padding:16px 0">No staff yet</div>';
+  staffList.innerHTML = stHtml;
 }
 
 // ════════════════════════════════════════════════
@@ -2903,7 +2908,13 @@ function saveAdminForm(){
   const name=document.getElementById('afName').value.trim();
   const surname=(document.getElementById('afSurname')?document.getElementById('afSurname').value.trim():'');
   if(!name){showFlash('Please enter a name');return;}
-  if(adminFormDays.length===0){showFlash('Please select at least one day');return;}
+  if(type==='staff' && adminFormDays.length===0){showFlash('Please select at least one day');return;}
+  if(type!=='staff' && adminFormDays.length===0){
+    // A child can have no fixed days: holiday / ad hoc children, or a child whose days
+    // vary week to week. They won't appear automatically; you add them when needed with
+    // an ad hoc / holiday booking. Confirm so days aren't cleared by accident.
+    if(!confirm('Save with no fixed days?\n\nThis child will not appear automatically on any day. You add them when needed using an ad hoc / holiday booking. Save this way?')) return;
+  }
 
   if(type==='staff'){
     const role=document.getElementById('afRole').value;
