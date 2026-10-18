@@ -475,7 +475,6 @@
       <div class="set-title">🎌 Bank holidays</div>
       <div class="sec-sub" style="margin-bottom:8px">The setting is closed on bank holidays. This records each bank holiday as paid annual leave (off entitlement) for everyone scheduled to work that day. Safe to run more than once, it will not double up.</div>
       <button onclick="recordBankHolidays()" style="width:100%;padding:11px;background:var(--forest);color:var(--gold-light);border:none;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer">Record this year's bank holidays as leave</button>
-      <button onclick="resetSchedulesFromContracts()" style="width:100%;padding:10px;margin-top:6px;background:var(--gold);color:var(--forest);border:none;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer">⏱ Reset schedules &amp; leave allowances to contracted figures</button>
       <button onclick="tidyOutOfEmployment()" style="width:100%;padding:10px;margin-top:6px;background:var(--burgundy,#A13A2A);color:#fff;border:none;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer">🧹 Fix leave: remove out-of-employment entries and correct wrong hours</button>
       <div id="bankHolStatus" style="font-size:11px;margin-top:8px;color:var(--forest)"></div>
     </div>
@@ -592,7 +591,7 @@
     </div>
   </div>
 </div>
-<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 11Oct-c</div>
+<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 18Oct-a</div>
 
 <!-- PAY WORKBOOK EXPORT PREVIEW OVERLAY -->
 <div class="overlay" id="payPreviewOv">
@@ -707,11 +706,11 @@
     <div class="af-row">
       <div class="af-group">
         <label class="af-label">First name (shown on the sign-in screen)</label>
-        <input class="af-input" id="afName" type="text" placeholder="e.g. Thea">
+        <input class="af-input" id="afName" type="text" placeholder="e.g. first name" oninput="updateInvoiceHint()">
       </div>
       <div class="af-group">
         <label class="af-label">Surname (for the invoice & register only)</label>
-        <input class="af-input" id="afSurname" type="text" placeholder="e.g. Rose">
+        <input class="af-input" id="afSurname" type="text" placeholder="e.g. surname" oninput="updateInvoiceHint()">
       </div>
     </div>
     <div class="af-row">
@@ -754,6 +753,21 @@
         <label class="af-label">Paid hours per week</label>
         <input class="af-input" id="afPaidHours" type="number" step="0.5" placeholder="e.g. 37">
       </div>
+    </div>
+    <div class="af-row" id="afOwnerGroup" style="display:none">
+      <div class="af-group">
+        <label class="af-label">PAY workbook column</label>
+        <input class="af-input" id="afPayCol" type="text" maxlength="2" placeholder="e.g. E" style="text-transform:uppercase">
+      </div>
+      <div class="af-group">
+        <label class="af-label">Flexible hours</label>
+        <label style="display:flex;align-items:center;gap:7px;font-size:12px;color:var(--bark);padding-top:6px"><input type="checkbox" id="afIsOwner"> Owner — flexible hours &amp; own overtime rule</label>
+      </div>
+    </div>
+    <div class="af-group" id="afInvoiceGroup" style="display:none">
+      <label class="af-label">Invoice filename override (optional, only if the workbook name is non-standard)</label>
+      <input class="af-input" id="afInvoiceFile" type="text" placeholder="e.g. Firstname Surname - Invoice - 2026-2027.xlsx" oninput="updateInvoiceHint()">
+      <div id="afInvoiceHint" style="font-size:11px;color:var(--bark);margin-top:5px;line-height:1.5"></div>
     </div>
     <div class="af-group">
       <label class="af-label">Days attending</label>
@@ -861,7 +875,7 @@
     </div>
     <div class="af-group">
       <label class="af-label">Visiting (who or which child)</label>
-      <input class="af-input" id="visVisiting" type="text" placeholder="e.g. Sussie, or Mia's mum">
+      <input class="af-input" id="visVisiting" type="text" placeholder="e.g. a parent or visitor name">
     </div>
     <div class="af-group">
       <label class="af-label">Car Registration (optional)</label>
@@ -1390,7 +1404,7 @@ function restoreBackupFile(input){
 }
 
 // Load every key from a backup object over the live state. Full replace — this
-// is deliberate so real names/records come back even on a name-free build.
+// is deliberate so people and records always come back from the saved data.
 function applyRestoredState(d){
   try {
     if(Array.isArray(d.CHILDREN)) CHILDREN = d.CHILDREN;
@@ -1527,23 +1541,21 @@ async function catchUpInvoice(){
   if(st) st.textContent = `✓ Wrote ${done} day${done!==1?'s':''} to ${c.name}'s invoice`+(failed?` — ${failed} still failed, tap again to finish the rest`:'. All done.');
 }
 
+// The invoice workbook filename for a child: the per-child override set on their card
+// if present, otherwise the standard pattern from their first + last name. A trailing
+// single-letter initial (used on the register when two children share a first name) is
+// stripped so the filename matches the real workbook.
+function invoiceFileName(child){
+  if (child.invoiceFile && child.invoiceFile.trim()) return child.invoiceFile.trim();
+  const firstName = (child.name||'').replace(/\s+[A-Z]\.?$/,'').trim();
+  const fullName = child.surname ? `${firstName} ${child.surname}` : firstName;
+  return `${fullName} - Invoice - 2026-2027.xlsx`;
+}
+
 async function writeToExcel(child, date, att) {
   if (!odConnected || !odAccessToken) return;
   try {
-    // The register shows a disambiguating initial (e.g. "Thea R") when two children
-    // share a first name, but the invoice file is named with the real first + last
-    // name ("Thea Rose"). Strip a trailing single-letter initial so the filename matches.
-    const firstName = child.name.replace(/\s+[A-Z]\.?$/,'').trim();
-    const fullName = child.surname ? `${firstName} ${child.surname}` : firstName;
-    let fileNameStr = `${fullName} - Invoice - 2026-2027.xlsx`;
-    // Exact filenames for workbooks that don't follow the standard pattern
-    if (child.id === 'thear') fileNameStr = 'Thea Rose - Invoice - 2026-2027.xlsx';
-    if (child.id === 'theat') fileNameStr = 'Thea Topliss Invoice - 2026-2027.xlsx';
-    if (child.id === 'oliver') fileNameStr = 'Oliver Booker- Invoice - 2026-2027.xlsx';
-    if (child.id === 'rory') fileNameStr = 'Rory Dickins- Invoice - 2026-2027.xlsx';
-    if (child.id === 'evelyndad') fileNameStr = 'Evelyn Betts -DAD - Invoice - 2026-2027.xlsx';
-    if (child.id === 'evelynmum') fileNameStr = 'Evelyn Betts -MUM - Invoice - 2026-2027.xlsx';
-    const fileName = encodeURIComponent(fileNameStr);
+    const fileName = encodeURIComponent(invoiceFileName(child));
     const folderPath = '2026-2027 INVOICES';
     const tab = MONTH_TABS[date.getMonth()+1];
     const dayRow = date.getDate() + 8; // Row offset — date 1 = row 9
@@ -1722,88 +1734,14 @@ const EMOJIS = ['🌱','🌿','🌸','🌺','🌻','🌼','🍃','🍂','🌊','
 // ════════════════════════════════════════════════
 // DATA — children stored as mutable array so admin can add/edit
 // ════════════════════════════════════════════════
-let CHILDREN = [
-  // EY
-  {id:'mia',      name:'Mia',         surname:'Leeder',      emoji:'🌸',type:'ey',  ao:1,  color:AC[0], pin:'1001',days:[1,3],      cs:'07:30',ce:'17:30',billing:'funded',    ay:false,hb:null,      notes:'9mth funding',                               startDate:'2025-09-01',endDate:null,archived:false},
-  {id:'luke',     name:'Luke',        surname:'Greensit',    emoji:'🌊',type:'ey',  ao:2,  color:AC[1], pin:'1002',days:[1,2,3,4],  cs:'07:30',ce:'17:30',billing:'wraparound',ay:false,hb:null,      notes:'9mth funding 7.5hrs/day',                    startDate:'2025-09-01',endDate:null,archived:false},
-  {id:'oliver',   name:'Oliver',      surname:'Booker',      emoji:'🦔',type:'ey',  ao:3,  color:AC[2], pin:'1003',days:[2,3],      cs:'08:00',ce:'17:30',billing:'fullday',   ay:true, hb:'fullday', notes:'Under 2, full day, 9mth funding from Sep 26', startDate:'2026-05-18',endDate:null,archived:false},
-  {id:'sama',     name:'Sama',        surname:'Al-Derzi',    emoji:'🌺',type:'ey',  ao:4,  color:AC[3], pin:'1004',days:[1,2,3,4],  cs:'08:00',ce:'16:00',billing:'wraparound',ay:false,hb:null,      notes:'9mth funding',                               startDate:'2025-09-01',endDate:null,archived:false},
-  {id:'holly',    name:'Holly',       surname:'Hingley',     emoji:'🍃',type:'ey',  ao:5,  color:AC[4], pin:'1005',days:[1,2,3,4,5],cs:'08:30',ce:'17:30',billing:'wraparound',ay:true, hb:'fullday', notes:'2yr funding + wrap',                         startDate:'2025-09-01',endDate:null,archived:false},
-  {id:'arlo',     name:'Arlo',        surname:'Turner',      emoji:'🌱',type:'ey',  ao:6,  color:AC[5], pin:'1006',days:[1,2,4],    cs:'08:00',ce:'16:30',billing:'funded',    ay:false,hb:null,      notes:'2yr funding only',                           startDate:'2025-09-01',endDate:null,archived:false},
-  {id:'aureliusz',name:'Aureliusz',   surname:'Bingham',     emoji:'🌻',type:'ey',  ao:7,  color:AC[6], pin:'1007',days:[4,5],      cs:'08:30',ce:'16:00',billing:'funded',    ay:false,hb:null,      notes:'2yr funding only',                           startDate:'2025-09-01',endDate:null,archived:false},
-  {id:'james',    name:'James',       surname:'Leeder',      emoji:'🐸',type:'ey',  ao:8,  color:AC[7], pin:'1008',days:[1,3],      cs:'07:30',ce:'17:30',billing:'funded',    ay:false,hb:null,      notes:'2yr funding only',                           startDate:'2025-09-01',endDate:null,archived:false},
-  {id:'frankie',  name:'Frankie',     surname:'King',        emoji:'🚂',type:'ey',  ao:9,  color:AC[8], pin:'1009',days:[1,2,4],    cs:'08:00',ce:'17:00',billing:'wraparound',ay:true, hb:'fullday', notes:'Wrap around now, funded only from June term, 3 days/week',startDate:'2025-09-01',endDate:null,archived:false},
-  {id:'frederick',name:'Frederick',   surname:'Atkins',      emoji:'🐛',type:'ey',  ao:10, color:AC[9], pin:'1010',days:[3,4],      cs:'08:00',ce:'17:00',billing:'wraparound',ay:true, hb:'fullday', notes:'2yr funding + wrap',                         startDate:'2025-09-01',endDate:null,archived:false},
-  {id:'jean',     name:'Jean',        surname:'Haymans',     emoji:'🌿',type:'ey',  ao:11, color:AC[10],pin:'1011',days:[1,2,3,4,5],cs:'08:30',ce:'16:30',billing:'wraparound',ay:true, hb:'fullday', notes:'3yr 15hrs funding',                          startDate:'2025-09-01',endDate:null,archived:false},
-  {id:'joshua',   name:'Joshua',      surname:'Dixon',       emoji:'🐝',type:'ey',  ao:12, color:AC[0], pin:'1012',days:[4,5],      cs:'08:30',ce:'17:30',billing:'wraparound',ay:false,hb:null,      notes:'3yr funding 3.15hrs',                        startDate:'2025-09-01',endDate:null,archived:false},
-  {id:'margaret', name:'Margaret',    surname:'Jasaitis',    emoji:'🌼',type:'ey',  ao:13, color:AC[1], pin:'1013',days:[1,2,3,4,5],cs:'08:10',ce:'14:20',billing:'wraparound',ay:true, hb:'halfday', notes:'3yr funding',                                startDate:'2025-09-01',endDate:null,archived:false},
-  {id:'ashraf',   name:'Ashraf',      surname:'Adeniji',     emoji:'🌍',type:'ey',  ao:14, color:AC[2], pin:'1014',days:[1,2],      cs:'08:30',ce:'14:30',billing:'halfday',   ay:true, hb:'halfday', notes:'Half day fee',                               startDate:'2025-09-01',endDate:null,archived:false},
-  {id:'diora',    name:'Diora',       surname:'Maslovskaja', emoji:'🦚',type:'ey',  ao:15, color:AC[3], pin:'1015',days:[1,2,3,4],  cs:'07:30',ce:'17:00',billing:'fullday',   ay:true, hb:'fullday', notes:'4yr funding, all year round',                startDate:'2025-09-01',endDate:null,archived:false},
-  {id:'rory',     name:'Rory',        surname:'Dickins',     emoji:'🦊',type:'ey',  ao:16, color:AC[4], pin:'1016',days:[2,3,4,5],  cs:'07:45',ce:'17:15',billing:'wraparound',ay:false,hb:null,      notes:'4yr funding 7.5hrs/day',                     startDate:'2025-09-01',endDate:null,archived:false},
-  // School
-  {id:'alara',    name:'Alara',       surname:'Claypole-Demir',emoji:'⭐',type:'school',ao:1, color:AC[5], pin:'2001',days:[1,2,3,5],  cs:'07:30',ce:'16:30',billing:'wraponly',ay:false,hb:null,      notes:'Before school Mon/Tue/Wed/Fri, after school Mon only',   startDate:'2025-09-01',endDate:null,archived:false,schoolRun:true, afterSchoolDays:[1]},
-  {id:'bernard',  name:'Bernard',     surname:'Burr',          emoji:'🚀',type:'school',ao:2, color:AC[6], pin:'2002',days:[1,2,3,4,5],cs:'07:30',ce:'17:30',billing:'wraponly',ay:false,hb:null,      notes:'Before school daily, after school Wed & Thurs',startDate:'2025-09-01',endDate:null,archived:false,schoolRun:true, afterSchoolDays:[3,4]},
-  {id:'bonnie',   name:'Bonnie',      surname:'Stukins',       emoji:'🌈',type:'school',ao:3, color:AC[7], pin:'2003',days:[2,3,4,5], cs:'07:30',ce:'08:55',billing:'wraponly',ay:false,hb:null,       notes:'Before school Tue-Fri only',                   startDate:'2025-09-01',endDate:null,archived:false,schoolRun:true, afterSchoolDays:[]},
-  {id:'douglas',  name:'Douglas',     surname:'Burr',          emoji:'⚡',type:'school',ao:4, color:AC[8], pin:'2004',days:[1,2,3,4,5],cs:'07:30',ce:'17:30',billing:'wraponly',ay:false,hb:null,      notes:'Before school daily, after school Wed & Thurs',startDate:'2025-09-01',endDate:null,archived:false,schoolRun:true, afterSchoolDays:[3,4]},
-  {id:'ellia',    name:'Ellia',       surname:'Grigaliunas',   emoji:'🌙',type:'school',ao:5, color:AC[9], pin:'2005',days:[],         cs:'08:00',ce:'17:00',billing:'holidayfee',   ay:'holidays',hb:'fullday',notes:'Ad hoc holiday only',                          startDate:'2025-09-01',endDate:null,archived:false,schoolRun:false,afterSchoolDays:[]},
-  {id:'evelyndad',name:'Evelyn (Dad)', surname:'Betts -DAD',    emoji:'🌟',type:'school',ao:6, color:AC[10],pin:'2006',days:[3],        cs:'15:25',ce:'17:00',billing:'wraponly',ay:false,hb:null,       notes:'After school Wed, billed to Dad',              startDate:'2025-09-01',endDate:null,archived:false,schoolRun:true,afterSchoolDays:[3]},
-  {id:'evelynmum',name:'Evelyn (Mum)', surname:'Betts -MUM',    emoji:'🌟',type:'school',ao:7, color:AC[10],pin:'2007',days:[],         cs:'08:00',ce:'17:30',billing:'varies',    ay:false,hb:null,       notes:'Variable hours weekly — add via Day Changes with each day\'s times', startDate:'2025-09-01',endDate:null,archived:false,schoolRun:true,afterSchoolDays:[]},
-  {id:'harry',    name:'Harry',       surname:'Worsely',       emoji:'🦎',type:'school',ao:8, color:AC[6], pin:'2012',days:[2,3,5],    cs:'07:30',ce:'08:55',billing:'wraponly',ay:false,hb:'fullday',  notes:'Before school Tue/Wed/Fri, hol full days',     startDate:'2025-09-01',endDate:null,archived:false,schoolRun:true, afterSchoolDays:[]},
-  {id:'henry',    name:'Henry',       surname:'Chatterton',    emoji:'🌟',type:'ey', ao:17,color:AC[3], pin:'2013',days:[],        cs:'08:00',ce:'17:00',billing:'fullday',   ay:true, hb:'fullday', notes:'Ad hoc only, under 5, full day fee',          startDate:'2025-09-01',endDate:null,archived:false},
-  {id:'hope',     name:'Hope',        surname:'Elsom',         emoji:'🕊️',type:'school',ao:10,color:AC[0], pin:'2008',days:[1,2,3,4,5],cs:'07:30',ce:'17:00',billing:'wraponly',ay:false,hb:null,      notes:'Before school daily, after school Tue & Thurs',startDate:'2025-09-01',endDate:null,archived:false,schoolRun:true, afterSchoolDays:[2,4]},
-  {id:'norman',   name:'Norman',      surname:'Sadler',        emoji:'🦁',type:'school',ao:11,color:AC[1], pin:'2009',days:[1,2,3,4],  cs:'07:30',ce:'17:00',billing:'wraponly',ay:false,hb:null,       notes:'Before school Mon-Thurs, after school Mon-Wed',startDate:'2025-09-01',endDate:null,archived:false,schoolRun:true, afterSchoolDays:[1,2,3]},
-  {id:'thear',    name:'Thea R',      surname:'Rose',          emoji:'🌷',type:'school',ao:12,color:AC[2], pin:'2010',days:[],         cs:'08:00',ce:'17:00',billing:'holidayfee',   ay:'holidays',hb:'fullday',notes:'Ad hoc holiday only',                          startDate:'2025-09-01',endDate:null,archived:false,schoolRun:false,afterSchoolDays:[]},
-  {id:'theat',    name:'Thea T',      surname:'Topliss',       emoji:'🌹',type:'school',ao:13,color:AC[3], pin:'2011',days:[],         cs:'08:00',ce:'17:00',billing:'holidayfee',   ay:'holidays',hb:'fullday',notes:'Ad hoc holiday only',                          startDate:'2025-09-01',endDate:null,archived:false,schoolRun:false,afterSchoolDays:[]},
-  // New additions
-  {id:'ophelia',  name:'Ophelia',     surname:'Andradottir',   emoji:'🌟',type:'ey', ao:18,color:AC[5], pin:'1018',days:[1,2,3,5],  cs:'07:30',ce:'17:30',billing:'wraparound',ay:false,hb:'fullday', notes:'30hr funded, temp contract ends 24 Jul, ad hoc hols',startDate:'2026-06-29',endDate:'2026-07-24',archived:false},
-  {id:'bailey',   name:'Bailey',      surname:'Lowe',          emoji:'🌱',type:'ey', ao:19,color:AC[6], pin:'1019',days:[],         cs:'08:00',ce:'17:00',billing:'holidayfee',   ay:'holidays',hb:'fullday',notes:'Ad hoc holiday only',                            startDate:'2025-09-01',endDate:null,archived:false},
-  {id:'bennett',  name:'Bennett',     surname:'Lowe',          emoji:'🦔',type:'school',ao:14,color:AC[6],pin:'2014',days:[],        cs:'08:00',ce:'17:00',billing:'holidayfee',   ay:'holidays',hb:'fullday',notes:'Ad hoc holiday only',                            startDate:'2025-09-01',endDate:null,archived:false,schoolRun:false,afterSchoolDays:[]},
-  {id:'sebastian',name:'Sebastian',   surname:'McIntyre',      emoji:'🌿',type:'ey', ao:20,color:AC[7], pin:'1020',days:[],         cs:'08:00',ce:'17:00',billing:'holidayfee',   ay:'holidays',hb:'fullday',notes:'Ad hoc holiday only, 3/4 yr',                    startDate:'2025-09-01',endDate:null,archived:false},
-  {id:'alicja',   name:'Alicja',      surname:'Urbanaviciute', emoji:'🌸',type:'school',ao:15,color:AC[8],pin:'2015',days:[],        cs:'08:00',ce:'17:00',billing:'holidayfee',   ay:'holidays',hb:'fullday',notes:'Ad hoc holiday only, under 8',                   startDate:'2025-09-01',endDate:null,archived:false,schoolRun:false,afterSchoolDays:[]},
-];
+let CHILDREN = [];
 
-let STAFF = [
-  {id:'sussie',    name:'Sussie',    role:'Registered Childminder', color:AC[0],pin:'5840',sch:{1:{s:'07:30',e:'17:30'},2:{s:'07:30',e:'17:30'},3:{s:'07:30',e:'17:30'},4:{s:'07:30',e:'17:30'},5:{s:'07:30',e:'17:30'}},archived:false,hourlyRate:15.50,paidHoursPerWeek:16,actualHoursPerWeek:50,annualLeaveHours:280,startDate:'2025-04-01',isApprentice:false},
-  {id:'claire',    name:'Claire',    role:'Level 4 Educator',       color:AC[1],pin:'1111',sch:{1:{s:'07:45',e:'17:00'},3:{s:'08:00',e:'16:15'},4:{s:'08:00',e:'16:15'}},archived:false,hourlyRate:14.50,paidHoursPerWeek:26,actualHoursPerWeek:26,annualLeaveHours:145.6,startDate:'2025-04-01',isApprentice:false},
-  {id:'courtney',  name:'Courtney',  role:'Level 3 Educator',       color:AC[2],pin:'2222',sch:{2:{s:'07:30',e:'17:00'},3:{s:'07:30',e:'17:00'},4:{s:'07:30',e:'17:00'},5:{s:'08:00',e:'16:30'}},archived:false,hourlyRate:13.00,paidHoursPerWeek:37,actualHoursPerWeek:37,annualLeaveHours:207.2,startDate:'2025-04-01',isApprentice:false},
-  {id:'alexandra', name:'Alexandra', role:'Early Years Apprentice', color:AC[3],pin:'3333',sch:{1:{s:'07:30',e:'16:30'},4:{s:'07:30',e:'12:30'},5:{s:'07:30',e:'17:30'}},archived:false,hourlyRate:8.00,paidHoursPerWeek:30,actualHoursPerWeek:24,annualLeaveHours:152,startDate:'2026-05-11',isApprentice:true,collegeStartDate:'2026-07-06'},
-  {id:'chloe',     name:'Chloe',     role:'Early Years Apprentice', color:AC[4],pin:'4444',sch:{1:{s:'07:45',e:'17:15'},2:{s:'07:45',e:'17:15'},3:{s:'07:30',e:'12:30'}},archived:false,hourlyRate:8.00,paidHoursPerWeek:30,actualHoursPerWeek:24,annualLeaveHours:168,startDate:'2025-09-01',isApprentice:true,collegeStartDate:'2026-07-06'},
-  {id:'leah',      name:'Leah',      role:'Early Years Apprentice', color:AC[5],pin:'5555',sch:{2:{s:'08:30',e:'16:00'},3:{s:'12:30',e:'17:30'},4:{s:'12:30',e:'17:30'},5:{s:'08:30',e:'15:00'}},archived:false,hourlyRate:8.00,paidHoursPerWeek:30,actualHoursPerWeek:24,annualLeaveHours:168,startDate:'2025-09-01',isApprentice:true,collegeStartDate:'2026-07-06'},
-];
+let STAFF = [];
 
 // Canonical schedules from contracts — used to repair saved data if a device holds
 // an out-of-date rota (which makes leave/bank-holiday auto-hours wrong). Editing a
 // person in Admin still overrides these going forward.
-const CORRECT_SCHEDULES = {
-  sussie:   {0:{s:'06:00',e:'23:59'},1:{s:'06:00',e:'23:59'},2:{s:'06:00',e:'23:59'},3:{s:'06:00',e:'23:59'},4:{s:'06:00',e:'23:59'},5:{s:'06:00',e:'23:59'},6:{s:'06:00',e:'23:59'}},
-  claire:   {1:{s:'07:45',e:'17:00'},3:{s:'08:00',e:'16:15'},4:{s:'08:00',e:'16:15'}},
-  courtney: {2:{s:'07:30',e:'17:00'},3:{s:'07:30',e:'17:00'},4:{s:'07:30',e:'17:00'},5:{s:'08:00',e:'16:30'}},
-  alexandra:{1:{s:'07:30',e:'16:30'},4:{s:'07:30',e:'12:30'},5:{s:'07:30',e:'17:30'}},
-  chloe:    {1:{s:'07:45',e:'17:15'},2:{s:'07:45',e:'17:15'},3:{s:'07:30',e:'12:30'}},
-  leah:     {2:{s:'08:30',e:'16:00'},3:{s:'12:30',e:'17:30'},4:{s:'12:30',e:'17:30'},5:{s:'08:30',e:'15:00'}}
-};
 // Annual leave entitlement = contracted weekly hours × 5.6 statutory weeks.
-const CORRECT_ALLOWANCE = {
-  claire: 145.6,     // 26 × 5.6
-  courtney: 207.2,   // 37 × 5.6
-  alexandra: 168.0,  // 30 × 5.6
-  chloe: 168.0,      // 30 × 5.6
-  leah: 168.0        // 30 × 5.6
-  // Sussie left as-is (director — check separately)
-};
-function resetSchedulesFromContracts(){
-  let n=0;
-  STAFF.forEach(s=>{
-    if(CORRECT_SCHEDULES[s.id]){ s.sch = JSON.parse(JSON.stringify(CORRECT_SCHEDULES[s.id])); n++; }
-    if(CORRECT_ALLOWANCE[s.id]!==undefined){ s.annualLeaveHours = CORRECT_ALLOWANCE[s.id]; }
-    delete s.leaveOverride;   // clear any pinned figure so the accurate pro-rata applies
-  });
-  markDirty();
-  if(detailStaffId) openStaffDetail(detailStaffId); else renderPayroll();
-  if(odConnected) syncWithOneDrive();
-  const st=document.getElementById('bankHolStatus');
-  if(st) st.textContent = `✓ Reset ${n} staff schedules and leave allowances to contracted figures. Now tap the Fix leave button to correct recorded hours.`;
-}
 let timesheet = {};
 
 // ════════════════════════════════════════════════
@@ -2506,6 +2444,7 @@ function renderInvoice(){
       ${lb>0?`<div class="inv-row hl"><span>Late (${att.lateMins}min → ${lb} block${lb!==1?'s':''})</span><span>£${(lb*5).toFixed(2)}</span></div>`:''}
       <div class="inv-row"><span>Session (${bt})</span><span>${sc>0?'£'+sc.toFixed(2):'Funded'}</span></div>
       <div class="inv-row total"><span>Day total</span><span>£${(sc+(eb+lb)*5).toFixed(2)}</span></div>
+      <div class="inv-row" style="font-size:10px;color:rgba(255,255,255,0.45);border:none;padding-top:4px"><span>Saves to</span><span style="text-align:right;max-width:62%;word-break:break-word">${invoiceFileName(c)}${c.invoiceFile?' (set)':''}</span></div>
     </div>`;
   }).join('');
 }
@@ -2822,6 +2761,7 @@ function openAdminForm(type, id){
     document.getElementById('afType').value=type==='staff'?'staff':entity.type;
     if(type==='child'){
       document.getElementById('afBilling').value=entity.billing;
+      { const inv=document.getElementById('afInvoiceFile'); if(inv) inv.value=entity.invoiceFile||''; }
       document.getElementById('afStartTime').value=entity.cs;
       document.getElementById('afEndTime').value=entity.ce;
       document.getElementById('afTermTime').value=entity.ay===true?'false':entity.ay==='holidays'?'holidays':'true';
@@ -2831,6 +2771,7 @@ function openAdminForm(type, id){
     } else {
       document.getElementById('afRole').value=entity.role;
       { const hr=document.getElementById('afHourlyRate'); if(hr) hr.value=entity.hourlyRate!=null?entity.hourlyRate:''; const ph=document.getElementById('afPaidHours'); if(ph) ph.value=entity.paidHoursPerWeek!=null?entity.paidHoursPerWeek:''; }
+      { const pc=document.getElementById('afPayCol'); if(pc) pc.value=entity.payCol||''; const ow=document.getElementById('afIsOwner'); if(ow) ow.checked=!!entity.isOwner; }
       // Detect per-day times: if the schedule's days don't all share the same s/e, load them.
       { const sd=entity.sch||{}; const ks=Object.keys(sd); adminFormPerDay={}; ks.forEach(d=>adminFormPerDay[d]={s:sd[d].s,e:sd[d].e});
         const first=ks.length?sd[ks[0]]:null; const varied=first&&ks.some(d=>sd[d].s!==first.s||sd[d].e!==first.e);
@@ -2868,6 +2809,8 @@ function renderAdminForm(){
   document.getElementById('afBillingGroup').style.display=type==='staff'?'none':'block';
   document.getElementById('afRoleGroup').style.display=type==='staff'?'block':'none';
   { const pg=document.getElementById('afPayGroup'); if(pg) pg.style.display=type==='staff'?'flex':'none'; }
+  { const og=document.getElementById('afOwnerGroup'); if(og) og.style.display=type==='staff'?'flex':'none'; }
+  { const ig=document.getElementById('afInvoiceGroup'); if(ig) ig.style.display=type==='staff'?'none':'block'; }
   { const pdg=document.getElementById('afPerDayGroup'); if(pdg) pdg.style.display=type==='staff'?'block':'none'; if(type==='staff') renderPerDayTimes(); }
   document.getElementById('afTermGroup').style.display=type==='staff'?'none':'block';
   // School-run toggle only for school children; after-school days only when ticked.
@@ -2876,6 +2819,22 @@ function renderAdminForm(){
   const srOn=document.getElementById('afSchoolRun') && document.getElementById('afSchoolRun').checked;
   const asWrap=document.getElementById('afAfterSchoolWrap');
   if(asWrap) asWrap.style.display=(type==='school' && srOn)?'block':'none';
+  updateInvoiceHint();
+}
+// Show the child which invoice workbook their attendance will save to, so a wrong
+// automatic name is easy to spot and correct with the override field.
+function updateInvoiceHint(){
+  const el=document.getElementById('afInvoiceHint'); if(!el) return;
+  const esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+  const name=(document.getElementById('afName')||{}).value||'';
+  const surname=(document.getElementById('afSurname')||{}).value||'';
+  const override=((document.getElementById('afInvoiceFile')||{}).value||'').trim();
+  if(override){
+    el.innerHTML='✎ Saves to your override: <b>'+esc(override)+'</b>';
+  } else {
+    const fn=invoiceFileName({name, surname, invoiceFile:''});
+    el.innerHTML='If left blank, saves to: <b>'+esc(fn)+'</b>. If that is not the real workbook name, type the correct one above.';
+  }
 }
 function closeAdminForm(){ document.getElementById('adminFormOv').classList.remove('vis'); adminEditTarget=null; }
 function toggleDay(d){
@@ -2958,10 +2917,13 @@ function saveAdminForm(){
       if(phVal!=null) s.paidHoursPerWeek=phVal;
       s.startDate=document.getElementById('afStartDate').value||null;
       s.endDate=document.getElementById('afEndDate').value||null;
+      { const pc=document.getElementById('afPayCol'); if(pc) s.payCol=(pc.value||'').toUpperCase().trim(); const ow=document.getElementById('afIsOwner'); if(ow) s.isOwner=ow.checked; }
       showFlash(`✓ ${name} updated`);
     } else {
       STAFF.push({id:'staff_'+Date.now(),name,role,color:AC[STAFF.length%AC.length],pin:'0000',sch,archived:false,
         hourlyRate:rateVal!=null?rateVal:0, paidHoursPerWeek:phVal!=null?phVal:0,
+        payCol:(document.getElementById('afPayCol')?document.getElementById('afPayCol').value.toUpperCase().trim():''),
+        isOwner:(document.getElementById('afIsOwner')?document.getElementById('afIsOwner').checked:false),
         startDate:document.getElementById('afStartDate').value||null,
         endDate:document.getElementById('afEndDate').value||null});
       showFlash(`✓ ${name} added`);
@@ -2978,6 +2940,7 @@ function saveAdminForm(){
       const c=CHILDREN.find(x=>x.id===adminEditTarget.id);
       c.name=name;c.surname=surname;c.emoji=adminFormEmoji;c.type=type;c.days=adminFormDays;
       c.cs=cs;c.ce=ce;c.billing=billing;c.ay=ay;c.notes=notes;
+      { const inv=document.getElementById('afInvoiceFile'); if(inv) c.invoiceFile=inv.value.trim(); }
       c.startDate=document.getElementById('afStartDate').value||null;
       c.endDate=document.getElementById('afEndDate').value||null;
       const srBox=document.getElementById('afSchoolRun');
@@ -2989,6 +2952,7 @@ function saveAdminForm(){
       CHILDREN.push({id:'child_'+Date.now(),name,surname,emoji:adminFormEmoji,type,ao:maxAo+1,
         color:AC[CHILDREN.length%AC.length],pin:'0000',days:adminFormDays,
         cs,ce,billing,ay,hb:billing==='funded'?null:billing,notes,
+        invoiceFile:(document.getElementById('afInvoiceFile')?document.getElementById('afInvoiceFile').value.trim():''),
         schoolRun:(type==='school' && document.getElementById('afSchoolRun') && document.getElementById('afSchoolRun').checked),
         afterSchoolDays:(type==='school' && document.getElementById('afSchoolRun') && document.getElementById('afSchoolRun').checked)?[...adminFormAfterDays]:[],
         startDate:document.getElementById('afStartDate').value||null,
@@ -3187,7 +3151,7 @@ function computeLieu(staffId, refDate){
 // Leaver summary: pro-rata entitlement to the leaving date, leave already taken,
 // and lieu to pay out. The pro-rata is a guide from the days actually employed in
 // the leave year; the carried-over-from-last-year and any special adjustments are
-// entered by hand (in the note), since only Sussie knows those figures.
+// entered by hand (in the note), since only the owner knows those figures.
 function leaverSummary(staffId){
   const s=STAFF.find(x=>x.id===staffId);
   if(!s || !s.endDate) return null;
@@ -4202,14 +4166,14 @@ function openAction(type,id){
     if(!isIn){
       // Private late notice, shown only to the person clocking in (never on the
       // cards other staff and parents can see), so the time sheet is no surprise.
-      // Not shown for Sussie — she works flexibly (own overtime rules), so a late
+      // Not shown for the owner — she works flexibly (own overtime rules), so a late
       // clock-in is never a fault to flag.
       const dow=viewDate.getDay(), sched=e.sch[dow];
-      if(e.id!=='sussie' && sched && nowMins > pm(sched.s) && !isAuthLate(e.id, viewDate)){
+      if(!e.isOwner && sched && nowMins > pm(sched.s) && !isAuthLate(e.id, viewDate)){
         const late = nowMins - pm(sched.s);
         warn.style.display='block';
         document.getElementById('actWarnTitle').textContent=`Clocking in ${fmins(late)} after your start time`;
-        document.getElementById('actWarnDetail').textContent=`Due ${sched.s} · now ${ts(now)}. This shows on your time sheet and comes off your time in lieu. Speak to Sussie if it was agreed.`;
+        document.getElementById('actWarnDetail').textContent=`Due ${sched.s} · now ${ts(now)}. This shows on your time sheet and comes off your time in lieu. Speak to the manager if it was agreed.`;
       }
     }
   }
@@ -4448,7 +4412,7 @@ function exportPeriod(){
   const el=document.getElementById('exportMonth');
   let y,m; const mv=el?el.value:'';
   if(mv){ [y,m]=mv.split('-').map(Number); } else { const t=new Date(); y=t.getFullYear(); m=t.getMonth()+1; }
-  // Payroll runs 29th of the previous month to 28th of the chosen month (Sussie
+  // Payroll runs 29th of the previous month to 28th of the chosen month (the owner
   // sends to the accountant on the 28th), so late sick/leave in the last days of a
   // month land in that month's run rather than being missed.
   const to=new Date(y,m-1,28); to.setHours(0,0,0,0);
@@ -4482,7 +4446,7 @@ function scheduledHours(staffId, d){
 
 function staffLateEarly(staffId, d){
   const s = STAFF.find(x=>x.id===staffId);
-  if(staffId==='sussie') return {late:0, early:0, authLate:false, authEarly:false, authLateMins:0, authEarlyMins:0};  // flexible hours — never flagged
+  if(s && s.isOwner) return {late:0, early:0, authLate:false, authEarly:false, authLateMins:0, authEarlyMins:0};  // owner: flexible hours — never flagged
   const sched = s && s.sch[d.getDay()];
   const log = staffLog[staffId] && staffLog[staffId][dk(d)];
   const man = getTs(staffId, d);
@@ -4931,7 +4895,7 @@ function drawPaySheet(doc, staffId){
   const otTotal=otTotalHrs*rate;
 
   const totalPay=Math.round((monthly - dedTotal + otTotal)*100)/100;
-  const isSelf=(s.id==='sussie');
+  const isSelf=!!s.isOwner;
 
   pdfHeader(doc, 'Pay Sheet', `${s.name} · ${s.role} · £${rate.toFixed(2)}/hr`);
   doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(107,100,96);
@@ -5127,9 +5091,6 @@ function downloadAllStaffTimesheets(){
 // Nothing reaches payroll until it is approved here.
 // ════════════════════════════════════════════════
 const OT_MIN_MINUTES = 15; // ignore anything under this, to avoid noise from a few minutes
-// Sussie is the registered childminder/director (paid 16 hrs, works far more),
-// so automatic detection would flag every day. Add 'sussie' back in if ever wanted.
-const OT_EXCLUDE = ['sussie'];
 
 function getOT(staffId, d){ const k=dk(d); return (overtime[staffId]&&overtime[staffId][k])?overtime[staffId][k]:null; }
 function setOT(staffId, d, val){ const k=dk(d); if(!overtime[staffId])overtime[staffId]={}; if(val===null) delete overtime[staffId][k]; else overtime[staffId][k]=val; markDirty(); }
@@ -5139,10 +5100,10 @@ function overtimeFor(staffId, from, to){
   const s = STAFF.find(x=>x.id===staffId);
   const candidates=[], approved=[]; let approvedHours=0;
   if(!s) return {candidates, approved, approvedHours};
-  const excluded = OT_EXCLUDE.includes(staffId);
-  // Sussie's own rule: she doesn't pay herself for all her hours yet, so recognise
+  const excluded = !!(s && s.isOwner);
+  // the owner’s own rule: she doesn't pay herself for all her hours yet, so recognise
   // extra time as overtime — ALL weekend work, and weekday hours above 10h 15m.
-  if(staffId==='sussie'){
+  if(s && s.isOwner){
     eachDay(from,to).forEach(d=>{
       const k=dk(d);
       let man = timesheet[staffId] && timesheet[staffId][k];
@@ -5177,7 +5138,7 @@ function overtimeFor(staffId, from, to){
     return {candidates, approved, approvedHours};
   }
   if(excluded){
-    // No auto-detection for excluded staff (e.g. Sussie), but any overtime added
+    // No auto-detection for excluded staff (e.g. the owner), but any overtime added
     // by hand still counts and reaches payroll.
     eachDay(from,to).forEach(d=>{
       const rec = getOT(staffId, d);
@@ -5294,7 +5255,7 @@ function renderOvertimeSection(){
     </div>
   </div>`;
 }
-const PAY_COL={ sussie:'E', claire:'H', courtney:'K', chloe:'N', alexandra:'Q' };
+function payColFor(s){ return (s && s.payCol) ? String(s.payCol).toUpperCase().trim() : ''; }
 // The column immediately to the LEFT of each pay column holds the DATE, the pay
 // column itself holds the HOURS, for SSP/sick days (staff work varied hours, so the
 // hours lost must be shown, not just the date).
@@ -5324,8 +5285,8 @@ function buildPayPreview(){
   const {y,m}=payPreviewMonth;
   payPreviewUpdates=[]; let html=''; const warnings=[];
   STAFF.filter(s=>!s.archived).forEach(s=>{
-    const col=PAY_COL[s.id];
-    if(!col){ warnings.push(s.name+': no PAY column mapped, skipped. Add them to PAY_COL if needed.'); return; }
+    const col=payColFor(s);
+    if(!col){ warnings.push(s.name+': no PAY column set. Open their staff card and set the PAY workbook column, then try again.'); return; }
     const sick=[], unpaid=[], unauth=[], annual=[]; let unpaidHrs=0, unauthHrs=0;
     if(timesheet[s.id]){
       Object.keys(timesheet[s.id]).forEach(k=>{
@@ -5398,7 +5359,7 @@ function buildPayPreview(){
     }
     // Top overtime field (row 16): a formula pointing at the sum, or 0 if no overtime.
     ups.push({address:col+'16', value: overtimeTopRef || 0, label:'Overtime total (top field)'});
-    // (Annual leave dates are no longer written to the workbook — removed at Sussie's request.)
+    // (Annual leave dates are no longer written to the workbook — removed at the owner’s request.)
     payPreviewUpdates.push(...ups);
     html+=`<div style="margin:8px 0;padding:8px 10px;background:var(--parchment);border-radius:8px">
       <div style="font-weight:700;color:var(--forest);margin-bottom:3px">${s.name} <span style="font-weight:400;color:var(--bark)">→ column ${col}</span></div>
