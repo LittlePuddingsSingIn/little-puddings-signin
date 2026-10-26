@@ -440,22 +440,22 @@
   <!-- HOLIDAYS -->
   <div id="panel-holidays" style="display:none">
     <div class="sec-head"><div class="sec-label">Holiday Booking</div><div class="sec-line"></div></div>
-    <div class="sec-sub">Book children in across a holiday (or any period) in one go. Pick the dates, tick the days each child is in, set their times, then book them all together.</div>
+    <div class="sec-sub">Pick a holiday, then tap each child to book them in. All-year-round children are already in during holidays, so they are not listed.</div>
     <div class="set-section">
-      <div class="set-title">🏖️ Pick the dates</div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
-        <div style="flex:1;min-width:130px"><label style="font-size:11px;color:rgba(255,255,255,0.6);display:block;margin-bottom:4px">From (first day)</label><input type="date" id="holFrom" class="time-inp" style="width:100%" onchange="renderHolidays()"></div>
-        <div style="flex:1;min-width:130px"><label style="font-size:11px;color:rgba(255,255,255,0.6);display:block;margin-bottom:4px">To (last day)</label><input type="date" id="holTo" class="time-inp" style="width:100%" onchange="renderHolidays()"></div>
+      <div class="set-title">🏖️ Which holiday?</div>
+      <div id="holPresetRow" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+      <div id="holCustomRow" style="display:none;margin-top:10px">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+          <div style="flex:1;min-width:120px"><label style="font-size:11px;color:rgba(255,255,255,0.6);display:block;margin-bottom:4px">From</label><input type="date" id="holFrom" class="time-inp" style="width:100%" onchange="renderHolTiles()"></div>
+          <div style="flex:1;min-width:120px"><label style="font-size:11px;color:rgba(255,255,255,0.6);display:block;margin-bottom:4px">To</label><input type="date" id="holTo" class="time-inp" style="width:100%" onchange="renderHolTiles()"></div>
+        </div>
       </div>
-      <div id="holRangeNote" style="font-size:11px;color:var(--gold-light);margin-top:8px"></div>
+      <div id="holPeriodNote" style="font-size:12px;color:var(--gold-light);margin-top:10px"></div>
     </div>
     <div class="set-section">
-      <div class="set-title">👶 Who is in, and when</div>
-      <div class="sec-sub" style="margin-bottom:8px">Tick the weekdays each child attends in this period. Times default to their usual contract; change them for holiday hours. Leave a child with no days ticked to skip them.</div>
-      <div id="holBookGrid"></div>
-      <button onclick="saveHolidayBookings()" style="width:100%;padding:12px;background:var(--forest);color:#fff;border:none;border-radius:9px;font-weight:700;font-size:13px;cursor:pointer;margin-top:10px">Book these children in</button>
-      <div id="holBookStatus" style="font-size:11.5px;margin-top:10px;color:var(--gold-light);line-height:1.6"></div>
-      <button onclick="clearHolidayRange()" style="width:100%;padding:9px;background:rgba(161,58,42,0.25);color:#F4DEDA;border:none;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;margin-top:8px">Clear all holiday bookings in this date range</button>
+      <div class="set-title">👶 Tap a child to book them in</div>
+      <div class="sec-sub" style="margin-bottom:8px">A green tick shows how many days they are already booked for this holiday. Tap to change their days or times.</div>
+      <div id="holTileGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px"></div>
     </div>
   </div>
 
@@ -625,7 +625,7 @@
     </div>
   </div>
 </div>
-<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 26Oct-a</div>
+<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 26Oct-b</div>
 
 <!-- PAY WORKBOOK EXPORT PREVIEW OVERLAY -->
 <div class="overlay" id="payPreviewOv">
@@ -992,6 +992,30 @@
     </div>
     <button class="af-save" onclick="saveAdhocBooking()">Add</button>
     <button class="af-cancel" onclick="closeAdhoc()">Cancel</button>
+  </div>
+</div>
+
+<!-- HOLIDAY: BOOK ONE CHILD -->
+<div class="overlay" id="holChildOv">
+  <div class="admin-modal" style="max-width:360px">
+    <div class="af-title" id="holChildTitle">Book child</div>
+    <div class="sec-sub" id="holChildSub" style="margin-bottom:12px;color:var(--moss)"></div>
+    <label class="af-label">Days in during this holiday</label>
+    <div style="display:flex;gap:5px;flex-wrap:wrap;margin:6px 0 12px">
+      <label class="adhoc-day"><input type="checkbox" class="holCDay" value="1"> Mon</label>
+      <label class="adhoc-day"><input type="checkbox" class="holCDay" value="2"> Tue</label>
+      <label class="adhoc-day"><input type="checkbox" class="holCDay" value="3"> Wed</label>
+      <label class="adhoc-day"><input type="checkbox" class="holCDay" value="4"> Thu</label>
+      <label class="adhoc-day"><input type="checkbox" class="holCDay" value="5"> Fri</label>
+    </div>
+    <div class="af-row">
+      <div class="af-group"><label class="af-label">Start time</label><input class="af-input" id="holCStart" type="time" value="08:00"></div>
+      <div class="af-group"><label class="af-label">End time</label><input class="af-input" id="holCEnd" type="time" value="17:00"></div>
+    </div>
+    <div style="font-size:10px;color:var(--moss);margin:-4px 0 10px">Ticked days are booked; unticking a day removes it. Early/late charges apply against these times.</div>
+    <button class="af-save" onclick="saveHolChild()">Book these days</button>
+    <button onclick="removeHolChild()" style="width:100%;padding:11px;margin-top:6px;background:var(--burgundy,#A13A2A);color:#fff;border:none;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer">Remove from this holiday</button>
+    <button class="af-cancel" onclick="closeHolChild()">Cancel</button>
   </div>
 </div>
 
@@ -2747,73 +2771,126 @@ function saveAdhocBooking() {
 }
 
 // ════════════════════════════════════════════════
-// HOLIDAY BOOKING (book many children across a period in one go)
+// HOLIDAY BOOKING — pick a holiday, tap a child tile to book
 // ════════════════════════════════════════════════
-function holRangeDates(){
-  const from=parseDInput(document.getElementById('holFrom').value);
-  const to=parseDInput(document.getElementById('holTo').value);
+let holSelected = null;      // {from:Date, to:Date, name:string, custom:bool}
+let holChildTarget = null;
+
+// Name a holiday by the month its gap falls in (English school year shape).
+function holMonthName(d){ const m=d.getMonth();
+  if(m===9||m===10) return 'October half term';
+  if(m===11||m===0) return 'Christmas';
+  if(m===1)         return 'February half term';
+  if(m===2||m===3)  return 'Easter';
+  if(m===4||m===5)  return 'May half term';
+  if(m===6||m===7)  return 'Summer';
+  return 'Holiday'; }
+// Upcoming holidays = the gaps between your saved term ranges (so the dates always
+// match your setting). Past holidays are hidden.
+function holidayPeriods(){
+  const ranges=getTermRanges().map(r=>[new Date(r[0]),new Date(r[1])]).sort((a,b)=>a[0]-b[0]);
+  const out=[]; const today=today0();
+  for(let i=0;i<ranges.length-1;i++){
+    const s=new Date(ranges[i][1]);   s.setDate(s.getDate()+1); s.setHours(0,0,0,0);
+    const e=new Date(ranges[i+1][0]); e.setDate(e.getDate()-1); e.setHours(0,0,0,0);
+    if(e<s) continue;              // no gap
+    if(e<today) continue;          // already over
+    out.push({from:s,to:e,name:holMonthName(s)});
+  }
+  return out;
+}
+function holActiveWeekdays(){
+  if(!holSelected) return null;
+  let from,to;
+  if(holSelected.custom){ from=parseDInput(document.getElementById('holFrom').value); to=parseDInput(document.getElementById('holTo').value); }
+  else { from=holSelected.from; to=holSelected.to; }
   if(!from||!to||to<from) return null;
-  return eachDay(from,to).filter(d=>d.getDay()!==0 && d.getDay()!==6); // weekdays only
+  return eachDay(from,to).filter(d=>d.getDay()!==0 && d.getDay()!==6);
 }
 function renderHolidays(){
-  const grid=document.getElementById('holBookGrid');
-  const note=document.getElementById('holRangeNote');
-  const dates=holRangeDates();
-  if(!dates){ note.textContent='Pick a From and To date to begin.'; }
-  else {
-    const anyHol=dates.some(d=>isHoliday(d)), anyTerm=dates.some(d=>isTerm(d));
-    const mix = anyHol&&anyTerm ? ' (spans term and holiday)' : anyHol ? ' (school holiday)' : ' (term time)';
-    note.textContent=`${dates.length} weekday${dates.length!==1?'s':''} in this period${mix}.`;
-  }
-  const DOW=[['1','Mon'],['2','Tue'],['3','Wed'],['4','Thu'],['5','Fri']];
-  const kids=CHILDREN.filter(c=>!c.archived).sort((a,b)=> a.type===b.type ? (a.name||'').localeCompare(b.name||'') : (a.type==='ey'?-1:1));
-  if(!kids.length){ grid.innerHTML='<div style="font-size:12px;color:rgba(255,255,255,0.5)">No children to book.</div>'; return; }
+  const row=document.getElementById('holPresetRow');
+  const periods=holidayPeriods();
+  let html=periods.map((p,i)=>{
+    const active=holSelected && !holSelected.custom && dk(holSelected.from)===dk(p.from);
+    return `<button onclick="selectHolPreset(${i})" style="padding:8px 11px;border-radius:9px;border:2px solid ${active?'var(--gold)':'rgba(201,168,76,0.3)'};background:${active?'rgba(201,168,76,0.25)':'rgba(255,255,255,0.05)'};color:var(--gold-light);font-weight:700;font-size:12px;cursor:pointer;text-align:center;line-height:1.3">${p.name}<br><span style="font-size:10px;opacity:.75;font-weight:400">${p2(p.from.getDate())} ${MONTH_SHORT[p.from.getMonth()]} – ${p2(p.to.getDate())} ${MONTH_SHORT[p.to.getMonth()]}</span></button>`;
+  }).join('');
+  const customOn=holSelected&&holSelected.custom;
+  html+=`<button onclick="selectHolCustom()" style="padding:8px 11px;border-radius:9px;border:2px solid ${customOn?'var(--gold)':'rgba(201,168,76,0.3)'};background:${customOn?'rgba(201,168,76,0.25)':'rgba(255,255,255,0.05)'};color:var(--gold-light);font-weight:700;font-size:12px;cursor:pointer">Custom dates</button>`;
+  row.innerHTML=html;
+  document.getElementById('holCustomRow').style.display=customOn?'block':'none';
+  if(!periods.length && !customOn){ document.getElementById('holPeriodNote').innerHTML='<span style="color:rgba(255,255,255,0.5)">No upcoming holidays found from your term dates. Check Settings → Term dates, or use Custom dates.</span>'; }
+  renderHolTiles();
+}
+function selectHolPreset(i){ const p=holidayPeriods()[i]; if(!p) return; holSelected={from:p.from,to:p.to,name:p.name,custom:false}; renderHolidays(); }
+function selectHolCustom(){ holSelected={custom:true,name:'Custom dates',from:null,to:null}; renderHolidays(); }
+function renderHolTiles(){
+  const note=document.getElementById('holPeriodNote');
+  const grid=document.getElementById('holTileGrid');
+  const dates=holActiveWeekdays();
+  if(!dates){ note.textContent = holSelected&&holSelected.custom ? 'Pick a From and To date.' : 'Choose a holiday above to begin.'; grid.innerHTML=''; return; }
+  note.innerHTML=`<strong>${holSelected.name}</strong>: ${fmtUK(dates[0])} to ${fmtUK(dates[dates.length-1])} · ${dates.length} weekday${dates.length!==1?'s':''}`;
+  const kids=CHILDREN.filter(c=>!c.archived && c.ay!==true)
+    .sort((a,b)=> a.type===b.type ? (a.name||'').localeCompare(b.name||'') : (a.type==='ey'?-1:1));
+  if(!kids.length){ grid.innerHTML='<div style="font-size:12px;color:rgba(255,255,255,0.5);grid-column:1/-1">No children to book — all-year-round children are already in.</div>'; return; }
   grid.innerHTML=kids.map(c=>{
-    const cs=c.cs||'08:00', ce=c.ce||'17:00';
-    const normal=(c.days||[]);
-    const ticks=DOW.map(([v,lab])=>`<label class="adhoc-day" style="background:var(--parchment,#F6F3EE);color:var(--forest,#1A7A4A);font-weight:700"><input type="checkbox" class="holDay" data-cid="${c.id}" data-dow="${v}" ${normal.includes(Number(v))?'checked':''}> ${lab}</label>`).join('');
-    return `<div style="background:rgba(255,255,255,0.04);border:1px solid rgba(201,168,76,0.12);border-radius:10px;padding:10px;margin-bottom:8px">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:7px"><span style="font-size:16px">${c.emoji||'🧒'}</span><strong style="color:var(--gold-light);font-size:13px">${c.name}</strong><span style="font-size:10px;color:rgba(255,255,255,0.4)">${c.type==='ey'?'Under 5':'School'}</span></div>
-      <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:7px">${ticks}</div>
-      <div style="display:flex;gap:6px;align-items:center">
-        <span style="font-size:10px;color:rgba(255,255,255,0.5)">Times</span>
-        <input type="time" id="holIn-${c.id}" class="time-inp" style="max-width:120px" value="${cs}">
-        <span style="color:rgba(255,255,255,0.5)">–</span>
-        <input type="time" id="holOut-${c.id}" class="time-inp" style="max-width:120px" value="${ce}">
-      </div>
+    const booked=dates.filter(d=>{ const o=getOv(d)[c.id]; const a=typeof o==='string'?o:o&&o.action; return a==='add'; }).length;
+    const on=booked>0;
+    return `<div onclick="openHolChild('${c.id}')" style="background:var(--parchment);border:2px solid ${on?'var(--forest)':'transparent'};border-radius:11px;padding:9px 6px;text-align:center;cursor:pointer">
+      <div style="width:38px;height:38px;border-radius:50%;margin:0 auto 5px;display:flex;align-items:center;justify-content:center;font-size:19px;background:${c.color||'#4A7C6A'}">${c.emoji||'🧒'}</div>
+      <div style="font-weight:700;color:var(--bark);font-size:11.5px;line-height:1.2">${c.name}</div>
+      <div style="font-size:8.5px;color:var(--moss);text-transform:uppercase;letter-spacing:.4px">${c.type==='ey'?'Under 5':'School'}</div>
+      ${on?`<div style="margin-top:4px;font-size:9.5px;font-weight:700;color:#fff;background:var(--forest);border-radius:20px;padding:2px 6px;display:inline-block">✓ ${booked} day${booked!==1?'s':''}</div>`:''}
     </div>`;
   }).join('');
-  document.getElementById('holBookStatus').textContent='';
 }
-function saveHolidayBookings(){
-  const dates=holRangeDates();
-  if(!dates){ showFlash('Pick a valid From and To date first'); return; }
-  let totalDays=0; const perChild=[];
-  CHILDREN.filter(c=>!c.archived).forEach(c=>{
-    const picked=Array.from(document.querySelectorAll(`.holDay[data-cid="${c.id}"]:checked`)).map(cb=>Number(cb.dataset.dow));
-    if(!picked.length) return;
-    const inV=document.getElementById('holIn-'+c.id).value, outV=document.getElementById('holOut-'+c.id).value;
-    if(!inV||!outV){ perChild.push(`${c.name}: skipped (missing times)`); return; }
-    let n=0;
-    dates.forEach(d=>{ if(picked.includes(d.getDay())){ getOv(d)[c.id]={action:'add',cs:inV,ce:outV,at:Date.now()}; n++; } });
-    if(n){ perChild.push(`${c.name}: ${n} day${n!==1?'s':''}, ${inV}–${outV}`); totalDays+=n; }
+function openHolChild(cid){
+  const dates=holActiveWeekdays();
+  if(!dates){ showFlash('Choose a holiday first'); return; }
+  holChildTarget=cid;
+  const c=CHILDREN.find(x=>x.id===cid);
+  document.getElementById('holChildTitle').textContent=`${c.emoji||'🧒'} ${c.name}`;
+  document.getElementById('holChildSub').textContent=`${holSelected.name} · ${fmtUK(dates[0])} to ${fmtUK(dates[dates.length-1])}`;
+  // Existing bookings in this holiday → reflect their days and times
+  const bookedDows=new Set(); let exCs=null, exCe=null;
+  dates.forEach(d=>{ const o=getOv(d)[cid]; if(o&&o.action==='add'){ bookedDows.add(d.getDay()); exCs=o.cs; exCe=o.ce; } });
+  const availDows=new Set(dates.map(d=>d.getDay()));
+  const normal=(c.days||[]).filter(x=>availDows.has(x));
+  const defaults = bookedDows.size ? bookedDows : new Set(normal);
+  document.querySelectorAll('.holCDay').forEach(cb=>{
+    const v=Number(cb.value);
+    cb.checked = defaults.has(v);
+    cb.disabled = !availDows.has(v);                 // grey out days the holiday doesn't include
+    cb.parentElement.style.opacity = availDows.has(v)?'1':'0.35';
   });
-  if(!totalDays){ document.getElementById('holBookStatus').textContent='Nothing booked — tick at least one day for a child.'; return; }
-  markDirty(); if(odConnected) syncWithOneDrive();
-  renderChildren(); updateStatusBar();
-  document.getElementById('holBookStatus').innerHTML='✅ Booked:<br>'+perChild.join('<br>');
-  showFlash(`🏖️ Holiday bookings saved — ${totalDays} child-day${totalDays!==1?'s':''}`);
+  document.getElementById('holCStart').value = exCs || c.cs || '08:00';
+  document.getElementById('holCEnd').value   = exCe || c.ce || '17:00';
+  document.getElementById('holChildOv').classList.add('vis');
 }
-function clearHolidayRange(){
-  const dates=holRangeDates();
-  if(!dates){ showFlash('Pick a valid From and To date first'); return; }
-  if(!confirm('Remove ALL holiday (ad hoc) bookings for every child in this date range? Normal scheduled days and absences are not touched.')) return;
-  let removed=0;
-  dates.forEach(d=>{ const ov=getOv(d); Object.keys(ov).forEach(cid=>{ const a=ov[cid]; const action=typeof a==='string'?a:a&&a.action; if(action==='add'){ delete ov[cid]; removed++; } }); });
+function closeHolChild(){ document.getElementById('holChildOv').classList.remove('vis'); holChildTarget=null; }
+function saveHolChild(){
+  const dates=holActiveWeekdays(); if(!dates||!holChildTarget) return;
+  const c=CHILDREN.find(x=>x.id===holChildTarget);
+  const picked=Array.from(document.querySelectorAll('.holCDay:checked')).map(cb=>Number(cb.value));
+  const inV=document.getElementById('holCStart').value, outV=document.getElementById('holCEnd').value;
+  if(picked.length && (!inV||!outV)){ showFlash('Set both times'); return; }
+  let added=0;
+  dates.forEach(d=>{
+    const dow=d.getDay();
+    if(picked.includes(dow)){ getOv(d)[holChildTarget]={action:'add',cs:inV,ce:outV,at:Date.now()}; added++; }
+    else { const o=getOv(d)[holChildTarget]; if(o&&o.action==='add') delete getOv(d)[holChildTarget]; } // unticked day removed
+  });
   markDirty(); if(odConnected) syncWithOneDrive();
-  renderChildren(); updateStatusBar();
-  document.getElementById('holBookStatus').textContent=removed?`Cleared ${removed} booking${removed!==1?'s':''} in this range.`:'No ad hoc bookings found in this range.';
-  showFlash('Holiday bookings cleared for the range');
+  renderChildren(); updateStatusBar(); closeHolChild(); renderHolidays();
+  showFlash(added?`🏖️ ${c.name} booked for ${added} day${added!==1?'s':''}`:`${c.name} removed from this holiday`);
+}
+function removeHolChild(){
+  const dates=holActiveWeekdays(); if(!dates||!holChildTarget) return;
+  const c=CHILDREN.find(x=>x.id===holChildTarget);
+  let removed=0;
+  dates.forEach(d=>{ const o=getOv(d)[holChildTarget]; if(o&&o.action==='add'){ delete getOv(d)[holChildTarget]; removed++; } });
+  markDirty(); if(odConnected) syncWithOneDrive();
+  renderChildren(); updateStatusBar(); closeHolChild(); renderHolidays();
+  showFlash(removed?`${c.name} removed from this holiday`:'Nothing booked to remove');
 }
 
 // Get effective contracted times for child on this date (override or default)
