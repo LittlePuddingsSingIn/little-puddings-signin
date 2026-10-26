@@ -625,7 +625,7 @@
     </div>
   </div>
 </div>
-<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 26Oct-b</div>
+<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 26Oct-c</div>
 
 <!-- PAY WORKBOOK EXPORT PREVIEW OVERLAY -->
 <div class="overlay" id="payPreviewOv">
@@ -997,22 +997,12 @@
 
 <!-- HOLIDAY: BOOK ONE CHILD -->
 <div class="overlay" id="holChildOv">
-  <div class="admin-modal" style="max-width:360px">
+  <div class="admin-modal" style="max-width:380px">
     <div class="af-title" id="holChildTitle">Book child</div>
     <div class="sec-sub" id="holChildSub" style="margin-bottom:12px;color:var(--moss)"></div>
-    <label class="af-label">Days in during this holiday</label>
-    <div style="display:flex;gap:5px;flex-wrap:wrap;margin:6px 0 12px">
-      <label class="adhoc-day"><input type="checkbox" class="holCDay" value="1"> Mon</label>
-      <label class="adhoc-day"><input type="checkbox" class="holCDay" value="2"> Tue</label>
-      <label class="adhoc-day"><input type="checkbox" class="holCDay" value="3"> Wed</label>
-      <label class="adhoc-day"><input type="checkbox" class="holCDay" value="4"> Thu</label>
-      <label class="adhoc-day"><input type="checkbox" class="holCDay" value="5"> Fri</label>
-    </div>
-    <div class="af-row">
-      <div class="af-group"><label class="af-label">Start time</label><input class="af-input" id="holCStart" type="time" value="08:00"></div>
-      <div class="af-group"><label class="af-label">End time</label><input class="af-input" id="holCEnd" type="time" value="17:00"></div>
-    </div>
-    <div style="font-size:10px;color:var(--moss);margin:-4px 0 10px">Ticked days are booked; unticking a day removes it. Early/late charges apply against these times.</div>
+    <label class="af-label">Days and times during this holiday</label>
+    <div id="holDayRows" style="margin:8px 0 10px"></div>
+    <div style="font-size:10px;color:var(--moss);margin:0 0 10px">Tick each day the child is in and set its start and end; the days can have different hours. Unticking a day removes it. Early/late charges apply against these times.</div>
     <button class="af-save" onclick="saveHolChild()">Book these days</button>
     <button onclick="removeHolChild()" style="width:100%;padding:11px;margin-top:6px;background:var(--burgundy,#A13A2A);color:#fff;border:none;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer">Remove from this holiday</button>
     <button class="af-cancel" onclick="closeHolChild()">Cancel</button>
@@ -2843,6 +2833,11 @@ function renderHolTiles(){
     </div>`;
   }).join('');
 }
+const HOL_DOW=[[1,'Mon'],[2,'Tue'],[3,'Wed'],[4,'Thu'],[5,'Fri']];
+function holRowToggle(cb){
+  const v=cb.value, on=cb.checked;
+  document.querySelectorAll(`.holCIn[data-dow="${v}"],.holCOut[data-dow="${v}"]`).forEach(inp=>{ inp.disabled=!on; inp.style.opacity=on?'1':'0.4'; });
+}
 function openHolChild(cid){
   const dates=holActiveWeekdays();
   if(!dates){ showFlash('Choose a holiday first'); return; }
@@ -2850,33 +2845,47 @@ function openHolChild(cid){
   const c=CHILDREN.find(x=>x.id===cid);
   document.getElementById('holChildTitle').textContent=`${c.emoji||'🧒'} ${c.name}`;
   document.getElementById('holChildSub').textContent=`${holSelected.name} · ${fmtUK(dates[0])} to ${fmtUK(dates[dates.length-1])}`;
-  // Existing bookings in this holiday → reflect their days and times
-  const bookedDows=new Set(); let exCs=null, exCe=null;
-  dates.forEach(d=>{ const o=getOv(d)[cid]; if(o&&o.action==='add'){ bookedDows.add(d.getDay()); exCs=o.cs; exCe=o.ce; } });
   const availDows=new Set(dates.map(d=>d.getDay()));
-  const normal=(c.days||[]).filter(x=>availDows.has(x));
-  const defaults = bookedDows.size ? bookedDows : new Set(normal);
-  document.querySelectorAll('.holCDay').forEach(cb=>{
-    const v=Number(cb.value);
-    cb.checked = defaults.has(v);
-    cb.disabled = !availDows.has(v);                 // grey out days the holiday doesn't include
-    cb.parentElement.style.opacity = availDows.has(v)?'1':'0.35';
-  });
-  document.getElementById('holCStart').value = exCs || c.cs || '08:00';
-  document.getElementById('holCEnd').value   = exCe || c.ce || '17:00';
+  // Existing bookings in this holiday, grouped by weekday → reflect their days and per-day times
+  const exByDow={};
+  dates.forEach(d=>{ const o=getOv(d)[cid]; if(o&&o.action==='add'){ exByDow[d.getDay()]={cs:o.cs,ce:o.ce}; } });
+  const hasExisting=Object.keys(exByDow).length>0;
+  const normal=new Set((c.days||[]).filter(x=>availDows.has(x)));
+  const defCs=c.cs||'08:00', defCe=c.ce||'17:00';
+  document.getElementById('holDayRows').innerHTML=HOL_DOW.map(([v,lab])=>{
+    const avail=availDows.has(v);
+    const checked = avail && (hasExisting ? (v in exByDow) : normal.has(v));
+    const cs=(exByDow[v]&&exByDow[v].cs)||defCs, ce=(exByDow[v]&&exByDow[v].ce)||defCe;
+    const dis = checked?'':'disabled', op=checked?'1':'0.4';
+    const tInp=`padding:7px 4px;border:2px solid var(--sage);border-radius:7px;font-family:inherit;font-size:13px;background:var(--parchment);text-align:center;width:108px;box-sizing:border-box`;
+    return `<div style="display:flex;align-items:center;gap:7px;margin-bottom:6px;${avail?'':'opacity:0.35'}">
+      <label style="min-width:66px;display:flex;align-items:center;gap:6px;font-size:13px;color:var(--bark);font-weight:700"><input type="checkbox" class="holCDay" value="${v}" ${checked?'checked':''} ${avail?'':'disabled'} onchange="holRowToggle(this)"> ${lab}</label>
+      <input type="time" class="holCIn" data-dow="${v}" value="${cs}" ${dis} style="${tInp};opacity:${op}">
+      <span style="color:var(--moss)">–</span>
+      <input type="time" class="holCOut" data-dow="${v}" value="${ce}" ${dis} style="${tInp};opacity:${op}">
+    </div>`;
+  }).join('');
   document.getElementById('holChildOv').classList.add('vis');
 }
 function closeHolChild(){ document.getElementById('holChildOv').classList.remove('vis'); holChildTarget=null; }
 function saveHolChild(){
   const dates=holActiveWeekdays(); if(!dates||!holChildTarget) return;
   const c=CHILDREN.find(x=>x.id===holChildTarget);
-  const picked=Array.from(document.querySelectorAll('.holCDay:checked')).map(cb=>Number(cb.value));
-  const inV=document.getElementById('holCStart').value, outV=document.getElementById('holCEnd').value;
-  if(picked.length && (!inV||!outV)){ showFlash('Set both times'); return; }
+  // Gather per-weekday choice + times; validate before writing anything
+  const byDow={}; let bad=false;
+  HOL_DOW.forEach(([v])=>{
+    const cb=document.querySelector(`.holCDay[value="${v}"]`);
+    if(cb && cb.checked){
+      const inV=document.querySelector(`.holCIn[data-dow="${v}"]`).value;
+      const outV=document.querySelector(`.holCOut[data-dow="${v}"]`).value;
+      if(!inV||!outV) bad=true; else byDow[v]={cs:inV,ce:outV};
+    }
+  });
+  if(bad){ showFlash('Set a start and end time for each ticked day'); return; }
   let added=0;
   dates.forEach(d=>{
     const dow=d.getDay();
-    if(picked.includes(dow)){ getOv(d)[holChildTarget]={action:'add',cs:inV,ce:outV,at:Date.now()}; added++; }
+    if(byDow[dow]){ getOv(d)[holChildTarget]={action:'add',cs:byDow[dow].cs,ce:byDow[dow].ce,at:Date.now()}; added++; }
     else { const o=getOv(d)[holChildTarget]; if(o&&o.action==='add') delete getOv(d)[holChildTarget]; } // unticked day removed
   });
   markDirty(); if(odConnected) syncWithOneDrive();
