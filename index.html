@@ -356,6 +356,7 @@
     <button class="tab mgr-only dep-ok" onclick="setTab('log')"      style="display:none">Log</button>
     <button class="tab mgr-only" onclick="setTab('invoice')"  style="display:none">Invoices</button>
     <button class="tab mgr-only dep-ok" onclick="setTab('override')" style="display:none">Day Changes</button>
+    <button class="tab mgr-only dep-ok" onclick="setTab('holidays')" style="display:none">Holidays</button>
     <button class="tab mgr-only dep-ok" onclick="setTab('solecharge')" style="display:none">Sole Charge</button>
     <button class="tab mgr-only" onclick="setTab('admin')"    style="display:none">Admin</button>
     <button class="tab mgr-only" onclick="setTab('payroll')"  style="display:none">Payroll</button>
@@ -433,6 +434,28 @@
         <button onclick="addAnotherSession()" id="addSessionBtn" style="margin-top:6px;width:100%;padding:8px;background:rgba(26,122,74,0.35);color:var(--gold-light);border:none;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;display:none">＋ Add another session (e.g. after school)</button>
         <button onclick="clearOverrideTimes()" style="margin-top:6px;width:100%;padding:8px;background:rgba(161,58,42,0.25);color:#F4DEDA;border:none;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer">Clear all times for this day</button>
       </div>
+    </div>
+  </div>
+
+  <!-- HOLIDAYS -->
+  <div id="panel-holidays" style="display:none">
+    <div class="sec-head"><div class="sec-label">Holiday Booking</div><div class="sec-line"></div></div>
+    <div class="sec-sub">Book children in across a holiday (or any period) in one go. Pick the dates, tick the days each child is in, set their times, then book them all together.</div>
+    <div class="set-section">
+      <div class="set-title">🏖️ Pick the dates</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+        <div style="flex:1;min-width:130px"><label style="font-size:11px;color:rgba(255,255,255,0.6);display:block;margin-bottom:4px">From (first day)</label><input type="date" id="holFrom" class="time-inp" style="width:100%" onchange="renderHolidays()"></div>
+        <div style="flex:1;min-width:130px"><label style="font-size:11px;color:rgba(255,255,255,0.6);display:block;margin-bottom:4px">To (last day)</label><input type="date" id="holTo" class="time-inp" style="width:100%" onchange="renderHolidays()"></div>
+      </div>
+      <div id="holRangeNote" style="font-size:11px;color:var(--gold-light);margin-top:8px"></div>
+    </div>
+    <div class="set-section">
+      <div class="set-title">👶 Who is in, and when</div>
+      <div class="sec-sub" style="margin-bottom:8px">Tick the weekdays each child attends in this period. Times default to their usual contract; change them for holiday hours. Leave a child with no days ticked to skip them.</div>
+      <div id="holBookGrid"></div>
+      <button onclick="saveHolidayBookings()" style="width:100%;padding:12px;background:var(--forest);color:#fff;border:none;border-radius:9px;font-weight:700;font-size:13px;cursor:pointer;margin-top:10px">Book these children in</button>
+      <div id="holBookStatus" style="font-size:11.5px;margin-top:10px;color:var(--gold-light);line-height:1.6"></div>
+      <button onclick="clearHolidayRange()" style="width:100%;padding:9px;background:rgba(161,58,42,0.25);color:#F4DEDA;border:none;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;margin-top:8px">Clear all holiday bookings in this date range</button>
     </div>
   </div>
 
@@ -524,6 +547,17 @@
       <button onclick="exportWeeklyRegisterPDF()" style="width:100%;padding:11px;background:var(--forest);color:#fff;border:none;border-radius:9px;font-weight:700;font-size:12px;cursor:pointer">Generate weekly register PDF</button>
     </div>
 
+    <!-- WHO'S DUE THIS WEEK -->
+    <div class="set-section">
+      <div class="set-title">📋 Who's due this week</div>
+      <div class="sec-sub" style="margin-bottom:8px">A forward planning sheet: each child due Monday to Friday with their expected times, plus a daily headcount.</div>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
+        <label style="font-size:11px;color:rgba(255,255,255,0.6)">Week beginning (any day in the week)</label>
+        <input type="date" id="dueWeekDate" class="time-inp" style="max-width:170px">
+      </div>
+      <button onclick="exportDuePDF()" style="width:100%;padding:11px;background:var(--forest);color:#fff;border:none;border-radius:9px;font-weight:700;font-size:12px;cursor:pointer">Generate who's-due PDF</button>
+    </div>
+
     <!-- INDIVIDUAL CHILD REGISTER -->
     <div class="set-section">
       <div class="set-title">👤 Individual Child Register (funding audit)</div>
@@ -591,7 +625,7 @@
     </div>
   </div>
 </div>
-<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 18Oct-d</div>
+<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 26Oct-a</div>
 
 <!-- PAY WORKBOOK EXPORT PREVIEW OVERLAY -->
 <div class="overlay" id="payPreviewOv">
@@ -1752,6 +1786,8 @@ let timesheet = {};
 const DATA_VERSION = 14;
 
 let viewDate = new Date(); viewDate.setHours(0,0,0,0);
+// Midnight of the real current day — the door always signs in/out against this.
+function today0(){ const t=new Date(); t.setHours(0,0,0,0); return t; }
 let managerMode = false;
 let deputyMode = false; // limited access for when the manager is not present
 // Auto-logout: if manager/deputy mode is left idle (e.g. tablet sitting in the
@@ -2060,6 +2096,11 @@ function updateClock(){
   const n=new Date();
   document.getElementById('clock').textContent=ts(n);
   document.getElementById('dateDisp').textContent=`${DAYS[n.getDay()].slice(0,3)} ${n.getDate()} ${MONTH_SHORT[n.getMonth()]}`;
+  // Keep the live door on the real current day. Whenever no one is reviewing
+  // another day in manager/deputy mode, snap back to today. This covers a manager
+  // who viewed a different day and walked away, and the roll-over to a new day if
+  // the tablet is left on overnight, so a sign in/out can never land on the wrong date.
+  if(!elevated() && dk(viewDate)!==dk(n)){ viewDate=today0(); updateDateNav(); renderAll(); }
 }
 updateClock(); setInterval(updateClock,1000);
 
@@ -2170,6 +2211,7 @@ function exitManager(){
   document.getElementById('dateNav').style.display='none';
   document.querySelectorAll('.mgr-only').forEach(el=>el.style.display='none');
   if(!['children','staff'].includes(currentTab))setTab('children');
+  viewDate=today0(); updateDateNav();   // leaving review returns the door to today
   renderAll();
 }
 function enterDeputy(){
@@ -2191,6 +2233,7 @@ function exitDeputy(){
   document.getElementById('dateNav').style.display='none';
   document.querySelectorAll('.dep-ok').forEach(el=>el.style.display='none');
   if(!['children','staff','visitor'].includes(currentTab))setTab('children');
+  viewDate=today0(); updateDateNav();   // leaving review returns the door to today
   renderAll();
 }
 
@@ -2211,7 +2254,7 @@ function goToday(){ viewDate=new Date();viewDate.setHours(0,0,0,0);updateDateNav
 // ════════════════════════════════════════════════
 function setTab(t){
   currentTab=t;
-  ['children','staff','visitor','log','invoice','override','solecharge','admin','payroll','reports','settings'].forEach((p,i)=>{
+  ['children','staff','visitor','log','invoice','override','holidays','solecharge','admin','payroll','reports','settings'].forEach((p,i)=>{
     document.getElementById('panel-'+p).style.display=p===t?'':'none';
     document.querySelectorAll('.tab')[i].classList.toggle('active',p===t);
   });
@@ -2219,6 +2262,7 @@ function setTab(t){
   if(t==='log')renderLog();
   if(t==='invoice')renderInvoice();
   if(t==='override')renderOverride();
+  if(t==='holidays')renderHolidays();
   if(t==='solecharge')renderSoleCharge(true);
   if(t==='admin')renderAdmin();
   if(t==='payroll')renderPayroll();
@@ -2700,6 +2744,76 @@ function saveAdhocBooking() {
   renderOverride(); renderChildren(); updateStatusBar();
   markDirty();
   if (odConnected) syncWithOneDrive();
+}
+
+// ════════════════════════════════════════════════
+// HOLIDAY BOOKING (book many children across a period in one go)
+// ════════════════════════════════════════════════
+function holRangeDates(){
+  const from=parseDInput(document.getElementById('holFrom').value);
+  const to=parseDInput(document.getElementById('holTo').value);
+  if(!from||!to||to<from) return null;
+  return eachDay(from,to).filter(d=>d.getDay()!==0 && d.getDay()!==6); // weekdays only
+}
+function renderHolidays(){
+  const grid=document.getElementById('holBookGrid');
+  const note=document.getElementById('holRangeNote');
+  const dates=holRangeDates();
+  if(!dates){ note.textContent='Pick a From and To date to begin.'; }
+  else {
+    const anyHol=dates.some(d=>isHoliday(d)), anyTerm=dates.some(d=>isTerm(d));
+    const mix = anyHol&&anyTerm ? ' (spans term and holiday)' : anyHol ? ' (school holiday)' : ' (term time)';
+    note.textContent=`${dates.length} weekday${dates.length!==1?'s':''} in this period${mix}.`;
+  }
+  const DOW=[['1','Mon'],['2','Tue'],['3','Wed'],['4','Thu'],['5','Fri']];
+  const kids=CHILDREN.filter(c=>!c.archived).sort((a,b)=> a.type===b.type ? (a.name||'').localeCompare(b.name||'') : (a.type==='ey'?-1:1));
+  if(!kids.length){ grid.innerHTML='<div style="font-size:12px;color:rgba(255,255,255,0.5)">No children to book.</div>'; return; }
+  grid.innerHTML=kids.map(c=>{
+    const cs=c.cs||'08:00', ce=c.ce||'17:00';
+    const normal=(c.days||[]);
+    const ticks=DOW.map(([v,lab])=>`<label class="adhoc-day" style="background:var(--parchment,#F6F3EE);color:var(--forest,#1A7A4A);font-weight:700"><input type="checkbox" class="holDay" data-cid="${c.id}" data-dow="${v}" ${normal.includes(Number(v))?'checked':''}> ${lab}</label>`).join('');
+    return `<div style="background:rgba(255,255,255,0.04);border:1px solid rgba(201,168,76,0.12);border-radius:10px;padding:10px;margin-bottom:8px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:7px"><span style="font-size:16px">${c.emoji||'🧒'}</span><strong style="color:var(--gold-light);font-size:13px">${c.name}</strong><span style="font-size:10px;color:rgba(255,255,255,0.4)">${c.type==='ey'?'Under 5':'School'}</span></div>
+      <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:7px">${ticks}</div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <span style="font-size:10px;color:rgba(255,255,255,0.5)">Times</span>
+        <input type="time" id="holIn-${c.id}" class="time-inp" style="max-width:120px" value="${cs}">
+        <span style="color:rgba(255,255,255,0.5)">–</span>
+        <input type="time" id="holOut-${c.id}" class="time-inp" style="max-width:120px" value="${ce}">
+      </div>
+    </div>`;
+  }).join('');
+  document.getElementById('holBookStatus').textContent='';
+}
+function saveHolidayBookings(){
+  const dates=holRangeDates();
+  if(!dates){ showFlash('Pick a valid From and To date first'); return; }
+  let totalDays=0; const perChild=[];
+  CHILDREN.filter(c=>!c.archived).forEach(c=>{
+    const picked=Array.from(document.querySelectorAll(`.holDay[data-cid="${c.id}"]:checked`)).map(cb=>Number(cb.dataset.dow));
+    if(!picked.length) return;
+    const inV=document.getElementById('holIn-'+c.id).value, outV=document.getElementById('holOut-'+c.id).value;
+    if(!inV||!outV){ perChild.push(`${c.name}: skipped (missing times)`); return; }
+    let n=0;
+    dates.forEach(d=>{ if(picked.includes(d.getDay())){ getOv(d)[c.id]={action:'add',cs:inV,ce:outV,at:Date.now()}; n++; } });
+    if(n){ perChild.push(`${c.name}: ${n} day${n!==1?'s':''}, ${inV}–${outV}`); totalDays+=n; }
+  });
+  if(!totalDays){ document.getElementById('holBookStatus').textContent='Nothing booked — tick at least one day for a child.'; return; }
+  markDirty(); if(odConnected) syncWithOneDrive();
+  renderChildren(); updateStatusBar();
+  document.getElementById('holBookStatus').innerHTML='✅ Booked:<br>'+perChild.join('<br>');
+  showFlash(`🏖️ Holiday bookings saved — ${totalDays} child-day${totalDays!==1?'s':''}`);
+}
+function clearHolidayRange(){
+  const dates=holRangeDates();
+  if(!dates){ showFlash('Pick a valid From and To date first'); return; }
+  if(!confirm('Remove ALL holiday (ad hoc) bookings for every child in this date range? Normal scheduled days and absences are not touched.')) return;
+  let removed=0;
+  dates.forEach(d=>{ const ov=getOv(d); Object.keys(ov).forEach(cid=>{ const a=ov[cid]; const action=typeof a==='string'?a:a&&a.action; if(action==='add'){ delete ov[cid]; removed++; } }); });
+  markDirty(); if(odConnected) syncWithOneDrive();
+  renderChildren(); updateStatusBar();
+  document.getElementById('holBookStatus').textContent=removed?`Cleared ${removed} booking${removed!==1?'s':''} in this range.`:'No ad hoc bookings found in this range.';
+  showFlash('Holiday bookings cleared for the range');
 }
 
 // Get effective contracted times for child on this date (override or default)
@@ -4150,6 +4264,10 @@ function checkSetPin(){
 function openAction(type,id){
   actionTarget={type,id};
   const now=new Date();
+  // A sign in/out is always a live action for the real current day. If the screen
+  // was left on another day, snap back to today first so it can never be stamped
+  // on the wrong date.
+  if(dk(viewDate)!==dk(now)){ viewDate=today0(); updateDateNav(); renderAll(); }
   const e=type==='child'?CHILDREN.find(x=>x.id===id):STAFF.find(x=>x.id===id);
   const av=document.getElementById('actAv');
   av.style.cssText=`width:60px;height:60px;border-radius:50%;background:${e.color};display:flex;align-items:center;justify-content:center;margin:0 auto 10px;`;
@@ -4334,9 +4452,11 @@ function schoolRunTick() {
     CHILDREN.filter(c=>c.schoolRun && afterSchoolToday(c,now) && childScheduledToday(c,now)).forEach(c=>{
       if(collected[c.id]) return;
       const att=getAtt(c.id,now);
-      // Only auto sign-in if they haven't been signed in yet this afternoon
-      if(!att.signedIn && att.signOutTime==='08:55') {
-        attStartNewSession(att);   // keep the morning session, start the afternoon one
+      // Auto sign-in the after-school collection if they aren't already in. Covers
+      // both a child dropped off in the morning (signed out at 08:55) and a child
+      // who only comes in the afternoon (no morning session at all).
+      if(!att.signedIn && (att.signOutTime==='08:55' || !att.signInTime)) {
+        attStartNewSession(att);   // keep any morning session, start the afternoon one
         att.signedIn=true; att.signInTime='15:25';
         getLog(now).unshift({name:c.name,type:'child',action:'in',time:'15:25',extra:0,verified:true,note:'Auto — afternoon collection'});
         if(odConnected) writeToExcel(c,now,att);
@@ -5493,6 +5613,56 @@ function exportWeeklyRegisterPDF(){
   doc.text('Key:  top time = signed in, lower time = signed out  ·  HOL holiday  ·  ILL illness  ·  FAM family event  ·  N/S no show  ·  "·" booked, no times  ·  blank = not booked', 12, ly, {maxWidth:doc.internal.pageSize.getWidth()-24});
   doc.save('LP Weekly Register '+dk(mon)+'.pdf');
   showFlash('📄 Weekly register PDF generated');
+}
+
+// ════════════════════════════════════════════════
+// WHO'S DUE THIS WEEK (forward planning sheet with expected times)
+// ════════════════════════════════════════════════
+function exportDuePDF(){
+  if(!window.jspdf){ alert('PDF library not loaded. Check the internet connection and refresh (Ctrl+F5).'); return; }
+  const base=parseDInput(document.getElementById('dueWeekDate').value)||new Date();
+  const mon=mondayOf(base);
+  const week=[0,1,2,3,4].map(i=>{ const d=new Date(mon); d.setDate(d.getDate()+i); return d; });
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+  const kids=CHILDREN.filter(c=>!c.archived)
+    .filter(c=>week.some(d=>childScheduledToday(c,d)))
+    .sort((a,b)=> a.type===b.type ? cName(a).localeCompare(cName(b)) : (a.type==='ey'?-1:1));
+  const body=kids.map(c=>{
+    const cells=week.map(d=>{
+      if(!childScheduledToday(c,d)) return '';
+      const t=effectiveTimes(c,d);
+      return (t&&t.cs&&t.ce)?`${t.cs}–${t.ce}`:'·';
+    });
+    return [cName(c), c.type==='ey'?'Under 5':'School', ...cells];
+  });
+  // Daily headcounts for ratio planning
+  const eyCount=week.map(d=>CHILDREN.filter(c=>!c.archived&&c.type==='ey'&&childScheduledToday(c,d)).length);
+  const schCount=week.map(d=>CHILDREN.filter(c=>!c.archived&&c.type==='school'&&childScheduledToday(c,d)).length);
+  const foot=[
+    ['Due — under 5s','', ...eyCount.map(n=>String(n))],
+    ['Due — school','', ...schCount.map(n=>String(n))],
+    ['Total due','', ...week.map((d,i)=>String(eyCount[i]+schCount[i]))]
+  ];
+  pdfHeader(doc,'Children Due This Week','Week beginning '+fmtUK(mon)+'   ('+fmtUK(mon)+' to '+fmtUK(week[4])+')');
+  doc.autoTable({
+    startY:44,
+    head:[['Child','Type',...week.map(d=>DAYS[d.getDay()]+'\n'+p2(d.getDate())+'/'+p2(d.getMonth()+1))]],
+    body: body.length?body:[['No children due this week','','','','','','']],
+    foot: body.length?foot:[],
+    styles:{fontSize:8.5,cellPadding:2,valign:'middle',halign:'center',lineColor:[204,204,204],lineWidth:0.1,textColor:[40,40,40]},
+    headStyles:{fillColor:[232,241,236],textColor:[26,122,74],fontStyle:'bold',halign:'center'},
+    footStyles:{fillColor:[251,243,220],textColor:[26,122,74],fontStyle:'bold',halign:'center'},
+    columnStyles:{0:{cellWidth:48,halign:'left',fontStyle:'bold'},1:{cellWidth:18}},
+    alternateRowStyles:{fillColor:[247,243,236]},
+    margin:{left:12,right:12},
+    didDrawPage:()=>pdfFooter(doc)
+  });
+  const ly=doc.lastAutoTable.finalY+6;
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(107,100,96);
+  doc.text('Expected times shown for each day a child is booked in. Blank = not in that day. "·" = booked, no set times.', 12, ly, {maxWidth:doc.internal.pageSize.getWidth()-24});
+  doc.save('LP Children Due '+dk(mon)+'.pdf');
+  showFlash('📋 Who’s-due PDF generated');
 }
 
 // ════════════════════════════════════════════════
