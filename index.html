@@ -297,6 +297,66 @@
   .coming-soon{background:rgba(44,74,62,0.9);border-radius:9px;padding:10px 14px;color:var(--gold-light);font-size:11px;text-align:center;border:1px solid rgba(201,168,76,0.25);margin-top:8px}
   .save-indicator{font-size:10px;color:var(--ok);font-weight:700;margin-left:8px}
   .footer-note{text-align:center;color:rgba(255,255,255,0.7);font-size:10px;letter-spacing:1px;padding:8px 0 18px;text-transform:uppercase}
+
+  /* ═══ FIRE SAFETY (v7) ═══ */
+  .fire-btn{background:#A13A2A;color:#fff}
+  .fire-btn:hover{background:#7f2c1f}
+  .fire-modal{background:var(--cream);border-radius:18px;padding:22px;width:100%;max-width:620px;max-height:92vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,0.4)}
+  .fire-modal h2{font-family:'Playfair Display',serif;color:var(--forest);font-size:20px;margin-bottom:6px}
+  .fire-modal .fm-sub{font-size:12px;color:var(--bark);margin-bottom:16px;line-height:1.45}
+  .fire-modal .af-label{margin-top:14px}
+  .fire-modal textarea.af-input{min-height:64px;resize:vertical}
+  .fire-big{display:block;width:100%;padding:18px;border:none;border-radius:14px;font-size:16px;font-weight:700;cursor:pointer;margin-bottom:10px}
+  .fire-go{background:var(--forest);color:var(--gold-light)}
+  .fire-real{background:#A13A2A;color:#fff}
+  .fire-cx{background:var(--parchment);color:var(--forest)}
+  .fire-run{position:fixed;inset:0;z-index:300;background:var(--cream);overflow:auto;display:none;padding:14px 16px 90px}
+  .fire-run.vis{display:block}
+  .fr-top{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+  .fr-title{font-family:'Playfair Display',serif;color:var(--forest);font-size:22px;font-weight:700}
+  .fr-timer{font-family:'Playfair Display',serif;font-size:46px;font-weight:700;color:var(--forest);line-height:1}
+  .fr-real-banner{background:#F4DEDA;border-left:6px solid #A13A2A;border-radius:12px;padding:12px 14px;color:#A13A2A;font-weight:700;margin-bottom:10px;font-size:15px;line-height:1.4}
+  .fr-stage{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+  .fr-stage button{flex:1;min-width:200px;padding:16px;border-radius:14px;border:none;font-size:16px;font-weight:700;cursor:pointer}
+  .fr-out{background:var(--gold);color:var(--forest)}
+  .fr-out.done{background:#E8F1EC;color:var(--forest);cursor:default}
+  .fr-counts{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+  .fr-chip{background:#fff;border-radius:20px;padding:7px 13px;font-size:13px;font-weight:700;color:var(--forest);border:1px solid rgba(0,0,0,0.08)}
+  .fr-chip.miss{background:#F4DEDA;color:#A13A2A;border-color:#A13A2A}
+  .fr-chip.allok{background:#1A7A4A;color:#fff}
+  .fr-group{font-family:'Playfair Display',serif;color:var(--forest);font-size:15px;margin:14px 0 8px}
+  .fr-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:9px}
+  .fr-tile{border-radius:14px;padding:12px 10px;background:#fff;border:3px solid #A13A2A;cursor:pointer;text-align:center;user-select:none}
+  .fr-tile .nm{font-weight:700;color:var(--forest);font-size:14px;line-height:1.2}
+  .fr-tile .st{font-size:11px;margin-top:4px;color:#A13A2A;font-weight:700}
+  .fr-tile.found{background:#E8F1EC;border-color:#1A7A4A}
+  .fr-tile.found .st{color:#1A7A4A}
+  .fr-tile.absent{background:var(--parchment);border-color:#CCCCCC;opacity:0.75}
+  .fr-tile.absent .nm{text-decoration:line-through}
+  .fr-tile.absent .st{color:var(--bark)}
+  .fr-tile .ns{display:inline-block;margin-top:7px;font-size:10px;color:var(--bark);background:var(--parchment);border-radius:8px;padding:3px 8px;border:none;cursor:pointer}
+  .fr-bottom{position:fixed;left:0;right:0;bottom:0;background:var(--cream);border-top:3px solid var(--gold);padding:10px 16px;display:flex;gap:10px;z-index:301}
+  .fr-bottom button{flex:1;padding:14px;border-radius:12px;border:none;font-weight:700;font-size:14px;cursor:pointer}
+  .fire-card{background:rgba(255,255,255,0.07);border:1px solid rgba(201,168,76,0.35);border-radius:12px;padding:12px 14px;margin-bottom:10px;display:flex;align-items:center;gap:12px;color:#fff;font-size:13px}
+  .fire-card b{color:var(--gold-light)}
+  .fire-card button{margin-left:auto;padding:9px 14px;border-radius:9px;border:none;background:var(--gold);color:var(--forest);font-weight:700;cursor:pointer;white-space:nowrap}
+  .fire-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid rgba(255,255,255,0.08);color:#fff;font-size:12px;flex-wrap:wrap}
+  .fire-row:first-child{border-top:none}
+  .fire-badge{display:inline-block;border-radius:10px;padding:2px 8px;font-size:10px;font-weight:700}
+  .fb-need{background:#F4DEDA;color:#A13A2A}
+  .fb-sub{background:#FBF3DC;color:#8a6a0a}
+  .fb-ok{background:#E8F1EC;color:#1A7A4A}
+  .fire-sbtn{padding:7px 11px;border-radius:8px;border:none;background:var(--forest);color:var(--gold-light);font-size:11px;font-weight:700;cursor:pointer}
+  .fire-tbl{width:100%;border-collapse:collapse;font-size:12px;color:#fff}
+  .fire-tbl td,.fire-tbl th{padding:7px 6px;border-top:1px solid rgba(255,255,255,0.08);text-align:left;vertical-align:top}
+  .fire-tbl th{color:var(--gold-light);font-size:10px;text-transform:uppercase;letter-spacing:0.5px}
+  .fire-tbl input{padding:5px 6px;border-radius:7px;border:1px solid var(--sage);background:var(--parchment);font-size:12px}
+  .fire-check{display:flex;align-items:center;gap:10px;padding:11px 12px;background:#fff;border-radius:11px;margin-bottom:7px;cursor:pointer;font-size:14px;color:var(--forest);font-weight:600}
+  .fire-check input{width:22px;height:22px;accent-color:#1A7A4A}
+  .fd-sec{font-family:'Playfair Display',serif;color:var(--forest);font-size:15px;margin:16px 0 6px}
+  .fd-kv{display:grid;grid-template-columns:170px 1fr;gap:4px 12px;font-size:13px;color:var(--forest)}
+  .fd-kv div:nth-child(odd){color:var(--bark);font-weight:700}
+  .fd-text{font-size:13px;color:#333;white-space:pre-wrap;background:#fff;border-radius:10px;padding:9px 11px}
 </style>
 </head>
 <body>
@@ -309,6 +369,7 @@
     <div class="logo-text"><h1>Little Puddings</h1><p>Sign In &amp; Out</p></div>
   </div>
   <div class="header-right">
+    <button class="mgr-btn fire-btn" onclick="fireOpenStart()" style="margin-right:6px">🔥 Fire</button>
     <button class="mgr-btn" id="mgrBtn" onclick="mgrBtnClick()">⚙ Manager</button>
     <button class="mgr-btn" id="depBtn" onclick="depBtnClick()" style="margin-left:6px;background:var(--moss)">Deputy</button>
     <div class="htime">
@@ -362,6 +423,7 @@
     <button class="tab mgr-only" onclick="setTab('payroll')"  style="display:none">Payroll</button>
     <button class="tab mgr-only" onclick="setTab('reports')"  style="display:none">Reports</button>
     <button class="tab mgr-only" onclick="setTab('settings')" style="display:none">Settings</button>
+    <button class="tab mgr-only dep-ok" onclick="setTab('fire')" style="display:none">Fire Safety</button>
   </div>
 
   <!-- CHILDREN -->
@@ -371,6 +433,7 @@
   <div id="panel-staff" style="display:none">
     <div class="sec-head"><div class="sec-label">Staff</div><div class="sec-line"></div></div>
     <div class="sec-sub">Tap your name · PIN required</div>
+    <div id="fireStaffPrompts"></div>
     <div class="staff-list" id="staffList"></div>
   </div>
 
@@ -532,6 +595,8 @@
     <div id="soleChargeList"></div>
   </div>
 
+  <div id="panel-fire" style="display:none"><div id="fireTabBody"></div></div>
+
   <div id="panel-reports" style="display:none">
     <div class="sec-head"><div class="sec-label">Reports & Registers</div><div class="sec-line"></div></div>
     <div class="sec-sub">PDF registers for safeguarding, Ofsted and funding audits</div>
@@ -625,7 +690,7 @@
     </div>
   </div>
 </div>
-<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 26Oct-c</div>
+<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 1Nov-fire</div>
 
 <!-- PAY WORKBOOK EXPORT PREVIEW OVERLAY -->
 <div class="overlay" id="payPreviewOv">
@@ -665,6 +730,37 @@
 </div>
 
 <!-- PIN OVERLAY -->
+
+<!-- ═══ FIRE SAFETY (v7) ═══ -->
+<div class="overlay" id="fireStartOv">
+  <div class="fire-modal" style="max-width:460px">
+    <h2>Fire</h2>
+    <div class="fm-sub">No PIN needed. Starting takes a snapshot of every child, adult and visitor signed in right now, ready to count at the assembly point.</div>
+    <button class="fire-big fire-go" onclick="fireStart('drill')">Start a fire drill</button>
+    <button class="fire-big fire-real" onclick="fireStart('real')">Real fire: evacuate now</button>
+    <button class="fire-big fire-cx" onclick="fireCloseOv('fireStartOv')">Cancel</button>
+  </div>
+</div>
+
+<div class="fire-run" id="fireRun"></div>
+
+<div class="overlay" id="fireWriteOv"><div class="fire-modal" id="fireWriteBody"></div></div>
+<div class="overlay" id="fireSignOv" style="z-index:320">
+  <div class="fire-modal" style="max-width:420px">
+    <h2 id="fireSignTitle">Sign</h2>
+    <div class="fm-sub" id="fireSignSub">Choose your name and enter your own sign-in PIN.</div>
+    <label class="af-label">Your name</label>
+    <select class="af-select" id="fireSignStaff"></select>
+    <label class="af-label">Your PIN</label>
+    <input class="af-input" id="fireSignPin" type="password" inputmode="numeric" maxlength="8" autocomplete="off" style="font-size:20px;letter-spacing:6px;text-align:center">
+    <div id="fireSignErr" style="color:#A13A2A;font-size:12px;font-weight:700;min-height:18px;margin-top:6px"></div>
+    <button class="fire-big fire-go" style="margin-top:6px" onclick="fireSignConfirm()">Sign</button>
+    <button class="fire-big fire-cx" onclick="fireCloseOv('fireSignOv')">Back</button>
+  </div>
+</div>
+<div class="overlay" id="fireCheckOv"><div class="fire-modal" id="fireCheckBody" style="max-width:520px"></div></div>
+<div class="overlay" id="fireDetailOv"><div class="fire-modal" id="fireDetailBody"></div></div>
+
 <div class="overlay" id="pinOv">
   <div class="pin-modal" id="pinModal">
     <div class="pm-av" id="pmAv"></div>
@@ -1254,6 +1350,7 @@ async function syncWithOneDrive() {
           });
         });
       }
+      fireMergeRemote(remoteData);
       // For children & staff — only use remote if remote version is same or newer
       const remoteVersion = remoteData.dataVersion || 1;
       const remoteHasNewerData = remoteVersion >= DATA_VERSION;
@@ -1281,7 +1378,7 @@ async function syncWithOneDrive() {
     const payload = JSON.stringify({
       dataVersion: DATA_VERSION,
       CHILDREN, STAFF, attendance, staffLog, eventLog, overrides, absences,
-      collectedFromSchool, droppedOffAtSchool, visitors, soleCharge, staffOverrides, overtime, authorised, archivedState, carriedOver, pinCustomised, termDates, timesheet, managerPin, deputyPin, lastUpdated: new Date().toISOString()
+      collectedFromSchool, droppedOffAtSchool, visitors, soleCharge, staffOverrides, overtime, authorised, archivedState, carriedOver, pinCustomised, termDates, timesheet, managerPin, deputyPin, fireDrills, fireChecks, fireSettings, lastUpdated: new Date().toISOString()
     });
     
     const uploadUrl = `https://graph.microsoft.com/v1.0/me/drive/root:/${SYNC_FOLDER}/${encodeURIComponent(SYNC_FILE)}:/content`;
@@ -1334,6 +1431,7 @@ function saveLocal(){
       dataVersion: DATA_VERSION,
       CHILDREN, STAFF, attendance, staffLog, eventLog, overrides, absences,
       collectedFromSchool, droppedOffAtSchool, visitors, soleCharge, staffOverrides, overtime, authorised, archivedState, carriedOver, pinCustomised, termDates, timesheet, managerPin, deputyPin,
+      fireDrills, fireChecks, fireSettings,
       pendingSync: dataDirty, savedAt: new Date().toISOString()
     }));
   } catch(e){ console.warn('On-device save failed (storage full/unavailable):', e); }
@@ -1364,6 +1462,7 @@ function loadLocal(){
     if(d.carriedOver) carriedOver = d.carriedOver;
     applyArchivedState();
     if(d.timesheet) timesheet = d.timesheet;
+    fireLoadSaved(d);
     if(d.dataVersion === DATA_VERSION){
       if(d.CHILDREN && d.CHILDREN.length) CHILDREN = d.CHILDREN;
       if(d.STAFF && d.STAFF.length && d.STAFF[0].hourlyRate !== undefined) STAFF = d.STAFF;
@@ -1397,6 +1496,7 @@ function collectAllState(){
     collectedFromSchool, droppedOffAtSchool, visitors, soleCharge, staffOverrides,
     overtime, authorised, archivedState, carriedOver, pinCustomised, termDates, timesheet,
     managerPin, deputyPin,
+    fireDrills, fireChecks, fireSettings,
     exportedAt: new Date().toISOString()
   };
 }
@@ -1476,6 +1576,7 @@ function applyRestoredState(d){
     if(typeof d.deputyPin === 'string')  deputyPin = d.deputyPin;
     if(Array.isArray(d.termDates)) termDates = d.termDates;
     if(d.timesheet)             timesheet = d.timesheet;
+    fireLoadSaved(d);
     applyArchivedState();
     // Persist the restored state on the device, then push to OneDrive if connected.
     dataDirty = true;
@@ -1828,6 +1929,638 @@ let collectedFromSchool = {}; // [dateKey][childId] = true — skip afternoon au
 let droppedOffAtSchool = {}; // [dateKey][childId] = true — skip morning auto sign-out (parent doing school drop)
 let visitors = {}; // [dateKey] = [{id, name, reason, reg, purpose, signInTime, signOutTime, visiting}]
 let soleCharge = {}; // [dateKey] = [{id, inCharge, from, to, staffPresent:[names], children:[names], count, note, recordedBy}]
+
+// ════════════════════════════════════════════════
+// FIRE SAFETY (v7)
+// Fire drills and real evacuations run from the door tablet with no PIN, so
+// nothing slows anyone down. The roll call is a snapshot of who is signed in at
+// the moment the drill starts. Everything works offline: the run in progress is
+// kept on the device (FIRE_ACTIVE_KEY) so a refresh or reboot carries on where it
+// left off. Finished drills are written up with a staff PIN, approved by the
+// manager, then locked (follow-up comments only). No names live in this code:
+// people come from the private data, and the setting address is entered in the
+// Fire Safety tab and stored with the data, not here.
+// ════════════════════════════════════════════════
+let fireDrills = {};    // [id] = drill record (see fireFinish)
+let fireChecks = {};    // [mondayKey] = {items:{}, notes, by, byName, at}
+let fireSettings = { at:0, address:'', assembly:'', plan:{} }; // plan[YYYY-MM] = 'YYYY-MM-DD'
+const FIRE_ACTIVE_KEY = 'lp_fire_active_v1';
+let fireActive = null;  // the drill currently running on this device
+let fireTimer = null;
+let fireWakeLock = null;
+
+const FIRE_PLAN = [
+  ['2026-11', 2, 'Mid-morning',            'Everyday play; both exits walked; first timed baseline'],
+  ['2026-12', 4, 'Sleep time',             'Lifting sleeping children; sweep of the sleep area'],
+  ['2027-01', 1, 'Arrivals, 7.30 to 8.30', 'Busy door; parents on site; register still filling'],
+  ['2027-02', 5, 'Late afternoon',         'Collections under way; children signing out'],
+  ['2027-03', 3, 'Lunchtime',              'Children at the table and in high chairs'],
+  ['2027-04', 2, 'Morning',                'Main exit treated as blocked; second exit used'],
+  ['2027-05', 4, 'Garden time',            'Gathering children from outdoors'],
+  ['2027-06', 1, 'Sleep time',             'Sleeping children again, with a different team'],
+  ['2027-07', 3, 'School holidays',        'Bigger mixed-age group with school children'],
+  ['2027-08', 5, 'Mid-afternoon',          'Toileting or a nappy change in progress'],
+  ['2027-09', 2, 'Morning',                'New starters’ first drill; new staff walk-through first'],
+  ['2027-10', 4, 'Lead’s choice',     'Count test: one adult waits elsewhere by arrangement, so the register check must spot them'],
+];
+const FIRE_CHECK_ITEMS = [
+  ['alarms',  'Smoke alarms tested'],
+  ['exits',   'Both exits and routes clear'],
+  ['keys',    'Keys by the exits'],
+  ['blanket', 'Fire blanket and extinguisher in place'],
+  ['tablet',  'Tablet charged and in its holder'],
+  ['grabbag', 'Grab bag stocked'],
+];
+const FIRE_DOW = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+
+function fEsc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fMMSS(ms){ if(ms==null||ms<0) return '--:--'; const s=Math.floor(ms/1000); return p2(Math.floor(s/60))+':'+p2(s%60); }
+function fMinsSecs(ms){ if(ms==null) return 'not recorded'; const s=Math.round(ms/1000), m=Math.floor(s/60), r=s%60; return (m?m+' min ':'')+r+' sec'; }
+function fDateOf(rec){ const [y,m,d]=rec.date.split('-').map(Number); return new Date(y,m-1,d); }
+function fNiceDate(rec){ const d=fDateOf(rec); return DAYS[d.getDay()]+' '+fmtUK(d); }
+function fireList(){ return Object.values(fireDrills).filter(r=>r && !r.deleted).sort((a,b)=>(b.startedMs||0)-(a.startedMs||0)); }
+function fireStaffActive(){ return STAFF.filter(s=>!s.archived).sort((a,b)=>a.name.localeCompare(b.name)); }
+function fireStatusLabel(r){
+  if(r.status==='approved') return '<span class="fire-badge fb-ok">Approved</span>';
+  if(r.status==='submitted') return '<span class="fire-badge fb-sub">Awaiting approval</span>';
+  return '<span class="fire-badge fb-need">Needs writing up</span>';
+}
+function fireTouch(rec){ rec.at = Date.now(); fireDrills[rec.id] = rec; markDirty(); }
+function fireCloseOv(id){ document.getElementById(id).classList.remove('vis'); }
+function fireOpenOv(id){ document.getElementById(id).classList.add('vis'); }
+
+// ── persistence of the run in progress (device only, survives reload) ──
+function fireSaveActive(){ try{ if(fireActive) localStorage.setItem(FIRE_ACTIVE_KEY, JSON.stringify(fireActive)); else localStorage.removeItem(FIRE_ACTIVE_KEY); }catch(e){} }
+function fireLoadActive(){ try{ const raw=localStorage.getItem(FIRE_ACTIVE_KEY); if(raw) fireActive=JSON.parse(raw); }catch(e){ fireActive=null; } }
+
+// ── starting ──
+function fireOpenStart(){
+  if(fireActive){ fireShowRun(); return; }
+  fireOpenOv('fireStartOv');
+}
+function fireSnapshot(){
+  const t = today0(), k = dk(t), roll = [];
+  CHILDREN.filter(c=>!c.archived).forEach(c=>{
+    const a = readAtt(c.id, t);
+    if(a && a.signInTime && !a.signOutTime) roll.push({kind:'child', id:c.id, name:cName(c), status:'pending', at:null});
+  });
+  STAFF.filter(s=>!s.archived).forEach(s=>{
+    const l = staffLog[s.id] && staffLog[s.id][k];
+    if(l && l.clockedIn) roll.push({kind:'staff', id:s.id, name:s.name, status:'pending', at:null});
+  });
+  (visitors[k]||[]).filter(v=>v && v.signInTime && !v.signOutTime).forEach(v=>{
+    roll.push({kind:'visitor', id:v.id, name:v.name, status:'pending', at:null});
+  });
+  roll.sort((a,b)=>a.name.localeCompare(b.name));
+  return roll;
+}
+function fireStart(type){
+  fireCloseOv('fireStartOv');
+  const now = new Date();
+  fireActive = {
+    id: 'fd_'+now.getTime().toString(36),
+    type, date: dk(now), startClock: ts(now), startedMs: now.getTime(),
+    outMs: null, countedMs: null, roll: fireSnapshot(), extras: []
+  };
+  fireSaveActive();
+  fireShowRun();
+}
+
+// ── the run screen ──
+function fireShowRun(){
+  document.getElementById('fireRun').classList.add('vis');
+  fireRenderRun();
+  if(fireTimer) clearInterval(fireTimer);
+  fireTimer = setInterval(fireTick, 500);
+  try{ if(navigator.wakeLock && !fireWakeLock) navigator.wakeLock.request('screen').then(w=>{ fireWakeLock=w; }).catch(()=>{}); }catch(e){}
+}
+function fireHideRun(){
+  document.getElementById('fireRun').classList.remove('vis');
+  if(fireTimer){ clearInterval(fireTimer); fireTimer=null; }
+  try{ if(fireWakeLock){ fireWakeLock.release(); fireWakeLock=null; } }catch(e){}
+}
+function fireTick(){
+  const el = document.getElementById('frTimer');
+  if(!el || !fireActive) return;
+  const stop = fireActive.countedMs;
+  el.textContent = fMMSS((stop!=null ? fireActive.startedMs+stop : Date.now()) - fireActive.startedMs);
+}
+function fireCounts(){
+  const r = fireActive.roll, by = k => r.filter(x=>x.kind===k);
+  const c = k => { const all=by(k); return { found: all.filter(x=>x.status==='found').length, total: all.filter(x=>x.status!=='absent').length }; };
+  const missing = r.filter(x=>x.status==='pending').length;
+  return { child:c('child'), staff:c('staff'), visitor:c('visitor'), missing };
+}
+function fireRenderRun(){
+  const a = fireActive, box = document.getElementById('fireRun');
+  if(!a){ box.innerHTML=''; return; }
+  const n = fireCounts(), real = a.type==='real';
+  const addr = fireSettings.address ? fEsc(fireSettings.address) : 'give the setting address';
+  const tile = (x,i) => {
+    const st = x.status==='found' ? '✓ Here at '+fMMSS(x.at)
+             : x.status==='absent' ? 'Not on site' : 'Not yet seen';
+    return `<div class="fr-tile ${x.status}" onclick="fireToggle(${i})">
+      <div class="nm">${fEsc(x.name)}</div><div class="st">${st}</div>
+      ${x.status==='pending'?`<button class="ns" onclick="event.stopPropagation();fireAbsent(${i})">Not on site</button>`:''}
+      ${x.status==='absent'?`<button class="ns" onclick="event.stopPropagation();fireAbsent(${i})">Undo</button>`:''}
+    </div>`;
+  };
+  const group = (kind,label) => {
+    const items = a.roll.map((x,i)=>({x,i})).filter(o=>o.x.kind===kind);
+    if(!items.length) return '';
+    return `<div class="fr-group">${label}</div><div class="fr-grid">${items.map(o=>tile(o.x,o.i)).join('')}</div>`;
+  };
+  const allOk = n.missing===0;
+  box.innerHTML = `
+    <div class="fr-top">
+      <div><div class="fr-title">${real?'Evacuation':'Fire drill'}</div>
+        <div style="font-size:12px;color:var(--bark)">Started ${a.startClock}</div></div>
+      <div class="fr-timer" id="frTimer">00:00</div>
+    </div>
+    ${real?`<div class="fr-real-banner">Call 999 from a safe place: ${addr}.<br>Never go back inside.</div>`:''}
+    <div class="fr-stage">
+      ${a.outMs==null
+        ? `<button class="fr-out" onclick="fireOut()">Everyone is out</button>`
+        : `<button class="fr-out done">Out in ${fMMSS(a.outMs)}</button>`}
+    </div>
+    <div class="fr-counts">
+      ${allOk ? `<span class="fr-chip allok">Everyone accounted for${a.countedMs!=null?' in '+fMMSS(a.countedMs):''}</span>`
+              : `<span class="fr-chip miss">${n.missing} not yet seen</span>`}
+      <span class="fr-chip">Children ${n.child.found} of ${n.child.total}</span>
+      <span class="fr-chip">Adults ${n.staff.found} of ${n.staff.total}</span>
+      ${n.visitor.total||a.roll.some(x=>x.kind==='visitor')?`<span class="fr-chip">Visitors ${n.visitor.found} of ${n.visitor.total}</span>`:''}
+    </div>
+    <div style="font-size:12px;color:var(--bark);margin-bottom:4px">Tap each person as you see them. Anyone signed in who is not actually here: tap Not on site.</div>
+    ${a.roll.length?'':'<div class="fr-real-banner" style="background:#FBF3DC;border-color:#D4A017;color:#6B4F3A">Nobody is signed in on this tablet. Count everyone by sight and add them below.</div>'}
+    ${group('child','Children')}
+    ${group('staff','Adults')}
+    ${group('visitor','Visitors')}
+    ${a.extras.length?`<div class="fr-group">Here but not signed in</div><div class="fr-grid">${a.extras.map((x,i)=>`<div class="fr-tile found"><div class="nm">${fEsc(x.name)}</div><div class="st">Added at ${fMMSS(x.at)}</div><button class="ns" onclick="fireRemoveExtra(${i})">Remove</button></div>`).join('')}</div>`:''}
+    <button onclick="fireAddExtra()" style="margin-top:12px;padding:11px 14px;border-radius:11px;border:2px dashed var(--sage);background:transparent;color:var(--forest);font-weight:700;cursor:pointer">+ Someone here who is not on the list</button>
+    <div class="fr-bottom">
+      <button style="background:var(--parchment);color:var(--forest);flex:0.6" onclick="fireCancelRun()">Started by mistake</button>
+      <button style="background:var(--forest);color:var(--gold-light)" onclick="fireFinishAsk()">Finish</button>
+    </div>`;
+  fireTick();
+}
+function fireElapsed(){ return Date.now() - fireActive.startedMs; }
+function fireRecount(){
+  const n = fireCounts();
+  if(n.missing===0 && fireActive.countedMs==null){
+    fireActive.countedMs = fireElapsed();
+    try{ showFlash('✓ Everyone accounted for in '+fMMSS(fireActive.countedMs)); }catch(e){}
+  } else if(n.missing>0){ fireActive.countedMs = null; }
+  fireSaveActive(); fireRenderRun();
+}
+function fireToggle(i){
+  const x = fireActive.roll[i]; if(!x) return;
+  if(x.status==='found'){ x.status='pending'; x.at=null; }
+  else if(x.status==='pending'){ x.status='found'; x.at=fireElapsed(); }
+  else return;
+  fireRecount();
+}
+function fireAbsent(i){
+  const x = fireActive.roll[i]; if(!x) return;
+  if(x.status==='absent'){ x.status='pending'; x.at=null; } else { x.status='absent'; x.at=fireElapsed(); }
+  fireRecount();
+}
+function fireOut(){ if(fireActive.outMs==null){ fireActive.outMs = fireElapsed(); fireSaveActive(); fireRenderRun(); } }
+function fireAddExtra(){
+  const name = (prompt('Name of the person who is here but was not signed in:')||'').trim();
+  if(!name) return;
+  fireActive.extras.push({name, at:fireElapsed()});
+  fireSaveActive(); fireRenderRun();
+}
+function fireRemoveExtra(i){ fireActive.extras.splice(i,1); fireSaveActive(); fireRenderRun(); }
+function fireCancelRun(){
+  if(!confirm('Cancel this and keep no record? Only do this if it was started by mistake.')) return;
+  fireActive=null; fireSaveActive(); fireHideRun();
+}
+function fireFinishAsk(){
+  const n = fireCounts();
+  if(n.missing>0 && !confirm(n.missing+' '+(n.missing===1?'person is':'people are')+' still not marked as seen. Finish anyway? They will show on the record as not accounted for.')) return;
+  fireFinish();
+}
+function fireFinish(){
+  const a = fireActive;
+  const notOnSite = a.roll.filter(x=>x.status==='absent').length;
+  const unseen = a.roll.filter(x=>x.status==='pending').length;
+  const rec = {
+    id:a.id, type:a.type, date:a.date, startClock:a.startClock, startedMs:a.startedMs,
+    outMs:a.outMs, countedMs:a.countedMs, endedMs:Date.now()-a.startedMs,
+    roll:a.roll, extras:a.extras,
+    matched: notOnSite===0 && unseen===0 && a.extras.length===0,
+    counts:{ children:a.roll.filter(x=>x.kind==='child').length, staff:a.roll.filter(x=>x.kind==='staff').length,
+             visitors:a.roll.filter(x=>x.kind==='visitor').length, notOnSite, unseen, extras:a.extras.length },
+    status:'needs-writeup', write:null, comments:[]
+  };
+  fireTouch(rec);
+  fireActive=null; fireSaveActive();
+  fireRenderSummary(rec);
+}
+function fireRenderSummary(rec){
+  const box = document.getElementById('fireRun');
+  const last = fireList().filter(r=>r.id!==rec.id && r.type==='drill')[0];
+  box.innerHTML = `
+    <div class="fr-title" style="margin-bottom:6px">${rec.type==='real'?'Evacuation recorded':'Drill recorded'}</div>
+    <div style="font-size:13px;color:var(--bark);margin-bottom:16px">${fNiceDate(rec)}, started ${rec.startClock}</div>
+    <div class="fd-kv" style="font-size:15px">
+      <div>Everyone out</div><div>${fMinsSecs(rec.outMs)}</div>
+      <div>Everyone counted</div><div>${rec.countedMs!=null?fMinsSecs(rec.countedMs):'Not everyone was accounted for'}</div>
+      ${last?`<div>Last drill</div><div>out ${fMinsSecs(last.outMs)}, counted ${fMinsSecs(last.countedMs)}</div>`:''}
+      <div>Register matched</div><div>${rec.matched?'Yes':'No: '+fireMismatchText(rec)}</div>
+    </div>
+    <div style="margin-top:22px;max-width:520px">
+      <button class="fire-big fire-go" onclick="fireHideRun();fireOpenWrite('${rec.id}')">Write it up now</button>
+      <button class="fire-big fire-cx" onclick="fireHideRun();renderAll()">Write up later</button>
+      <div style="font-size:12px;color:var(--bark)">A reminder stays on the Staff tab until it is written up.</div>
+    </div>`;
+}
+function fireMismatchText(r){
+  const c = r.counts||{}, bits=[];
+  if(c.notOnSite) bits.push(c.notOnSite+' signed in but not on site');
+  if(c.extras) bits.push(c.extras+' here but not signed in');
+  if(c.unseen) bits.push(c.unseen+' not accounted for');
+  return bits.join('; ') || 'see record';
+}
+
+// ── write-up ──
+let fireWriteId = null;
+function fireOpenWrite(id){
+  const r = fireDrills[id]; if(!r) return;
+  if(r.status==='approved'){ alert('This record has been approved and is now locked. Follow-up comments can be added in the Fire Safety tab.'); return; }
+  fireWriteId = id;
+  const w = r.write || {};
+  const plan = FIRE_PLAN.find(p=>p[0]===r.date.slice(0,7));
+  const acts = (w.actions && w.actions.length ? w.actions : []).concat([{},{},{}]).slice(0, Math.max(3,(w.actions||[]).length));
+  const staffOpts = '<option value="">Choose</option>'+fireStaffActive().map(s=>`<option value="${fEsc(s.id)}" ${w.lead===s.id?'selected':''}>${fEsc(s.name)}</option>`).join('');
+  const ta = (id,label,hint,val)=>`<label class="af-label">${label}</label>${hint?`<div style="font-size:11px;color:var(--bark);margin:-2px 0 4px">${hint}</div>`:''}<textarea class="af-input" id="${id}">${fEsc(val||'')}</textarea>`;
+  document.getElementById('fireWriteBody').innerHTML = `
+    <h2>${r.type==='real'?'Evacuation':'Fire drill'} record</h2>
+    <div class="fm-sub">${fNiceDate(r)}, started ${r.startClock}. Out in ${fMinsSecs(r.outMs)}; counted in ${r.countedMs!=null?fMinsSecs(r.countedMs):'not complete'}. Register matched: ${r.matched?'yes':'no ('+fEsc(fireMismatchText(r))+')'}.</div>
+    <label class="af-label">Led by</label><select class="af-select" id="fwLead">${staffOpts}</select>
+    <label class="af-label">What this drill tested</label>
+    <input class="af-input" id="fwTested" value="${fEsc(w.tested!=null?w.tested:(plan?plan[3]:''))}">
+    ${r.type==='drill'?`<label class="af-label">Staff told beforehand</label>
+    <select class="af-select" id="fwTold">
+      <option value="">Choose</option>
+      <option ${w.told==='The week only'?'selected':''}>The week only</option>
+      <option ${w.told==='Not told'?'selected':''}>Not told</option>
+      <option ${w.told==='Told the day and time (walk-through)'?'selected':''}>Told the day and time (walk-through)</option>
+    </select>`:''}
+    <label class="af-label">Exit or exits used</label><input class="af-input" id="fwExits" value="${fEsc(w.exits||'')}">
+    <label class="af-label">How the alarm was raised</label><input class="af-input" id="fwAlarm" value="${fEsc(w.alarm||'')}">
+    ${ta('fwWell','What went well','',w.well)}
+    ${ta('fwSlow','What slowed us down or did not go to plan','',w.slow)}
+    ${ta('fwKids','How the children responded','Anyone worried, unsettled or who needed extra help',w.kids)}
+    ${ta('fwPlans','Individual plans','Any child or adult with a different plan: did it work?',w.plans)}
+    ${r.matched?'':ta('fwMismatch','Why the register did not match','',w.mismatch)}
+    <label class="af-label">Actions</label>
+    <div id="fwActs">${acts.map((x,i)=>fireActRow(x,i)).join('')}</div>
+    <button onclick="fireAddActRow()" style="margin-top:4px;padding:7px 11px;border-radius:8px;border:2px dashed var(--sage);background:transparent;color:var(--forest);font-weight:700;cursor:pointer;font-size:12px">+ Another action</button>
+    <div style="display:flex;gap:10px;margin-top:20px;flex-wrap:wrap">
+      <button class="fire-big fire-cx" style="flex:1" onclick="fireSaveDraft()">Save draft</button>
+      <button class="fire-big fire-go" style="flex:1.4" onclick="fireSubmitAsk()">Sign and send for approval</button>
+    </div>
+    <button class="fire-big fire-cx" onclick="fireCloseOv('fireWriteOv')">Close</button>`;
+  fireOpenOv('fireWriteOv');
+}
+function fireActRow(x,i){
+  return `<div style="display:grid;grid-template-columns:1fr 130px 120px;gap:6px;margin-bottom:6px">
+    <input class="af-input fwA" placeholder="What we will change" value="${fEsc(x.what||'')}">
+    <input class="af-input fwW" placeholder="Who" value="${fEsc(x.who||'')}">
+    <input class="af-input fwB" type="date" value="${fEsc(x.by||'')}"></div>`;
+}
+function fireAddActRow(){ document.getElementById('fwActs').insertAdjacentHTML('beforeend', fireActRow({},0)); }
+function fireReadForm(){
+  const v = id => { const el=document.getElementById(id); return el?el.value.trim():''; };
+  const A=[...document.querySelectorAll('#fwActs .fwA')], W=[...document.querySelectorAll('#fwActs .fwW')], B=[...document.querySelectorAll('#fwActs .fwB')];
+  const actions = A.map((a,i)=>({what:a.value.trim(), who:W[i].value.trim(), by:B[i].value})).filter(x=>x.what);
+  return { lead:v('fwLead'), tested:v('fwTested'), told:v('fwTold'), exits:v('fwExits'), alarm:v('fwAlarm'),
+           well:v('fwWell'), slow:v('fwSlow'), kids:v('fwKids'), plans:v('fwPlans'), mismatch:v('fwMismatch'), actions };
+}
+function fireSaveDraft(){
+  const r = fireDrills[fireWriteId]; if(!r) return;
+  r.write = Object.assign({}, r.write||{}, fireReadForm());
+  fireTouch(r); fireCloseOv('fireWriteOv'); renderAll(); showFlash('Draft saved');
+}
+function fireSubmitAsk(){
+  const f = fireReadForm(), r = fireDrills[fireWriteId];
+  const missing = [];
+  if(!f.lead) missing.push('who led it');
+  if(!f.well) missing.push('what went well');
+  if(!f.slow) missing.push('what slowed you down (write "Nothing" if so)');
+  if(!r.matched && !f.mismatch) missing.push('why the register did not match');
+  if(missing.length){ alert('Please add '+missing.join(', ')+' before signing.'); return; }
+  fireAskSign('Sign this record', 'Choose your name and enter your own sign-in PIN.', staffId=>{
+    const s = STAFF.find(x=>x.id===staffId);
+    r.write = Object.assign({}, r.write||{}, f, { by:staffId, byName:s?s.name:'', at:Date.now() });
+    r.status = 'submitted';
+    fireTouch(r); fireCloseOv('fireWriteOv'); renderAll();
+    showFlash('✓ Sent for approval');
+  });
+}
+
+// ── staff signature (name + own PIN) ──
+let fireSignCb = null;
+function fireAskSign(title, sub, cb){
+  fireSignCb = cb;
+  document.getElementById('fireSignTitle').textContent = title;
+  document.getElementById('fireSignSub').textContent = sub;
+  document.getElementById('fireSignStaff').innerHTML = '<option value="">Choose</option>'+fireStaffActive().map(s=>`<option value="${fEsc(s.id)}">${fEsc(s.name)}</option>`).join('');
+  document.getElementById('fireSignPin').value='';
+  document.getElementById('fireSignErr').textContent='';
+  fireOpenOv('fireSignOv');
+}
+function fireSignConfirm(){
+  const id = document.getElementById('fireSignStaff').value, pin = document.getElementById('fireSignPin').value;
+  const s = STAFF.find(x=>x.id===id), err = document.getElementById('fireSignErr');
+  if(!s){ err.textContent='Choose your name'; return; }
+  if(!pin || pin!==s.pin){ err.textContent='That PIN does not match. Please try again.'; document.getElementById('fireSignPin').value=''; return; }
+  fireCloseOv('fireSignOv');
+  const cb = fireSignCb; fireSignCb=null; if(cb) cb(id);
+}
+
+// ── weekly checks ──
+function fireWeekKey(d){ return dk(mondayOf(d||new Date())); }
+function fireOpenChecks(){
+  const wk = fireWeekKey(), c = fireChecks[wk] || {items:{}};
+  document.getElementById('fireCheckBody').innerHTML = `
+    <h2>Weekly fire safety checks</h2>
+    <div class="fm-sub">Week beginning ${fmtUK(mondayOf(new Date()))}. Tick each one you have checked.</div>
+    ${FIRE_CHECK_ITEMS.map(([k,l])=>`<label class="fire-check"><input type="checkbox" id="fc_${k}" ${c.items&&c.items[k]?'checked':''}> ${l}</label>`).join('')}
+    <label class="af-label">Anything not right, and what you did</label>
+    <textarea class="af-input" id="fcNotes">${fEsc(c.notes||'')}</textarea>
+    <button class="fire-big fire-go" style="margin-top:16px" onclick="fireSaveChecks()">Sign checks</button>
+    <button class="fire-big fire-cx" onclick="fireCloseOv('fireCheckOv')">Close</button>`;
+  fireOpenOv('fireCheckOv');
+}
+function fireSaveChecks(){
+  const items = {}; FIRE_CHECK_ITEMS.forEach(([k])=>{ items[k]=document.getElementById('fc_'+k).checked; });
+  const notes = document.getElementById('fcNotes').value.trim();
+  const unticked = FIRE_CHECK_ITEMS.filter(([k])=>!items[k]);
+  if(unticked.length && !notes){ alert('Some checks are not ticked. Please say what was not right, and what you did, in the notes.'); return; }
+  fireAskSign('Sign the weekly checks', 'Choose your name and enter your own sign-in PIN.', staffId=>{
+    const s = STAFF.find(x=>x.id===staffId);
+    fireChecks[fireWeekKey()] = { items, notes, by:staffId, byName:s?s.name:'', at:Date.now() };
+    markDirty(); fireCloseOv('fireCheckOv'); renderAll(); showFlash('✓ Weekly checks signed');
+  });
+}
+
+// ── reminders on the Staff tab (no names shown, safe at the door) ──
+function renderFireStaffPrompts(){
+  const box = document.getElementById('fireStaffPrompts'); if(!box) return;
+  const cards = [];
+  if(fireActive) cards.push(`<div class="fire-card"><span>A ${fireActive.type==='real'?'evacuation':'fire drill'} is still running on this tablet.</span><button onclick="fireShowRun()">Open</button></div>`);
+  fireList().filter(r=>r.status==='needs-writeup').forEach(r=>{
+    cards.push(`<div class="fire-card"><span>The ${r.type==='real'?'evacuation':'fire drill'} on <b>${fNiceDate(r)}</b> needs writing up.</span><button onclick="fireOpenWrite('${r.id}')">Write up</button></div>`);
+  });
+  const dow = new Date().getDay();
+  if(dow>=1 && dow<=5 && !fireChecks[fireWeekKey()]) cards.push(`<div class="fire-card"><span>This week's <b>fire safety checks</b> are due.</span><button onclick="fireOpenChecks()">Do checks</button></div>`);
+  box.innerHTML = cards.join('');
+}
+
+// ── who has taken part this term ──
+function fireTermStart(){
+  const t = today0(), r = getTermRanges().find(([s,e])=>t>=s && t<=e);
+  if(r) return r[0];
+  const past = getTermRanges().filter(([s,e])=>e<t).sort((a,b)=>b[1]-a[1])[0];
+  if(past){ const x=new Date(past[1]); x.setDate(x.getDate()+1); return x; }
+  const x = new Date(t); x.setMonth(x.getMonth()-4); return x;
+}
+function fireCoverage(){
+  const from = dk(fireTermStart()), drills = fireList().filter(r=>r.date>=from);
+  const took = new Set();
+  drills.forEach(r=>(r.roll||[]).forEach(x=>{ if(x.status==='found') took.add(x.kind+':'+x.id); }));
+  const kids = CHILDREN.filter(c=>!c.archived && !took.has('child:'+c.id) && !(c.endDate && c.endDate<dk(today0())));
+  const staff = STAFF.filter(s=>!s.archived && !took.has('staff:'+s.id) && !(s.endDate && s.endDate<dk(today0())));
+  const score = [1,2,3,4,5].map(d=>({d, n: kids.filter(c=>(c.days||[]).includes(d)).length + staff.filter(s=>s.sch && s.sch[d]).length}));
+  score.sort((a,b)=>b.n-a.n);
+  return { from, drills:drills.length, kids, staff, best: score[0] && score[0].n ? score[0] : null };
+}
+
+// ── Fire Safety tab (Manager / Deputy) ──
+function renderFireTab(){
+  const box = document.getElementById('fireTabBody'); if(!box) return;
+  const list = fireList(), cov = fireCoverage(), wk = fireWeekKey(), chk = fireChecks[wk];
+  const lastDrill = list.find(r=>r.type==='drill');
+  const awaiting = list.filter(r=>r.status==='submitted').length, needs = list.filter(r=>r.status==='needs-writeup').length;
+  const rows = list.slice(0,40).map(r=>`
+    <div class="fire-row">
+      <div style="min-width:120px"><b style="color:var(--gold-light)">${fNiceDate(r)}</b><br><span style="opacity:0.7">${r.type==='real'?'Real evacuation':'Drill'} at ${r.startClock}</span></div>
+      <div style="min-width:150px">Out ${fMMSS(r.outMs)} · counted ${r.countedMs!=null?fMMSS(r.countedMs):'incomplete'}<br><span style="opacity:0.7">${(r.counts&&r.counts.children)||0} children, ${(r.counts&&r.counts.staff)||0} adults · ${r.matched?'register matched':'register did not match'}</span></div>
+      <div>${fireStatusLabel(r)}</div>
+      <div style="margin-left:auto;display:flex;gap:6px">
+        <button class="fire-sbtn" onclick="fireOpenDetail('${r.id}')">View</button>
+        ${r.status!=='approved'?`<button class="fire-sbtn" style="background:var(--moss)" onclick="fireOpenWrite('${r.id}')">${r.status==='needs-writeup'?'Write up':'Edit'}</button>`:''}
+      </div>
+    </div>`).join('') || '<div style="color:rgba(255,255,255,0.5);font-size:12px">No drills recorded yet. Start one with the Fire button at the top of the screen.</div>';
+  const plan = FIRE_PLAN.map(([m,dow,time,what])=>{
+    const done = list.filter(r=>r.type==='drill' && r.date.slice(0,7)===m);
+    const [y,mm] = m.split('-').map(Number);
+    const label = MONTH_SHORT[mm-1]+' '+y;
+    return `<tr><td><b>${label}</b></td><td>${FIRE_DOW[dow]}</td><td>${fEsc(time)}</td><td>${fEsc(what)}</td>
+      <td><input type="date" value="${fEsc((fireSettings.plan||{})[m]||'')}" onchange="fireSetPlan('${m}',this.value)"></td>
+      <td>${done.length?'✓ '+done.map(r=>fmtUK(fDateOf(r))).join(', '):''}</td></tr>`;
+  }).join('');
+  const nameList = arr => arr.map(x=>fEsc(x.surname?x.name+' '+x.surname:x.name)).join(', ');
+  const checkHist = Object.keys(fireChecks).sort().reverse().slice(0,8).map(k=>{
+    const c = fireChecks[k], ok = FIRE_CHECK_ITEMS.every(([i])=>c.items&&c.items[i]);
+    const [y,m,d]=k.split('-').map(Number);
+    return `<tr><td>${fmtUK(new Date(y,m-1,d))}</td><td>${ok?'✓ All checked':'⚠ '+FIRE_CHECK_ITEMS.filter(([i])=>!(c.items&&c.items[i])).map(([,l])=>l).join(', ')}</td><td>${fEsc(c.byName||'')}</td><td>${fEsc(c.notes||'')}</td></tr>`;
+  }).join('');
+  box.innerHTML = `
+    <div class="sec-head"><div class="sec-label">Fire Safety</div><div class="sec-line"></div></div>
+    <div class="sec-sub">Drills, evacuations, who has practised and the weekly checks</div>
+
+    <div class="set-section">
+      <div class="set-title">At a glance</div>
+      <div style="color:#fff;font-size:13px;line-height:1.8">
+        Last drill: <b style="color:var(--gold-light)">${lastDrill?fNiceDate(lastDrill)+', out '+fMMSS(lastDrill.outMs)+', counted '+(lastDrill.countedMs!=null?fMMSS(lastDrill.countedMs):'incomplete'):'none yet'}</b><br>
+        Drills this term: <b style="color:var(--gold-light)">${cov.drills}</b> &nbsp;·&nbsp; Waiting to be written up: <b style="color:var(--gold-light)">${needs}</b> &nbsp;·&nbsp; Waiting for approval: <b style="color:var(--gold-light)">${awaiting}</b><br>
+        This week's checks: <b style="color:var(--gold-light)">${chk?'done by '+fEsc(chk.byName||'')+(FIRE_CHECK_ITEMS.every(([i])=>chk.items&&chk.items[i])?'':' (something needed attention)'):'not done yet'}</b>
+      </div>
+      <button class="fire-sbtn" style="margin-top:10px;padding:10px 14px" onclick="fireOpenChecks()">Do this week's checks</button>
+    </div>
+
+    <div class="set-section">
+      <div class="set-title">Drill records</div>
+      ${rows}
+    </div>
+
+    <div class="set-section">
+      <div class="set-title">Not yet practised this term</div>
+      <div class="sec-sub" style="margin-bottom:8px">Since ${fmtUK(parseDInput(cov.from))}. Taking part means being ticked as seen at the assembly point.</div>
+      <div style="color:#fff;font-size:13px;line-height:1.6">
+        <b style="color:var(--gold-light)">Children (${cov.kids.length}):</b> ${cov.kids.length?nameList(cov.kids):'everyone has taken part'}<br>
+        <b style="color:var(--gold-light)">Adults (${cov.staff.length}):</b> ${cov.staff.length?nameList(cov.staff):'everyone has taken part'}
+        ${cov.best?`<br><span style="opacity:0.8">Best day for the next drill: <b>${FIRE_DOW[cov.best.d]}</b> (catches ${cov.best.n} of them)</span>`:''}
+      </div>
+    </div>
+
+    <div class="set-section">
+      <div class="set-title">Planner, November 2026 to October 2027</div>
+      <div class="sec-sub" style="margin-bottom:8px">Days and times rotate so each drill tests something different. Put the planned date in at the start of the month.</div>
+      <div style="overflow-x:auto"><table class="fire-tbl"><tr><th>Month</th><th>Day</th><th>Time</th><th>What it tests</th><th>Planned</th><th>Done</th></tr>${plan}</table></div>
+    </div>
+
+    <div class="set-section">
+      <div class="set-title">Weekly checks, last eight weeks</div>
+      ${checkHist?`<div style="overflow-x:auto"><table class="fire-tbl"><tr><th>Week</th><th>Result</th><th>Signed by</th><th>Notes</th></tr>${checkHist}</table></div>`:'<div style="color:rgba(255,255,255,0.5);font-size:12px">No checks recorded yet.</div>'}
+    </div>
+
+    <div class="set-section">
+      <div class="set-title">Fire drill log PDF</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+        <label style="font-size:11px;color:rgba(255,255,255,0.6)">From</label><input type="date" id="firePdfFrom" class="time-inp" style="max-width:170px" value="${cov.from}">
+        <label style="font-size:11px;color:rgba(255,255,255,0.6)">To</label><input type="date" id="firePdfTo" class="time-inp" style="max-width:170px" value="${dk(today0())}">
+      </div>
+      <button onclick="fireExportLogPDF()" style="width:100%;padding:11px;background:var(--forest);color:#fff;border:none;border-radius:9px;font-weight:700;font-size:12px;cursor:pointer">Generate fire drill log PDF</button>
+    </div>
+
+    ${managerMode?`<div class="set-section">
+      <div class="set-title">Setting details for an evacuation</div>
+      <div class="sec-sub" style="margin-bottom:8px">Shown on the screen during a real evacuation. Stored with your private data, not in the app's code.</div>
+      <label class="af-label" style="color:var(--gold-light)">Address to give when calling 999</label>
+      <input class="af-input" id="fireAddr" value="${fEsc(fireSettings.address||'')}">
+      <label class="af-label" style="color:var(--gold-light);margin-top:10px">Assembly point</label>
+      <input class="af-input" id="fireAssembly" value="${fEsc(fireSettings.assembly||'')}">
+      <button class="fire-sbtn" style="margin-top:10px;padding:10px 14px" onclick="fireSaveSettings()">Save</button>
+    </div>`:''}`;
+}
+function fireSetPlan(m,v){ if(!fireSettings.plan) fireSettings.plan={}; fireSettings.plan[m]=v; fireSettings.at=Date.now(); markDirty(); }
+function fireSaveSettings(){
+  fireSettings.address = document.getElementById('fireAddr').value.trim();
+  fireSettings.assembly = document.getElementById('fireAssembly').value.trim();
+  fireSettings.at = Date.now(); markDirty(); showFlash('✓ Saved');
+}
+
+// ── detail view, approval, comments ──
+function fireOpenDetail(id){
+  if(!elevated()) return;
+  const r = fireDrills[id]; if(!r) return;
+  const w = r.write || {};
+  const lead = w.lead ? ((STAFF.find(s=>s.id===w.lead)||{}).name || w.lead) : '';
+  const kindName = {child:'Child', staff:'Adult', visitor:'Visitor'};
+  const rollRows = (r.roll||[]).map(x=>`<tr><td>${fEsc(x.name)}</td><td>${kindName[x.kind]}</td><td>${x.status==='found'?'Seen at '+fMMSS(x.at):x.status==='absent'?'Signed in but not on site':'Not accounted for'}</td></tr>`).join('')
+    + (r.extras||[]).map(x=>`<tr><td>${fEsc(x.name)}</td><td>Not signed in</td><td>Seen at ${fMMSS(x.at)}</td></tr>`).join('');
+  const txt = (label,v)=> v?`<div class="fd-sec">${label}</div><div class="fd-text">${fEsc(v)}</div>`:'';
+  document.getElementById('fireDetailBody').innerHTML = `
+    <h2>${r.type==='real'?'Evacuation':'Fire drill'}, ${fNiceDate(r)}</h2>
+    <div style="margin-bottom:10px">${fireStatusLabel(r)}</div>
+    <div class="fd-kv">
+      <div>Started</div><div>${r.startClock}</div>
+      <div>Everyone out</div><div>${fMinsSecs(r.outMs)}</div>
+      <div>Everyone counted</div><div>${r.countedMs!=null?fMinsSecs(r.countedMs):'Not everyone was accounted for'}</div>
+      <div>Register matched</div><div>${r.matched?'Yes':'No: '+fEsc(fireMismatchText(r))}</div>
+      <div>Led by</div><div>${fEsc(lead)}</div>
+      <div>What it tested</div><div>${fEsc(w.tested||'')}</div>
+      ${r.type==='drill'?`<div>Staff told</div><div>${fEsc(w.told||'')}</div>`:''}
+      <div>Exits used</div><div>${fEsc(w.exits||'')}</div>
+      <div>Alarm raised by</div><div>${fEsc(w.alarm||'')}</div>
+    </div>
+    ${txt('What went well',w.well)}${txt('What slowed us down',w.slow)}${txt('How the children responded',w.kids)}${txt('Individual plans',w.plans)}${txt('Why the register did not match',w.mismatch)}
+    ${(w.actions&&w.actions.length)?`<div class="fd-sec">Actions</div><table style="width:100%;font-size:13px;border-collapse:collapse">${w.actions.map(a=>`<tr><td style="padding:5px 0;border-top:1px solid #ddd">${fEsc(a.what)}</td><td style="padding:5px 6px;border-top:1px solid #ddd">${fEsc(a.who)}</td><td style="padding:5px 0;border-top:1px solid #ddd;white-space:nowrap">${a.by?fmtUK(parseDInput(a.by)):''}</td></tr>`).join('')}</table>`:''}
+    <div class="fd-sec">Roll call</div>
+    <table style="width:100%;font-size:13px;border-collapse:collapse">${rollRows||'<tr><td>Nobody was signed in</td></tr>'}</table>
+    <div class="fd-sec">Sign-off</div>
+    <div class="fd-kv">
+      <div>Written up by</div><div>${w.byName?fEsc(w.byName)+', '+fmtUK(new Date(w.at))+' '+ts(new Date(w.at)):'not yet'}</div>
+      <div>Approved by</div><div>${r.approvedBy?fEsc(r.approvedBy)+', '+fmtUK(new Date(r.approvedAt))+' '+ts(new Date(r.approvedAt)):'not yet'}</div>
+    </div>
+    ${(r.comments||[]).length?`<div class="fd-sec">Follow-up comments</div>${r.comments.map(c=>`<div class="fd-text" style="margin-bottom:6px"><b>${fEsc(c.by)}, ${fmtUK(new Date(c.at))}:</b> ${fEsc(c.text)}</div>`).join('')}`:''}
+    ${r.status==='approved'?`<label class="af-label">Add a follow-up comment</label><textarea class="af-input" id="fdComment"></textarea>
+      <button class="fire-sbtn" style="margin-top:6px;padding:9px 13px" onclick="fireAddComment('${r.id}')">Add comment</button>`:''}
+    <div style="display:flex;gap:10px;margin-top:18px;flex-wrap:wrap">
+      ${r.status==='submitted'&&managerMode?`<button class="fire-big fire-go" style="flex:1" onclick="fireApprove('${r.id}')">Approve and lock</button>`:''}
+      <button class="fire-big fire-cx" style="flex:1" onclick="fireExportRecordPDF('${r.id}')">PDF</button>
+      ${r.status!=='approved'&&managerMode?`<button class="fire-big fire-cx" style="flex:1;color:#A13A2A" onclick="fireDelete('${r.id}')">Delete</button>`:''}
+    </div>
+    <button class="fire-big fire-cx" onclick="fireCloseOv('fireDetailOv')">Close</button>`;
+  fireOpenOv('fireDetailOv');
+}
+function fireApprove(id){
+  const r = fireDrills[id]; if(!r || !managerMode) return;
+  if(!confirm('Approve this record? It will be locked; after this only follow-up comments can be added.')) return;
+  r.status='approved'; r.approvedBy='Manager'; r.approvedAt=Date.now();
+  fireTouch(r); fireOpenDetail(id); renderAll(); showFlash('✓ Approved');
+}
+function fireAddComment(id){
+  const r = fireDrills[id], t = (document.getElementById('fdComment').value||'').trim(); if(!r||!t) return;
+  r.comments = r.comments||[]; r.comments.push({by: managerMode?'Manager':'Deputy', at:Date.now(), text:t});
+  fireTouch(r); fireOpenDetail(id);
+}
+function fireDelete(id){
+  const r = fireDrills[id]; if(!r || r.status==='approved' || !managerMode) return;
+  if(!confirm('Delete this record? Only for a record made by mistake.')) return;
+  r.deleted = true; fireTouch(r); fireCloseOv('fireDetailOv'); renderAll();
+}
+// Never leave names on screen at the door: close the detail view if the mode locks.
+setInterval(()=>{ const o=document.getElementById('fireDetailOv'); if(o && o.classList.contains('vis') && !elevated()) o.classList.remove('vis'); }, 1500);
+
+// ── PDFs ──
+function fireExportRecordPDF(id){
+  if(!window.jspdf){ alert('PDF library not loaded. Check the internet connection and refresh (Ctrl+F5).'); return; }
+  const r = fireDrills[id]; if(!r) return;
+  const w = r.write||{}, lead = w.lead ? ((STAFF.find(s=>s.id===w.lead)||{}).name || '') : '';
+  const {jsPDF}=window.jspdf; const doc=new jsPDF({unit:'mm',format:'a4'});
+  pdfHeader(doc, r.type==='real'?'Evacuation Record':'Fire Drill Record', fNiceDate(r)+', started '+r.startClock);
+  const kv = [
+    ['Everyone out', fMinsSecs(r.outMs)], ['Everyone counted', r.countedMs!=null?fMinsSecs(r.countedMs):'Not everyone was accounted for'],
+    ['Register matched', r.matched?'Yes':'No: '+fireMismatchText(r)], ['Led by', lead], ['What it tested', w.tested||''],
+    ...(r.type==='drill'?[['Staff told beforehand', w.told||'']]:[]), ['Exits used', w.exits||''], ['How the alarm was raised', w.alarm||''],
+    ['What went well', w.well||''], ['What slowed us down', w.slow||''], ['How the children responded', w.kids||''], ['Individual plans', w.plans||''],
+    ...(r.matched?[]:[['Why the register did not match', w.mismatch||'']]),
+    ['Written up by', w.byName?w.byName+', '+fmtUK(new Date(w.at))+' '+ts(new Date(w.at)):'not yet'],
+    ['Approved by', r.approvedBy?r.approvedBy+', '+fmtUK(new Date(r.approvedAt))+' '+ts(new Date(r.approvedAt)):'not yet'],
+  ];
+  const sty = {styles:{fontSize:9,cellPadding:2.2,lineColor:[204,204,204],lineWidth:0.1,textColor:[40,40,40]},headStyles:{fillColor:[232,241,236],textColor:[26,122,74],fontStyle:'bold'},margin:{left:12,right:12},didDrawPage:()=>pdfFooter(doc)};
+  doc.autoTable(Object.assign({startY:44, body:kv, columnStyles:{0:{cellWidth:50,fontStyle:'bold',textColor:[26,122,74]}}}, sty));
+  if(w.actions && w.actions.length) doc.autoTable(Object.assign({startY:doc.lastAutoTable.finalY+6, head:[['Action','Who','By when']], body:w.actions.map(a=>[a.what,a.who,a.by?fmtUK(parseDInput(a.by)):''])}, sty));
+  const roll = (r.roll||[]).map(x=>[x.name, {child:'Child',staff:'Adult',visitor:'Visitor'}[x.kind], x.status==='found'?'Seen at '+fMMSS(x.at):x.status==='absent'?'Signed in but not on site':'Not accounted for'])
+    .concat((r.extras||[]).map(x=>[x.name,'Not signed in','Seen at '+fMMSS(x.at)]));
+  doc.autoTable(Object.assign({startY:doc.lastAutoTable.finalY+6, head:[['Roll call','','']], body:roll.length?roll:[['Nobody was signed in','','']]}, sty));
+  if((r.comments||[]).length) doc.autoTable(Object.assign({startY:doc.lastAutoTable.finalY+6, head:[['Follow-up comments','']], body:r.comments.map(c=>[c.by+', '+fmtUK(new Date(c.at)), c.text])}, sty));
+  doc.save('LP '+(r.type==='real'?'Evacuation':'Fire Drill')+' '+r.date+'.pdf');
+}
+function fireExportLogPDF(){
+  if(!window.jspdf){ alert('PDF library not loaded. Check the internet connection and refresh (Ctrl+F5).'); return; }
+  const f = document.getElementById('firePdfFrom').value, t = document.getElementById('firePdfTo').value;
+  if(!f||!t||f>t){ alert('Check the dates: "From" must be on or before "To".'); return; }
+  const rows = fireList().filter(r=>r.date>=f && r.date<=t).reverse().map(r=>{
+    const w=r.write||{}, lead = w.lead ? ((STAFF.find(s=>s.id===w.lead)||{}).name||'') : '';
+    return [fmtUK(fDateOf(r)), r.type==='real'?'Real':'Drill', r.startClock, w.tested||'', String((r.counts&&r.counts.children)||0)+' / '+String((r.counts&&r.counts.staff)||0), fMMSS(r.outMs), r.countedMs!=null?fMMSS(r.countedMs):'incomplete', r.matched?'Yes':'No', lead,
+      (w.actions||[]).map(a=>a.what).join('; '), r.status==='approved'?'Approved':r.status==='submitted'?'Awaiting':'Not written up'];
+  });
+  const {jsPDF}=window.jspdf; const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+  pdfHeader(doc,'Fire Drill Log', fmtUK(parseDInput(f))+' to '+fmtUK(parseDInput(t))+'   ·   '+rows.length+' record'+(rows.length!==1?'s':''));
+  doc.autoTable({ startY:44, head:[['Date','Type','Time','What it tested','Children / adults','Out','Counted','Matched','Led by','Actions','Status']],
+    body: rows.length?rows:[['','No drills in this period','','','','','','','','','']],
+    styles:{fontSize:8,cellPadding:2,lineColor:[204,204,204],lineWidth:0.1,textColor:[40,40,40]},
+    headStyles:{fillColor:[232,241,236],textColor:[26,122,74],fontStyle:'bold'}, alternateRowStyles:{fillColor:[247,243,236]},
+    margin:{left:12,right:12}, didDrawPage:()=>pdfFooter(doc) });
+  doc.save('LP Fire Drill Log '+f+'_'+t+'.pdf');
+  showFlash('\u{1F4C4} Fire drill log PDF generated');
+}
+
+// ── sync helpers ──
+function fireMergeRemote(rd){
+  if(rd.fireDrills) Object.keys(rd.fireDrills).forEach(id=>{
+    const lv=fireDrills[id], rv=rd.fireDrills[id];
+    if(!lv || ((rv&&rv.at)||0) > ((lv&&lv.at)||0)) fireDrills[id]=rv;
+  });
+  if(rd.fireChecks) Object.keys(rd.fireChecks).forEach(k=>{
+    const lv=fireChecks[k], rv=rd.fireChecks[k];
+    if(!lv || ((rv&&rv.at)||0) > ((lv&&lv.at)||0)) fireChecks[k]=rv;
+  });
+  if(rd.fireSettings && ((rd.fireSettings.at||0) > (fireSettings.at||0))) fireSettings=rd.fireSettings;
+}
+function fireLoadSaved(d){
+  if(d.fireDrills) fireDrills=d.fireDrills;
+  if(d.fireChecks) fireChecks=d.fireChecks;
+  if(d.fireSettings) fireSettings=Object.assign({at:0,address:'',assembly:'',plan:{}}, d.fireSettings);
+}
+
 let staffOverrides = {}; // [dateKey][staffId] = {action:'add'|'remove'} — staff day changes (cover, day off)
 let overtime = {}; // [staffId][dateKey] = {hours, status:'approved'|'dismissed', note} — confirmed before payroll
 // [staffId][dateKey] = {late:true, early:true, at} — a late start or early finish you
@@ -2268,7 +3001,7 @@ function goToday(){ viewDate=new Date();viewDate.setHours(0,0,0,0);updateDateNav
 // ════════════════════════════════════════════════
 function setTab(t){
   currentTab=t;
-  ['children','staff','visitor','log','invoice','override','holidays','solecharge','admin','payroll','reports','settings'].forEach((p,i)=>{
+  ['children','staff','visitor','log','invoice','override','holidays','solecharge','admin','payroll','reports','settings','fire'].forEach((p,i)=>{
     document.getElementById('panel-'+p).style.display=p===t?'':'none';
     document.querySelectorAll('.tab')[i].classList.toggle('active',p===t);
   });
@@ -2282,6 +3015,7 @@ function setTab(t){
   if(t==='payroll')renderPayroll();
   if(t==='reports')renderReports();
   if(t==='settings')renderSettings();
+  if(t==='fire')renderFireTab();
 }
 
 // ════════════════════════════════════════════════
@@ -6076,6 +6810,8 @@ function renderAll(){
   if(currentTab==='solecharge')renderSoleCharge();
   if(currentTab==='reports')renderReports();
   if(currentTab==='settings')renderSettings();
+  renderFireStaffPrompts();
+  if(currentTab==='fire'){ const fb=document.getElementById('fireTabBody'); if(!(document.activeElement && fb && fb.contains(document.activeElement))) renderFireTab(); }
 }
 
 // PINs start as "default" so parents and staff will be prompted to set their own
@@ -6088,6 +6824,8 @@ document.querySelectorAll('.overlay').forEach(el => el.classList.remove('vis'));
 // Restore any on-device data first (survives refresh/reboot while offline),
 // then wire connection recovery, then connect and render.
 loadLocal();
+fireLoadActive();
+if(fireActive) fireShowRun();
 wireConnectionRecovery();
 initMSAL().then(()=>{ updateConnStatus(); renderAll(); });
 </script>
