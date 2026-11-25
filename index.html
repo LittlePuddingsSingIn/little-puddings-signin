@@ -690,7 +690,7 @@
     </div>
   </div>
 </div>
-<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 1Nov-b</div>
+<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 25Nov-a</div>
 
 <!-- PAY WORKBOOK EXPORT PREVIEW OVERLAY -->
 <div class="overlay" id="payPreviewOv">
@@ -2474,7 +2474,7 @@ function fireOpenDetail(id){
     <div style="display:flex;gap:10px;margin-top:18px;flex-wrap:wrap">
       ${r.status==='submitted'&&managerMode?`<button class="fire-big fire-go" style="flex:1" onclick="fireApprove('${r.id}')">Approve and lock</button>`:''}
       <button class="fire-big fire-cx" style="flex:1" onclick="fireExportRecordPDF('${r.id}')">PDF</button>
-      ${r.status!=='approved'&&managerMode?`<button class="fire-big fire-cx" style="flex:1;color:#A13A2A" onclick="fireDelete('${r.id}')">Delete</button>`:''}
+      ${managerMode?`<button class="fire-big fire-cx" style="flex:1;color:#A13A2A" onclick="fireDelete('${r.id}')">Delete</button>`:''}
     </div>
     <button class="fire-big fire-cx" onclick="fireCloseOv('fireDetailOv')">Close</button>`;
   fireOpenOv('fireDetailOv');
@@ -2491,9 +2491,12 @@ function fireAddComment(id){
   fireTouch(r); fireOpenDetail(id);
 }
 function fireDelete(id){
-  const r = fireDrills[id]; if(!r || r.status==='approved' || !managerMode) return;
-  if(!confirm('Delete this record? Only for a record made by mistake.')) return;
-  r.deleted = true; fireTouch(r); fireCloseOv('fireDetailOv'); renderAll();
+  const r = fireDrills[id]; if(!r || !managerMode) return;
+  const msg = r.status==='approved'
+    ? 'Delete this APPROVED fire drill record? It is removed for good. Only do this for a record made by mistake.'
+    : 'Delete this record? Only for a record made by mistake.';
+  if(!confirm(msg)) return;
+  r.deleted = true; fireTouch(r); fireCloseOv('fireDetailOv'); renderAll(); showFlash('Fire drill record deleted');
 }
 // Never leave names on screen at the door: close the detail view if the mode locks.
 setInterval(()=>{ const o=document.getElementById('fireDetailOv'); if(o && o.classList.contains('vis') && !elevated()) o.classList.remove('vis'); }, 1500);
@@ -5329,10 +5332,22 @@ function toggleCollectedFromSchool(cid) {
   const collected=getCollected(viewDate);
   collected[cid]=!collected[cid];
   const c=CHILDREN.find(x=>x.id===cid);
-  showFlash(collected[cid]?`${c.emoji} ${c.name} — collected from school today`:`${c.emoji} ${c.name} — will return at 15:25`);
+  if(collected[cid]){
+    // If the 15:25 auto sign-in has already run, undo it so the child does not keep
+    // showing as signed in when a parent actually collected them from school. Any
+    // earlier (before-school) session that day is kept.
+    const att=getAtt(cid,viewDate);
+    if(att.signInTime==='15:25'){
+      att.signedIn=false; att.signInTime=null; att.signOutTime=null; att.earlyMins=0; att.lateMins=0;
+      const log=getLog(viewDate);
+      const i=log.findIndex(e=>e && e.type==='child' && e.name===c.name && e.time==='15:25' && e.note && /afternoon/i.test(e.note));
+      if(i>=0) log.splice(i,1);
+    }
+  }
+  showFlash(collected[cid]?`${c.emoji} ${c.name} — collected from school, not signed in`:`${c.emoji} ${c.name} — will return at 15:25`);
   markDirty();
   if(odConnected){ writeToExcel(c, viewDate, getAtt(cid, viewDate)); syncWithOneDrive(); }
-  renderSettings();
+  renderAll();
 }
 
 function getDropped(d){ const k=dk(d);if(!droppedOffAtSchool[k])droppedOffAtSchool[k]={};return droppedOffAtSchool[k]; }
@@ -5778,8 +5793,9 @@ function downloadAllPaySheets(){
   const {jsPDF}=window.jspdf;
   // Summary page is LANDSCAPE (wide overview); each person's detail page is portrait.
   const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
-  const staff=STAFF.filter(x=>!x.archived);
   const {from,to}=exportPeriod();
+  // Exclude anyone who left before this period even started (no employed days to pay).
+  const staff=STAFF.filter(x=>!x.archived && !(x.endDate && dk(from) > x.endDate));
 
   // --- Summary page (front): everyone's rate, hours, weekly/annual/monthly, plus this
   // period's deductions, overtime and total, so Jamie sees the whole team at a glance.
@@ -5798,10 +5814,14 @@ function downloadAllPaySheets(){
       else if(e.type==='unauthorised') dedHrs+=scheduledHours(s.id,d);
     });
     if(sickCount) sickRows.push(idx);
+    const la=leaverAfterDeduction(s.id, from, to);        // part-month leaver days
+    if(la) dedHrs+=la.hrs;
     const ded=dedHrs*rate;
     const ot=overtimeFor(s.id, from, to);
     const otHrs=ot.approved.reduce((t,a)=>t+a.hours,0), otAmt=otHrs*rate;
-    const total=Math.round((perMo-ded+otAmt)*100)/100;
+    const settle=leaverSettlement(s.id, from, to);        // holiday + lieu in final period
+    const settleAdj=settle?settle.adj:0;
+    const total=Math.round((perMo-ded+otAmt+settleAdj)*100)/100;
     const perWk=rate*ph;
     return [s.name, '£'+rate.toFixed(2), String(ph), '£'+perWk.toFixed(2), '£'+perYr.toFixed(0), '£'+perMo.toFixed(2),
             ded?'– £'+ded.toFixed(2):'—', otAmt?'+ £'+otAmt.toFixed(2):'—',
@@ -5825,7 +5845,7 @@ function downloadAllPaySheets(){
   doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(161,58,42);
   if(sickRows.length) doc.text('⚠ SSP due for '+sickRows.length+' staff this period — see the highlighted rows and each person\u2019s SSP section.', 12, sy);
   doc.setFont('helvetica','italic'); doc.setFontSize(8); doc.setTextColor(107,100,96);
-  doc.text('* Total is the fixed monthly salary, less deductions, plus overtime — before Tax, NI, pension and SSP. Full breakdown for each person on the following pages.', 12, sy+(sickRows.length?5:0), {maxWidth:doc.internal.pageSize.getWidth()-24});
+  doc.text('* Total is the fixed monthly salary, less deductions, plus overtime, and for a leaver also the days after their leaving date and their holiday and lieu settlement — before Tax, NI, pension and SSP. Full breakdown for each person on the following pages.', 12, sy+(sickRows.length?5:0), {maxWidth:doc.internal.pageSize.getWidth()-24});
   pdfFooterNoSign(doc);
 
   // --- Each person's full pay sheet behind (portrait) ---
@@ -5836,6 +5856,37 @@ function downloadAllPaySheets(){
   });
   doc.save(`All Pay Sheets ${dk(to)}.pdf`);
   showFlash(`📄 Summary + ${staff.length} pay sheets generated`);
+}
+
+// Leaver: scheduled working days AFTER the leaving date within a period, as one
+// consolidated deduction (the fixed monthly salary assumes a full month, so a part-month
+// leaver has the days they will not work taken off). Returns null if not a leaver or
+// nothing to deduct in this window.
+function leaverAfterDeduction(staffId, from, to){
+  const s=STAFF.find(x=>x.id===staffId); if(!s||!s.endDate) return null;
+  const endD=parseDInput(s.endDate); if(!endD) return null;
+  let hrs=0, days=0;
+  eachDay(from,to).forEach(d=>{
+    if(d<=endD) return;                               // up to and including the last day: paid as normal
+    if(!(s.sch && s.sch[d.getDay()])) return;         // only scheduled working days
+    hrs+=scheduledHours(staffId,d); days++;
+  });
+  if(!days) return null;
+  const fd=new Date(endD); fd.setDate(fd.getDate()+1);
+  return {d:fd, days, hrs:Math.round(hrs*100)/100, type:`After leaving date (${days} day${days!==1?'s':''})`};
+}
+// Leaver final settlement (only in the period containing the leaving date): holiday
+// over/under-payment and the lieu balance, paid out (+) or clawed back (−).
+function leaverSettlement(staffId, from, to){
+  const s=STAFF.find(x=>x.id===staffId); if(!s||!s.endDate) return null;
+  const endD=parseDInput(s.endDate); if(!endD || endD<from || endD>to) return null;
+  const L=leaverSummary(staffId); if(!L) return null;
+  const rate=s.hourlyRate||0; const lines=[]; let adj=0;
+  const leavePay=Math.round(L.owedLeave*rate*100)/100;   // owedLeave may be negative (overtaken)
+  const lieuPay=Math.round((L.lieuMin/60)*rate*100)/100;  // lieuMin may be negative
+  if(leavePay){ adj+=leavePay; lines.push({label:`Holiday ${leavePay>=0?'owed, paid out':'overtaken, deducted'} (${Math.abs(L.owedLeave)}h)`, amt:leavePay}); }
+  if(lieuPay){ adj+=lieuPay; lines.push({label:`Lieu ${lieuPay>=0?'owed, paid out':'overtaken, deducted'} (${fmtMin(Math.abs(L.lieuMin))})`, amt:lieuPay}); }
+  return {L, rate, lines, adj:Math.round(adj*100)/100};
 }
 
 // Draw one person's pay sheet onto the current page of an existing doc.
@@ -5876,6 +5927,8 @@ function drawPaySheet(doc, staffId){
       else if(e.type==='unauthorised') deductions.push({d, type:'Unauthorised leave', hrs: scheduledHours(s.id,d)});
     });
   }
+  const la=leaverAfterDeduction(s.id, from, to);       // part-month leaver: days after leaving
+  if(la) deductions.push({d:la.d, type:la.type, hrs:la.hrs});
   deductions.sort((a,b)=>a.d-b.d);
   const dedTotal=deductions.reduce((t,x)=>t+x.hrs*rate,0);
 
@@ -5885,7 +5938,11 @@ function drawPaySheet(doc, staffId){
   const otTotalHrs=otRows.reduce((t,x)=>t+x.hrs,0);
   const otTotal=otTotalHrs*rate;
 
-  const totalPay=Math.round((monthly - dedTotal + otTotal)*100)/100;
+  // Leaver final settlement (holiday + lieu), only in the period they finish in.
+  const settle=leaverSettlement(s.id, from, to);
+  const settleAdj=settle?settle.adj:0;
+
+  const totalPay=Math.round((monthly - dedTotal + otTotal + settleAdj)*100)/100;
   const isSelf=!!s.isOwner;
 
   pdfHeader(doc, 'Pay Sheet', `${s.name} · ${s.role} · £${rate.toFixed(2)}/hr`);
@@ -5949,8 +6006,9 @@ function drawPaySheet(doc, staffId){
       ? `Monthly salary (£${rate.toFixed(2)} × ${paidHrsWk}h × 52 ÷ 12) — apprentice, includes 6h off-the-job`
       : `Monthly salary (£${rate.toFixed(2)} × ${paidHrsWk}h × 52 ÷ 12)`);
   const calc=[[basisNote, '£'+monthly.toFixed(2)]];
-  if(dedTotal) calc.push(['Less deductions (unpaid & sick, see above)', '– £'+dedTotal.toFixed(2)]);
+  if(dedTotal) calc.push([la?'Less deductions (sick, unpaid & days after leaving, see above)':'Less deductions (unpaid & sick, see above)', '– £'+dedTotal.toFixed(2)]);
   if(otTotal) calc.push(['Plus overtime (see above)', '+ £'+otTotal.toFixed(2)]);
+  if(settle) settle.lines.forEach(ln=>calc.push([ln.label, (ln.amt>=0?'+ £':'– £')+Math.abs(ln.amt).toFixed(2)]));
   calc.push(['Total before Tax, NI, pension & SSP', '£'+totalPay.toFixed(2)]);
   doc.autoTable({
     startY:yy+4,
@@ -6091,6 +6149,11 @@ function overtimeFor(staffId, from, to){
   const s = STAFF.find(x=>x.id===staffId);
   const candidates=[], approved=[]; let approvedHours=0;
   if(!s) return {candidates, approved, approvedHours};
+  // Overtime is captured one day behind the pay window. Payroll is usually sent on the
+  // morning of the 28th, so overtime worked later on the 28th is approved too late and
+  // must roll to the next month. Shift the window to the 28th(prev month)–27th.
+  from = new Date(from); from.setDate(from.getDate()-1); from.setHours(0,0,0,0);
+  to   = new Date(to);   to.setDate(to.getDate()-1);   to.setHours(0,0,0,0);
   const excluded = !!(s && s.isOwner);
   // the owner’s own rule: she doesn't pay herself for all her hours yet, so recognise
   // extra time as overtime — ALL weekend work, and weekday hours above 10h 15m.
@@ -6203,7 +6266,9 @@ function renderOvertimeSection(){
   const box = document.getElementById('overtimePanel');
   if(!box) return;
   const {from, to} = exportPeriod();
-  const mLabel = MONTH_SHORT[from.getMonth()]+' '+from.getFullYear();
+  const mLabel = MONTH_SHORT[to.getMonth()]+' '+to.getFullYear();
+  const otFrom=new Date(from); otFrom.setDate(otFrom.getDate()-1);
+  const otTo=new Date(to); otTo.setDate(otTo.getDate()-1);
   let anyCand = 0, html = '';
   STAFF.filter(s=>!s.archived).forEach(s=>{
     const ot = overtimeFor(s.id, from, to);
@@ -6232,7 +6297,8 @@ function renderOvertimeSection(){
     </div>`;
   });
   box.innerHTML = `<div style="background:var(--cream);border-radius:13px;padding:14px;margin-bottom:14px;border-left:5px solid #A13A2A">
-    <div style="font-family:'Playfair Display',serif;font-size:14px;color:var(--forest);margin-bottom:4px">⏱ Overtime to confirm · ${mLabel}</div>
+    <div style="font-family:'Playfair Display',serif;font-size:14px;color:var(--forest);margin-bottom:2px">⏱ Overtime to confirm · ${mLabel}</div>
+    <div style="font-size:10.5px;color:var(--moss);margin-bottom:8px">Overtime period ${fmtUK(otFrom)} to ${fmtUK(otTo)}. Payroll is sent on the 28th, so overtime from the 28th onward rolls into the next month's run.</div>
     <div style="font-size:11px;color:var(--bark);margin-bottom:10px">${anyCand?anyCand+' possible overtime day'+(anyCand!==1?'s':'')+' found. Approve or dismiss each one. Only approved overtime goes to payroll.':'Nothing to confirm. Approved overtime is listed below if any.'}</div>
     ${html || '<div style="font-size:12px;color:var(--bark)">No overtime detected this month.</div>'}
     <div style="border-top:1px solid rgba(0,0,0,0.08);margin-top:10px;padding-top:10px">
@@ -6275,7 +6341,7 @@ function previewPayWorkbook(){
 function buildPayPreview(){
   const {y,m}=payPreviewMonth;
   payPreviewUpdates=[]; let html=''; const warnings=[];
-  STAFF.filter(s=>!s.archived).forEach(s=>{
+  STAFF.filter(s=>!s.archived && !(s.endDate && dk(new Date(y,m-1,1)) > s.endDate)).forEach(s=>{
     const col=payColFor(s);
     if(!col){ warnings.push(s.name+': no PAY column set. Open their staff card and set the PAY workbook column, then try again.'); return; }
     const sick=[], unpaid=[], unauth=[], annual=[]; let unpaidHrs=0, unauthHrs=0;
@@ -6291,6 +6357,8 @@ function buildPayPreview(){
       });
     }
     sick.sort((a,b)=>a.d-b.d); unpaid.sort((a,b)=>a-b); unauth.sort((a,b)=>a-b); annual.sort((a,b)=>a-b);
+    const la=leaverAfterDeduction(s.id, new Date(y,m-1,1), new Date(y,m,0));     // part-month leaver days
+    const settle=leaverSettlement(s.id, new Date(y,m-1,1), new Date(y,m,0));     // holiday + lieu, final month
     const otData = overtimeFor(s.id, new Date(y,m-1,1), new Date(y,m,0));
     const otDates = otData.approved.map(a=>a.date).sort((a,b)=>a-b);
     const ups=[];
@@ -6299,7 +6367,7 @@ function buildPayPreview(){
     // (Annual leave entitlement figure not written — it's reference only and its row
     // shifts when rows are inserted; leave it to be set by hand if wanted.)
     const sickHrs = sick.reduce((t,x)=>t+(x.hrs||0),0);
-    ups.push({address:col+'19', value:Number((unpaidHrs+unauthHrs+sickHrs).toFixed(2)), label:'Deduction hours (sick + unpaid + unauthorised)'});
+    ups.push({address:col+'19', value:Number((unpaidHrs+unauthHrs+sickHrs+(la?la.hrs:0)).toFixed(2)), label:'Deduction hours (sick + unpaid + unauthorised'+(la?' + after leaving':'')+')'});
     let overtimeTopRef = null;   // set to a formula like "=E52" when overtime is written
     const fill=(arr,range,lbl)=>{ arr.forEach((d,i)=>{ const r=range[0]+i; if(r<=range[1]) ups.push({address:col+r,value:fmtUK(d),label:lbl,isDate:true}); }); if(arr.length>(range[1]-range[0]+1)) warnings.push(`${s.name}: ${arr.length} ${lbl.toLowerCase()} entries but only ${range[1]-range[0]+1} rows (${range[0]}–${range[1]}). Extra ones are not written.`); };
     // SSP: date in the left column, hours lost in the pay column, side by side
@@ -6317,7 +6385,8 @@ function buildPayPreview(){
     const deductions = [
       ...sick.map(x=>({d:x.d, hrs:x.hrs, label:'sick day'})),
       ...unpaid.map(d=>({d, hrs:scheduledHours(s.id, d), label:'unpaid leave'})),
-      ...unauth.map(d=>({d, hrs:scheduledHours(s.id, d), label:'unauthorised leave'}))
+      ...unauth.map(d=>({d, hrs:scheduledHours(s.id, d), label:'unauthorised leave'})),
+      ...(la?[{d:la.d, hrs:la.hrs, label:la.type.toLowerCase()}]:[])
     ].sort((a,b)=>a.d-b.d);
     // Individual deduction days start at row 31 and go DOWN, one row per day, for
     // however many there are (no 4-row cap). The workbook's SUM should sit on the row
@@ -6330,6 +6399,7 @@ function buildPayPreview(){
       ups.push({address:labelCol+r, value:item.label, label:'Deduction type'});
     });
     if(deductions.length>(dedLastAllowed-dedFirst+1)) warnings.push(`${s.name}: ${deductions.length} deduction days but only rows ${dedFirst}–${dedLastAllowed} available before the SUM. Extra ones are not written.`);
+    if(settle && settle.lines.length) warnings.push(`${s.name} (leaver, final pay): the days after their leaving date ARE deducted above. Add the holiday and lieu settlement to the workbook by hand — ${settle.lines.map(l=>l.label+' '+(l.amt>=0?'+£':'–£')+Math.abs(l.amt).toFixed(2)).join('; ')}.`);
     // Overtime: date in the left column, hours in the pay column, side by side
     // Overtime: write one row per approved day starting at the first overtime row and
     // growing down as many rows as needed (month-dependent). Then put a SUM formula on
