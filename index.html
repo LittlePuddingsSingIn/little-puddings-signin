@@ -465,10 +465,11 @@
 
     <div class="set-section" style="margin-top:14px">
       <div class="set-title">🗓 Catch up an invoice</div>
-      <div class="sec-sub" style="margin-bottom:8px">If a child's invoice file was added late, their earlier attendance is still stored here but was never written to the file. Pick the child and re-write all their recorded days into the file now. Safe to run more than once, it just overwrites the same cells.</div>
+      <div class="sec-sub" style="margin-bottom:8px">Every recorded day is kept here, so if some never reached the file, their invoice was added late, a new starter's workbook wasn't ready, or OneDrive wasn't connected when a day was signed in or out, you can re-write them now. Pick a child, or do everyone at once. Safe to run more than once; it just overwrites the same cells.</div>
       <select id="catchupChild" class="af-select" style="width:100%;margin-bottom:8px"></select>
       <button onclick="catchUpInvoice()" style="width:100%;padding:11px;background:var(--forest);color:var(--gold-light);border:none;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer">Write all recorded days to this child's invoice</button>
-      <div id="catchupStatus" style="font-size:11px;margin-top:8px;color:var(--forest)"></div>
+      <button onclick="catchUpAllInvoices()" style="width:100%;padding:11px;margin-top:8px;background:#fff;color:var(--forest);border:2px solid var(--forest);border-radius:9px;font-size:12px;font-weight:700;cursor:pointer">Catch up ALL children at once</button>
+      <div id="catchupStatus" style="font-size:11px;margin-top:8px;color:var(--forest);line-height:1.5"></div>
     </div>
   </div>
 
@@ -690,7 +691,7 @@
     </div>
   </div>
 </div>
-<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 25Nov-a</div>
+<div class="footer-note">Little Puddings · Grounded &amp; Curious Ltd · 2026–2027 · build 25Nov-d</div>
 
 <!-- PAY WORKBOOK EXPORT PREVIEW OVERLAY -->
 <div class="overlay" id="payPreviewOv">
@@ -1688,6 +1689,36 @@ async function catchUpInvoice(){
     await wait(350);   // gentle pace between days so Graph doesn't rate-limit
   }
   if(st) st.textContent = `✓ Wrote ${done} day${done!==1?'s':''} to ${c.name}'s invoice`+(failed?` — ${failed} still failed, tap again to finish the rest`:'. All done.');
+}
+
+// Re-write every recorded day for EVERY child into their invoice files. Use after a day
+// (or a few) where OneDrive was not connected, so the register has the times but the
+// files missed them. Idempotent — it overwrites the same cells.
+async function catchUpAllInvoices(){
+  const st=document.getElementById('catchupStatus');
+  if(!odConnected || !odAccessToken){ if(st)st.textContent='Connect OneDrive first.'; return; }
+  const kids=CHILDREN.filter(c=>!c.archived);
+  if(!kids.length){ if(st)st.textContent='No children to write.'; return; }
+  if(!confirm(`Write every recorded day to all ${kids.length} children's invoices now? This can take a minute or two, and is safe to run again.`)) return;
+  const wait=ms=>new Promise(r=>setTimeout(r,ms));
+  let totalDays=0, totalFail=0; const missing=[];
+  for(let ci=0; ci<kids.length; ci++){
+    const c=kids[ci];
+    const days=(attendance[c.id]?Object.keys(attendance[c.id]):[]).sort().filter(k=>{ const a=attendance[c.id][k]; return a && (a.signInTime || (a.sessions&&a.sessions.length)); });
+    let childFail=0;
+    for(let i=0;i<days.length;i++){
+      if(st) st.textContent=`Catching up ${c.name} (${ci+1}/${kids.length}) — day ${i+1} of ${days.length}…`;
+      let ok=false;
+      for(let a=0;a<3 && !ok;a++){ try{ await writeToExcel(c, new Date(days[i]), attendance[c.id][days[i]]); ok=true; }catch(e){ await wait(1200*(a+1)); } }
+      if(ok) totalDays++; else { childFail++; totalFail++; }
+      await wait(300);
+    }
+    if(days.length && childFail===days.length) missing.push(c.name);   // whole child failed → likely no invoice file yet
+  }
+  let msg=`✓ Wrote ${totalDays} day${totalDays!==1?'s':''} across ${kids.length} children`;
+  if(totalFail) msg+=`, ${totalFail} write${totalFail!==1?'s':''} failed`;
+  msg += missing.length ? `. No invoice file found for: ${missing.join(', ')} — create their workbook in OneDrive, then run this again.` : '. All done.';
+  if(st) st.textContent=msg;
 }
 
 // The invoice workbook filename for a child: the per-child override set on their card
@@ -5302,9 +5333,21 @@ function schoolRunTick() {
   // Auto sign-in school children at 15:25 (or catch up if app opens later)
   if(nowMins >= 15*60+25) {
     const collected=getCollected(now);
-    let anySignedIn = false;
+    let anySignedIn = false, anyCleared = false;
     CHILDREN.filter(c=>c.schoolRun && afterSchoolToday(c,now) && childScheduledToday(c,now)).forEach(c=>{
-      if(collected[c.id]) return;
+      if(collected[c.id]){
+        // Parent collected from school: make sure the auto afternoon sign-in is removed
+        // and stays removed, whether it was marked before or after 15:25.
+        const att=getAtt(c.id,now);
+        if(att.signedIn && att.signInTime==='15:25'){
+          att.signedIn=false; att.signInTime=null; att.signOutTime=null; att.earlyMins=0; att.lateMins=0;
+          const log=getLog(now); const i=log.findIndex(e=>e&&e.type==='child'&&e.name===c.name&&e.time==='15:25'&&e.note&&/afternoon/i.test(e.note));
+          if(i>=0) log.splice(i,1);
+          if(odConnected) writeToExcel(c,now,att);
+          anyCleared=true;
+        }
+        return;
+      }
       const att=getAtt(c.id,now);
       // Auto sign-in the after-school collection if they aren't already in. Covers
       // both a child dropped off in the morning (signed out at 08:55) and a child
@@ -5317,9 +5360,10 @@ function schoolRunTick() {
         anySignedIn = true;
       }
     });
-    if(anySignedIn) {
+    if(anySignedIn || anyCleared) {
+      markDirty();
       renderAll();
-      if(nowMins < 16*60) showFlash('🏫 Afternoon — children signed in at 15:25');
+      if(anySignedIn && nowMins < 16*60) showFlash('🏫 Afternoon — children signed in at 15:25');
     }
   }
 }
@@ -5794,8 +5838,8 @@ function downloadAllPaySheets(){
   // Summary page is LANDSCAPE (wide overview); each person's detail page is portrait.
   const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
   const {from,to}=exportPeriod();
-  // Exclude anyone who left before this period even started (no employed days to pay).
-  const staff=STAFF.filter(x=>!x.archived && !(x.endDate && dk(from) > x.endDate));
+  // Exclude anyone who left before this calendar month even started (no days to pay).
+  const staff=STAFF.filter(x=>!x.archived && !(x.endDate && dk(payCalMonth().from) > x.endDate));
 
   // --- Summary page (front): everyone's rate, hours, weekly/annual/monthly, plus this
   // period's deductions, overtime and total, so Jamie sees the whole team at a glance.
@@ -5814,12 +5858,12 @@ function downloadAllPaySheets(){
       else if(e.type==='unauthorised') dedHrs+=scheduledHours(s.id,d);
     });
     if(sickCount) sickRows.push(idx);
-    const la=leaverAfterDeduction(s.id, from, to);        // part-month leaver days
+    const la=leaverAfterDeduction(s.id);        // part-month leaver days
     if(la) dedHrs+=la.hrs;
     const ded=dedHrs*rate;
     const ot=overtimeFor(s.id, from, to);
     const otHrs=ot.approved.reduce((t,a)=>t+a.hours,0), otAmt=otHrs*rate;
-    const settle=leaverSettlement(s.id, from, to);        // holiday + lieu in final period
+    const settle=leaverSettlement(s.id);        // holiday + lieu in final period
     const settleAdj=settle?settle.adj:0;
     const total=Math.round((perMo-ded+otAmt+settleAdj)*100)/100;
     const perWk=rate*ph;
@@ -5858,13 +5902,23 @@ function downloadAllPaySheets(){
   showFlash(`📄 Summary + ${staff.length} pay sheets generated`);
 }
 
-// Leaver: scheduled working days AFTER the leaving date within a period, as one
-// consolidated deduction (the fixed monthly salary assumes a full month, so a part-month
-// leaver has the days they will not work taken off). Returns null if not a leaver or
-// nothing to deduct in this window.
-function leaverAfterDeduction(staffId, from, to){
+// The pay run's CALENDAR month (1st to last day). The salary is the full calendar
+// month; the 29th-to-28th window is only for getting extras and deductions to the
+// accountant in time. So a leaver's unworked days run to the end of the calendar month.
+function payCalMonth(){
+  const el=document.getElementById('exportMonth');
+  let y,m; const mv=el?el.value:'';
+  if(mv){ [y,m]=mv.split('-').map(Number); } else { const t=new Date(); y=t.getFullYear(); m=t.getMonth()+1; }
+  return {from:new Date(y,m-1,1), to:new Date(y,m,0), y, m};
+}
+// Leaver: scheduled working days AFTER the leaving date, through the END OF THE CALENDAR
+// MONTH, as one consolidated deduction (the full monthly salary assumes the whole month,
+// so a part-month leaver has the days they will not work taken off). Null if not a leaver
+// or nothing to deduct this month.
+function leaverAfterDeduction(staffId){
   const s=STAFF.find(x=>x.id===staffId); if(!s||!s.endDate) return null;
   const endD=parseDInput(s.endDate); if(!endD) return null;
+  const {from,to}=payCalMonth();
   let hrs=0, days=0;
   eachDay(from,to).forEach(d=>{
     if(d<=endD) return;                               // up to and including the last day: paid as normal
@@ -5875,11 +5929,13 @@ function leaverAfterDeduction(staffId, from, to){
   const fd=new Date(endD); fd.setDate(fd.getDate()+1);
   return {d:fd, days, hrs:Math.round(hrs*100)/100, type:`After leaving date (${days} day${days!==1?'s':''})`};
 }
-// Leaver final settlement (only in the period containing the leaving date): holiday
+// Leaver final settlement (only in the calendar month they finish in): holiday
 // over/under-payment and the lieu balance, paid out (+) or clawed back (−).
-function leaverSettlement(staffId, from, to){
+function leaverSettlement(staffId){
   const s=STAFF.find(x=>x.id===staffId); if(!s||!s.endDate) return null;
-  const endD=parseDInput(s.endDate); if(!endD || endD<from || endD>to) return null;
+  const endD=parseDInput(s.endDate); if(!endD) return null;
+  const {from,to}=payCalMonth();
+  if(endD<from || endD>to) return null;               // settle only in the month they finish
   const L=leaverSummary(staffId); if(!L) return null;
   const rate=s.hourlyRate||0; const lines=[]; let adj=0;
   const leavePay=Math.round(L.owedLeave*rate*100)/100;   // owedLeave may be negative (overtaken)
@@ -5927,7 +5983,7 @@ function drawPaySheet(doc, staffId){
       else if(e.type==='unauthorised') deductions.push({d, type:'Unauthorised leave', hrs: scheduledHours(s.id,d)});
     });
   }
-  const la=leaverAfterDeduction(s.id, from, to);       // part-month leaver: days after leaving
+  const la=leaverAfterDeduction(s.id);       // part-month leaver: days after leaving
   if(la) deductions.push({d:la.d, type:la.type, hrs:la.hrs});
   deductions.sort((a,b)=>a.d-b.d);
   const dedTotal=deductions.reduce((t,x)=>t+x.hrs*rate,0);
@@ -5939,7 +5995,7 @@ function drawPaySheet(doc, staffId){
   const otTotal=otTotalHrs*rate;
 
   // Leaver final settlement (holiday + lieu), only in the period they finish in.
-  const settle=leaverSettlement(s.id, from, to);
+  const settle=leaverSettlement(s.id);
   const settleAdj=settle?settle.adj:0;
 
   const totalPay=Math.round((monthly - dedTotal + otTotal + settleAdj)*100)/100;
@@ -6357,8 +6413,8 @@ function buildPayPreview(){
       });
     }
     sick.sort((a,b)=>a.d-b.d); unpaid.sort((a,b)=>a-b); unauth.sort((a,b)=>a-b); annual.sort((a,b)=>a-b);
-    const la=leaverAfterDeduction(s.id, new Date(y,m-1,1), new Date(y,m,0));     // part-month leaver days
-    const settle=leaverSettlement(s.id, new Date(y,m-1,1), new Date(y,m,0));     // holiday + lieu, final month
+    const la=leaverAfterDeduction(s.id);     // part-month leaver days (calendar month)
+    const settle=leaverSettlement(s.id);     // holiday + lieu, final month
     const otData = overtimeFor(s.id, new Date(y,m-1,1), new Date(y,m,0));
     const otDates = otData.approved.map(a=>a.date).sort((a,b)=>a-b);
     const ups=[];
